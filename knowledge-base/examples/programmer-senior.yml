@@ -1,0 +1,75 @@
+# Пример: Senior Software Engineer
+
+role: "Senior Software Engineer"
+
+description: |
+  Программист уровня middle+/senior. AI-помощник помогает с архитектурными
+  решениями, код-ревью, дебагом, выбором технологий, документацией
+  и развитием технических навыков.
+
+entities:
+  tech_stack:
+    enabled: true
+    why: "Стек технологий, предпочтения, опыт, мнения о фреймворках"
+    knowledge_paths:
+      - "knowledge/domain/tech-stack.md"
+      - "knowledge/principles/technology-choices.md"
+
+  architecture:
+    enabled: true
+    why: "Архитектурные паттерны, ADR, trade-offs, системный дизайн"
+    knowledge_paths:
+      - "knowledge/domain/architecture.md"
+      - "knowledge/decisions/"
+
+  code_style:
+    enabled: true
+    why: "Стиль кода, предпочтения форматирования, naming conventions"
+    knowledge_paths:
+      - "knowledge/voice/code-style.md"
+      - "knowledge/principles/code-quality.md"
+
+  debugging:
+    enabled: true
+    why: "Подходы к дебагу, типичные ошибки, lessons learned"
+    knowledge_paths:
+      - "knowledge/playbooks/debugging.md"
+      - "knowledge/domain/common-pitfalls.md"
+
+  projects:
+    enabled: true
+    why: "Проекты, роли, технологии, результаты, кейсы"
+    knowledge_paths:
+      - "knowledge/projects/"
+
+  learning:
+    enabled: true
+    why: "Что изучаю, план развития, интересные технологии"
+    knowledge_paths:
+      - "knowledge/timelines/learning-path.md"
+      - "knowledge/open-questions/"
+
+  devops:
+    enabled: true
+    why: "CI/CD, Docker, инфраструктура, мониторинг"
+    knowledge_paths:
+      - "knowledge/domain/devops.md"
+      - "knowledge/playbooks/deployment.md"
+
+raw_data_examples:
+  - "Заметки с код-ревью"
+  - "ADR (Architecture Decision Records)"
+  - "Статьи и туториалы (закладки)"
+  - "Конфиги проектов и примеры решений"
+  - "Записи технических митингов"
+  - "Экспорты обсуждений в Slack/Discord"
+  - "README и документация проектов"
+
+ai_assistant_tasks:
+  - "Код-ревью и архитектурные советы"
+  - "Дебаг сложных проблем"
+  - "Выбор технологий с обоснованием"
+  - "Написание документации в моём стиле"
+  - "Рефакторинг с учётом моих принципов"
+  - "Подготовка к техническим интервью"
+  - "Обсуждение системного дизайна"

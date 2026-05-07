@@ -1,0 +1,78 @@
+# Пример: Директор по маркетингу
+
+role: "Директор по маркетингу"
+
+description: |
+  Руководитель маркетинга, отвечающий за стратегию, каналы, бренд,
+  аудиторию, кампании и метрики роста. AI-помощник помогает с анализом
+  рынка, конкурентов, планированием кампаний и стилем коммуникации.
+
+entities:
+  brand:
+    enabled: true
+    why: "Позиционирование, tone of voice, визуальный вкус, брендовые правила"
+    knowledge_paths:
+      - "knowledge/domain/brand.md"
+      - "knowledge/voice/brand-voice.md"
+
+  audience:
+    enabled: true
+    why: "Сегменты, боли, JTBD, интервью, возражения, инсайты"
+    knowledge_paths:
+      - "knowledge/domain/audience.md"
+      - "knowledge/playbooks/customer-interviewing.md"
+
+  campaigns:
+    enabled: true
+    why: "Запуски, каналы, гипотезы, результаты, lessons learned"
+    knowledge_paths:
+      - "knowledge/projects/"
+      - "knowledge/playbooks/campaign-planning.md"
+
+  competitors:
+    enabled: true
+    why: "Рынок, альтернативы, сильные и слабые стороны конкурентов"
+    knowledge_paths:
+      - "knowledge/domain/competitors.md"
+
+  metrics:
+    enabled: true
+    why: "KPI, воронки, retention, CAC, LTV, payback, north star"
+    knowledge_paths:
+      - "knowledge/domain/metrics.md"
+
+  decisions:
+    enabled: true
+    why: "Что решили, почему, на каких данных, какой результат"
+    knowledge_paths:
+      - "knowledge/decisions/"
+
+  voice:
+    enabled: true
+    why: "Стиль письма, презентаций, объяснений, продаж и публичной коммуникации"
+    knowledge_paths:
+      - "knowledge/voice/"
+
+  playbooks:
+    enabled: true
+    why: "Повторяемые схемы: запуск кампании, аудит, исследование, бриф"
+    knowledge_paths:
+      - "knowledge/playbooks/"
+
+raw_data_examples:
+  - "PDF-отчёты об исследованиях рынка"
+  - "Презентации стратегий и результатов"
+  - "Экспорты рабочих чатов (Telegram, Slack)"
+  - "Таблицы KPI и воронок"
+  - "Записи созвонов с командой и клиентами"
+  - "Брендбуки и гайдлайны"
+  - "Примеры любимой рекламы и референсы"
+
+ai_assistant_tasks:
+  - "Анализ конкурентов и рынка"
+  - "Подготовка стратегий и планов"
+  - "Написание текстов в tone of voice бренда"
+  - "Аудит кампаний и каналов"
+  - "Подготовка брифов для подрядчиков"
+  - "Анализ воронки и метрик"
+  - "Генерация гипотез для экспериментов"
