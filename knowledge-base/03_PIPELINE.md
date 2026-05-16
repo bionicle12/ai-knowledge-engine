@@ -124,3 +124,56 @@ A file is routed to `review/needs-ai-decision/` if it:
 - Is a high-value presentation
 - Has conflicting claims
 - Has ambiguous type detection
+
+---
+
+## Handling long reference materials (books, courses, manuals)
+
+Some inputs are **long-form reference texts**, not raw notes — published books on writing craft, programming textbooks, business strategy books, research methodology manuals. The pipeline can extract their text, but doing so risks three things:
+
+1. **Token cost:** a 300-page book ≈ 70-90K words. The agent burns ~50-100K tokens trying to summarize it during review.
+2. **Copyright greyness:** the full text of a copyrighted book ending up inside `knowledge/` (and from there in the Repomix index) is uncomfortable even for personal use, and dangerous if the base is ever shared.
+3. **Voice / style contamination:** for writer or content-creator roles especially, the prose of a famous author inside `voice/` or `principles/` will quietly seep into the AI's tone, displacing the user's own voice.
+
+### Recommended pattern: PDF as reference, notes as knowledge
+
+```
+raw/documents/unsorted/Save-the-Cat.pdf
+        ↓ pipeline
+assets/documents/2026-05-16__save-the-cat.pdf   ← stays here, NOT indexed
+assets-index/documents.md                        ← contains a one-line entry, IS indexed
+
+raw/reference/unsorted/save-the-cat-my-takeaways.md
+        ↓ pipeline → review (low complexity → auto-extract) → knowledge/
+knowledge/principles/save-the-cat-beats.md       ← your interpretation, IS indexed
+```
+
+The user (or the agent during review) writes a **companion note** that captures *the rules as the user understands them*, in the user's own words. The note is what the AI reads daily. The original book stays in `assets/` and is consulted on demand when the user needs an exact quote or page reference.
+
+### When the agent processes a long reference book in review
+
+If a book ends up in `review/needs-ai-decision/`, the agent should:
+
+1. **Check copyright/length first.** If the file is the full text of a copyrighted book, do NOT extract its prose into `knowledge/`. Instead:
+   - Confirm the original is in `assets/`
+   - Add a one-line entry to `assets-index/documents.md` (already done by the pipeline)
+   - Ask the user: *"Would you like me to draft a 'takeaways for you' note based on this book? I'll keep it to your own words and reference the source."*
+2. **If yes, draft the takeaway note.** 5-15 bullet points or short paragraphs in `knowledge/principles/<book-slug>-takeaways.md`. Cite the source via frontmatter `source:` and span citations (see `11_PROVENANCE.md`).
+3. **Maintain a bookshelf index.** For roles where this happens repeatedly (writer, researcher, programmer reading textbooks, founder reading business books), keep `knowledge/principles/<role>-bookshelf.md` as a one-line catalog of every reference book + a link to the takeaway note + a status flag (`read` / `partially read` / `to read`).
+
+### When extraction IS appropriate
+
+- **Public-domain books** (out of copyright)
+- **Open licenses** (CC-BY, etc.) — original text is safe to extract
+- **Excerpts within fair use** (a paragraph, not a chapter) — already handled via the `influences` artifact pattern
+- **The user's own writing** — drafts, manuscripts, published work they own
+
+### Quick decision tree
+
+```
+File in raw/documents/unsorted/ is detected as a long PDF/EPUB/DOCX
+      ↓
+Is it a copyrighted book the user did not write?
+      ├─ Yes → asset stays in assets/, agent offers to write a takeaway note
+      └─ No  → standard pipeline (extract → process → review if complex)
+```

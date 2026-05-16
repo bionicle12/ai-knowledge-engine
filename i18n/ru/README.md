@@ -1,7 +1,7 @@
 ---
 translation_of: README.md
-source_commit: 6aa3cf8185ced124e010747a4238fd8f6097a76f
-source_version: 0.7.0
+source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
+source_version: 0.8.1
 translated_at: 2026-05-16
 translator: human
 ---
@@ -17,9 +17,9 @@ translator: human
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#требования)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#требования)
-[![Tests](https://img.shields.io/badge/tests-133_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-134_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](../../VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](../../VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [English](../../README.md) · [Быстрый старт](#быстрый-старт) · [Возможности](#возможности) · [Архитектура](#архитектура) · [Примеры](#примеры-ролей)
@@ -227,6 +227,7 @@ cp -r knowledge-base/ /path/to/your-project/setup/
 | `researcher.yml` | Исследователь / Аналитик | Литературный граф, гипотезы, методология |
 | `founder.yml` | Основатель стартапа | Инвесторы, найм, продукт, лог решений |
 | `content-creator.yml` | Контент-мейкер | Voice fingerprinting, аудитория, монетизация |
+| `fiction-writer.yml` | Писатель художественной литературы | Craft theory, voice training через influences, критика драфтов |
 
 Не нашли свою роль? Скажите AI-агенту свою профессию — он сгенерирует конфигурацию с релевантными сущностями.
 

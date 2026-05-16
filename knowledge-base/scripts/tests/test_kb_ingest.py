@@ -162,3 +162,79 @@ nlp:
     assert code == 0
     # Should remain in unsorted because it's skipped
     assert src.exists()
+
+
+
+# ---------------------------------------------------------------------------
+# Long-book detection (PDFs/EPUBs/DOCX with >25k words → asset-only flow)
+# ---------------------------------------------------------------------------
+
+
+def test_looks_like_long_book_short_text_is_false():
+    assert kb_ingest._looks_like_long_book(
+        ext=".pdf", processed_text="just a short note"
+    ) is False
+
+
+def test_looks_like_long_book_long_pdf_is_true():
+    long_text = "word " * 30_000
+    assert kb_ingest._looks_like_long_book(
+        ext=".pdf", processed_text=long_text
+    ) is True
+
+
+def test_looks_like_long_book_long_epub_is_true():
+    long_text = "word " * 26_000
+    assert kb_ingest._looks_like_long_book(
+        ext=".epub", processed_text=long_text
+    ) is True
+
+
+def test_looks_like_long_book_long_docx_is_true():
+    long_text = "word " * 30_000
+    assert kb_ingest._looks_like_long_book(
+        ext=".docx", processed_text=long_text
+    ) is True
+
+
+def test_looks_like_long_book_other_ext_is_false():
+    long_text = "word " * 30_000
+    # Plain markdown drafts are not "books"
+    assert kb_ingest._looks_like_long_book(
+        ext=".md", processed_text=long_text
+    ) is False
+
+
+def test_looks_like_long_book_no_text_is_false():
+    assert kb_ingest._looks_like_long_book(
+        ext=".pdf", processed_text=None
+    ) is False
+    assert kb_ingest._looks_like_long_book(
+        ext=".pdf", processed_text=""
+    ) is False
+
+
+def test_review_package_includes_long_book_hint_block():
+    pkg = kb_ingest._build_review_package(
+        asset_path="assets/documents/x.pdf",
+        processed_path="processed/markdown/x.md",
+        nlp_meta={},
+        reason="looks like a long-form reference book",
+        long_book_hint=True,
+    )
+    assert "Likely long-form reference book" in pkg
+    assert "Recommended flow" in pkg
+    assert "bookshelf" in pkg.lower()
+    assert "voice" in pkg.lower()
+
+
+def test_review_package_no_long_book_hint_when_flag_false():
+    pkg = kb_ingest._build_review_package(
+        asset_path="assets/documents/x.md",
+        processed_path="processed/markdown/x.md",
+        nlp_meta={},
+        reason="complexity 0.85 >= threshold 0.7",
+        long_book_hint=False,
+    )
+    assert "Likely long-form reference book" not in pkg
+    assert "## What to do" in pkg

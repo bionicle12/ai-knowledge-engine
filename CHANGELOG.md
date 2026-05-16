@@ -310,3 +310,18 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   python3 scripts/sync_translations.py --to-head --lang ru
   python3 scripts/check_translations.py --update-status
   ```
+
+## [0.8.1] - 2026-05-16
+
+### Added
+- `examples/fiction-writer.yml` — role template for fiction writers. Pillars:
+  - **Craft theory** entities (story structure, dialogue, POV, scene mechanics, show-don't-tell)
+  - **Influences** entity (excerpts from books the writer loves, dissected for *why* they work — the AI's voice anchor)
+  - **Genre conventions** entity (tropes, comp titles, reader expectations)
+  - **Project hierarchy** (current WIP with outline, characters, worldbuilding subfolders)
+  - 11-artifact `placement_examples` covering excerpts, drafts, outlines, character bibles, worldbuilding, beta feedback, voice memos, genre research, queries, anti-patterns
+  - `ai_assistant_tasks` focused on *analytical critique* — pacing audits, voice checks, POV slip detection, show-vs-tell passes, structural mapping
+- `README.md` and `i18n/ru/README.md` — added the new role to the templates table
+
+### Test stats
+- 134 tests passing (one new parametrized integration entry for fiction-writer)

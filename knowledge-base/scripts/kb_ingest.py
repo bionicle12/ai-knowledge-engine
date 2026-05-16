@@ -574,6 +574,9 @@ def process_one(
     )
     result.complexity = float(complexity or 0.0)
 
+    # Detect long reference books (PDFs/EPUBs/DOCX with >25k words)
+    long_book = _looks_like_long_book(ext=ext, processed_text=md_text)
+
     # Routing
     if md_text is None:
         # Cannot auto-process → review
@@ -586,30 +589,37 @@ def process_one(
                 processed_path=None,
                 nlp_meta=nlp_meta,
                 reason=result.review_reason or "no automatic conversion available",
+                long_book_hint=long_book,
             ),
             encoding="utf-8",
         )
         result.routed_to = "review/needs-ai-decision/"
-    elif result.complexity >= cfg.complexity_threshold:
+    elif result.complexity >= cfg.complexity_threshold or long_book:
         review_dir = root / "review" / "needs-ai-decision"
         review_pkg = review_dir / f"{asset_target.stem}.md"
         review_pkg.parent.mkdir(parents=True, exist_ok=True)
+        if long_book:
+            reason = "looks like a long-form reference book (>=25k words)"
+            result.review_reason = reason
+        else:
+            reason = (
+                f"complexity {result.complexity:.2f} >= threshold "
+                f"{cfg.complexity_threshold}"
+            )
+            result.review_reason = (
+                f"complexity {result.complexity:.2f} >= {cfg.complexity_threshold}"
+            )
         review_pkg.write_text(
             _build_review_package(
                 asset_path=result.asset_path,
                 processed_path=result.processed_path,
                 nlp_meta=nlp_meta,
-                reason=(
-                    f"complexity {result.complexity:.2f} >= threshold "
-                    f"{cfg.complexity_threshold}"
-                ),
+                reason=reason,
+                long_book_hint=long_book,
             ),
             encoding="utf-8",
         )
         result.routed_to = "review/needs-ai-decision/"
-        result.review_reason = (
-            f"complexity {result.complexity:.2f} >= {cfg.complexity_threshold}"
-        )
     else:
         result.routed_to = "processed/"
 
@@ -636,6 +646,7 @@ def process_one(
         "complexity": result.complexity,
         "is_surprise": True,
         "surprise_engine": "python",
+        "long_book_hint": long_book,
         "needs_ai_review": result.routed_to.startswith("review/"),
         "review_reason": result.review_reason,
         "nlp_meta_path": result.nlp_meta_path,
@@ -674,6 +685,7 @@ def _build_review_package(
     processed_path: str | None,
     nlp_meta: dict,
     reason: str,
+    long_book_hint: bool = False,
 ) -> str:
     lines = [f"# AI Review: {Path(asset_path or 'unknown').name}", ""]
     lines.append("## Source")
@@ -682,8 +694,43 @@ def _build_review_package(
     if processed_path:
         lines.append(f"- Processed: `{processed_path}`")
     lines.append(f"- Reason: {reason}")
-    if nlp_meta:
+    if long_book_hint:
         lines.append("")
+        lines.append("## ⚠️ Likely long-form reference book")
+        lines.append("")
+        lines.append(
+            "This file looks like a published book or long manual "
+            "(many words, many pages, full prose). Before extracting prose into "
+            "`knowledge/`, see **03_PIPELINE.md → Handling long reference materials**."
+        )
+        lines.append("")
+        lines.append("Recommended flow:")
+        lines.append(
+            "1. Confirm the original is in `assets/documents/` "
+            "(it should be — pipeline already moved it there)"
+        )
+        lines.append(
+            "2. Add a one-line entry in `assets-index/documents.md` describing the book"
+        )
+        lines.append(
+            "3. Ask the user: \"Want me to draft a 'takeaways for you' note "
+            "based on this book? I'll keep it in your own words.\""
+        )
+        lines.append(
+            "4. If yes — write 5-15 bullets in "
+            "`knowledge/principles/<book-slug>-takeaways.md` with `source:` frontmatter "
+            "pointing back to the asset"
+        )
+        lines.append(
+            "5. Update or create `knowledge/principles/<role>-bookshelf.md` "
+            "with the entry"
+        )
+        lines.append(
+            "6. **Do NOT** copy the book's prose into `knowledge/voice/` — it pollutes "
+            "the user's own voice. Capture *rules* and *takeaways*, not text."
+        )
+        lines.append("")
+    if nlp_meta:
         lines.append("## NLP enrichment")
         ents = nlp_meta.get("entities", [])
         if ents:
@@ -697,6 +744,9 @@ def _build_review_package(
     lines.append("")
     lines.append("## What to do")
     lines.append("")
+    if long_book_hint:
+        lines.append("**Use the long-book flow above.** The standard steps below apply only if you've decided not to treat this as a reference book.")
+        lines.append("")
     lines.append("1. Read the processed Markdown (if any) and the original asset.")
     lines.append("2. Extract durable knowledge into `knowledge/<category>/<slug>.md`")
     lines.append("3. Add frontmatter: `source`, `extracted_at`, `tags`, `lifecycle`, `importance`.")
@@ -704,6 +754,23 @@ def _build_review_package(
     lines.append("5. Delete this review package once processed.")
     lines.append("")
     return "\n".join(lines)
+
+
+def _looks_like_long_book(*, ext: str, processed_text: str | None) -> bool:
+    """Heuristic: does this look like a copyrighted long-form book / manual?
+
+    Triggers when *all* of these hold:
+    - File extension is .pdf / .epub / .docx (typical book formats)
+    - Extracted text exists and is very long (> 25 000 words ≈ 80+ pages)
+
+    Returns False for the user's own short drafts, articles, and notes.
+    """
+    if ext.lower() not in {".pdf", ".epub", ".docx"}:
+        return False
+    if not processed_text:
+        return False
+    word_count = len(processed_text.split())
+    return word_count >= 25_000
 
 
 def _update_assets_index(
