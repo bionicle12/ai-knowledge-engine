@@ -95,6 +95,27 @@ The scripts in the user's KB are **identical** to the ones in this repo. When up
 - Do not write your own watcher with custom debouncing. Copy `scripts/kb_watch.py`.
 - Do not skip `kb_doctor.py` at the end of the deployment.
 
+## When in doubt about file names
+
+Instructions sometimes lag reality. If a step says to run a script that you cannot find:
+
+1. **Check what is actually present** in `setup/shell/` and `setup/scripts/` — list the directory contents:
+   ```bash
+   ls setup/shell/
+   ls setup/scripts/
+   ```
+2. The current canonical names (as of the version you are reading):
+   - **Finalize** the deployment (move `knowledge-base/` to project root, delete `setup/`): `setup/shell/finalize.sh`
+   - Pipeline: `setup/scripts/kb_ingest.py`
+   - Lint: `setup/scripts/kb_lint.py`
+   - Doctor (smoke-test): `setup/scripts/kb_doctor.py`
+   - Watcher: `setup/scripts/kb_watch.py` (Python) or `setup/shell/watcher.sh`/`watcher-start.command`/`watcher-start.bat`
+   - Reflection trigger: `setup/scripts/kb_reflect.py`
+   - NLP batch: `setup/scripts/kb_nlp_batch.py`
+   - Common utils: `setup/scripts/kb_common.py`
+   - Populate (DATA_PLACEMENT_EXAMPLES.md generator): `setup/scripts/kb_populate.py`
+3. If a script you expected is missing, **do not invent it** — show the user `ls` output and ask. Older docs or your own memory may reference renamed files (e.g., `install.sh` was renamed to `finalize.sh`); always trust the filesystem over recall.
+
 ---
 
 ## Quick mental model

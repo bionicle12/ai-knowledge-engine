@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 `instructions_version` field in deployed `kb.config.yml` should match this VERSION.
 On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
+> 🤖 **Note for AI agents reading this file:** the entries below are
+> historical and may reference scripts/files that no longer exist by those
+> names (e.g., `install.sh` was renamed to `finalize.sh` in 0.9.1). For the
+> current canonical state, **always rely on what is actually present in
+> `knowledge-base/shell/` and the live instruction modules**, not on
+> CHANGELOG history. The `## [Unreleased]` section reflects pending work
+> only; the latest released version is the source of truth.
+
 ## [Unreleased]
 
 ### Added
