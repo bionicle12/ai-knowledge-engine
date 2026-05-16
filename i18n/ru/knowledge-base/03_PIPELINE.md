@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/03_PIPELINE.md
-source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
-source_version: 0.8.1
-translated_at: 2026-05-16
+source_commit: 069af84d1cdad91b3ff8b3d5290c6f5391ac9b7f
+source_version: 0.9.0
+translated_at: 2026-05-17
 translator: human
 ---
 

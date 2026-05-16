@@ -1,4 +1,4 @@
-"""Tests for scripts/kb_populate.py."""
+"""Tests for kb_populate.py (lives in knowledge-base/scripts/)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,7 +9,9 @@ import yaml
 import kb_populate as kp
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+# Test file is at knowledge-base/scripts/tests/test_kb_populate.py
+# REPO_ROOT (source-repo root) is three levels up.
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture()

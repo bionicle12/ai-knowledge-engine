@@ -35,7 +35,14 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXAMPLES_DIR = REPO_ROOT / "knowledge-base" / "examples"
+
+# Examples directory resolution:
+# - When deployed to a KB root, examples/ is sibling of scripts/ (i.e. REPO_ROOT/examples)
+# - When run from the source repo, examples/ is at knowledge-base/examples/
+# We try both; the first existing one wins.
+_DEFAULT_EXAMPLES = REPO_ROOT / "examples"
+_LEGACY_EXAMPLES = REPO_ROOT / "knowledge-base" / "examples"
+EXAMPLES_DIR = _DEFAULT_EXAMPLES if _DEFAULT_EXAMPLES.is_dir() else _LEGACY_EXAMPLES
 DEFAULT_OUTPUT = "DATA_PLACEMENT_EXAMPLES.md"
 
 

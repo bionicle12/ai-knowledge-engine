@@ -11,9 +11,9 @@ local-first NLP and automatic context indexing.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#requirements)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-134_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-142_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](i18n/ru/README.md)
@@ -64,20 +64,47 @@ Your AI agent will analyze the project structure, configure the indexer, set up 
 ### Full Mode: Knowledge Base
 
 ```bash
-# 1. Install dependencies
-npm install -g repomix
-pip install pyyaml python-slugify python-docx python-pptx pypdf pandas openpyxl
-pip install spacy rake-nltk keybert
-python3 -m spacy download ru_core_news_md  # Russian NLP (swap for your language)
-
-# 2. Copy knowledge-base/ into your project
+# 1. Copy this repo's knowledge-base/ into your project as `setup/`
 cp -r knowledge-base/ /path/to/your-project/setup/
 
-# 3. Tell your AI agent:
-"Read setup/README.md and deploy a knowledge base for [your role]"
+# 2. Open the project in an IDE with an AI agent
+cd /path/to/your-project
+
+# 3. In the chat, send EXACTLY this:
+#
+#    "Read setup/README.md and setup/00_OVERVIEW.md, then deploy a
+#     knowledge base for [your role] right here in this project root.
+#     Run setup/shell/install.sh when you're ready to materialize it."
 ```
 
-The agent will ask clarifying questions about your role, create the folder structure, configure NLP pipelines, and run the first indexing pass.
+The agent will:
+1. Ask clarifying questions about your role (or invent a custom one if no built-in fits)
+2. Run `bash setup/shell/install.sh` — flattens setup/ into the project root and creates the directory layout
+3. Parameterize `kb.config.yml`, `AGENTS.md`, `KNOWLEDGE_STRUCTURE.md`
+4. Generate `DATA_PLACEMENT_EXAMPLES.md` (deterministic, no tokens) via `kb_populate.py`
+5. Generate `START_HERE.md` — your first read after deployment
+6. Run `kb_doctor.py` to confirm everything is wired
+
+After deployment your project root looks like this:
+
+```
+your-project/
+├── START_HERE.md              ← read this first
+├── AGENTS.md                  ← agent instructions
+├── kb.config.yml              ← config
+├── DATA_PLACEMENT_EXAMPLES.md ← what to drop where (role-specific)
+├── reindex.sh, watcher.sh     ← Linux/CLI
+├── reindex.command            ← macOS double-click
+├── watcher-start.command      ← macOS double-click
+├── watcher-stop.command       ← macOS double-click
+├── reindex.bat, watcher-start.bat ← Windows double-click
+├── scripts/                   ← Python pipeline
+├── shell/, templates/, examples/
+├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+└── .repomix/                  ← AI-ready output
+```
+
+> ⚠️ **Critical:** every new chat session, start with the line: *"Read AGENTS.md and use it as the primary instruction for everything that follows."* Without this the agent has no idea your knowledge base exists. `START_HERE.md` reminds you of this.
 
 ---
 
@@ -150,56 +177,115 @@ Token consumption depends on the **operating mode** (`mode` in `kb.config.yml`):
 
 ## Knowledge Structure
 
-The full mode creates a rich, opinionated folder hierarchy:
+The full mode creates a rich, opinionated folder hierarchy at the **project root** (no nested `knowledge-base/`):
 
 ```
 your-project/
+├── START_HERE.md               # Read this first
 ├── AGENTS.md                   # AI agent instructions (auto-generated)
-├── kb.config.yml               # KB configuration (role, entities, rules)
-├── watcher.sh                  # Watch mode (auto-process new files)
-├── reindex.sh                  # Manual reindex trigger
-├── scripts/                    # Python automation
-│   ├── kb_ingest.py            # Raw → processed → knowledge pipeline
-│   ├── kb_lint.py              # Health check (Level 1: Python)
-│   ├── kb_reflect.py           # Reflection (synthesize insights)
-│   ├── kb_watch.py             # File watcher daemon
-│   └── kb_nlp_batch.py         # Batch NLP re-enrichment
+├── KNOWLEDGE_STRUCTURE.md      # This map
+├── DATA_PLACEMENT_EXAMPLES.md  # "Got X → put it here" (role-specific)
+├── kb.config.yml               # Config: role, entities, mode
+├── repomix.config.json         # Indexer config
+├── requirements.txt
 │
-├── raw/                        # Raw materials (NOT indexed)
+├── reindex.sh / reindex.command / reindex.bat       # Manual reindex
+├── watcher.sh / watcher-start.command / watcher-start.bat   # Auto pipeline
+├── watcher-stop.command                              # macOS daemon stop
+├── lint.sh, doctor.sh                                # Health checks
+│
+├── scripts/                    # Python pipeline (do not modify lightly)
+│   ├── kb_ingest.py            # Raw → processed → knowledge
+│   ├── kb_lint.py              # Health check (Level 1)
+│   ├── kb_reflect.py           # Reflection trigger logic
+│   ├── kb_watch.py             # File watcher daemon
+│   ├── kb_nlp_batch.py         # Batch NLP re-enrichment
+│   ├── kb_populate.py          # Generate DATA_PLACEMENT_EXAMPLES.md
+│   ├── kb_doctor.py            # Smoke test
+│   └── kb_common.py            # Shared utilities
+├── shell/                      # POSIX wrappers + macOS/Windows launchers
+├── templates/                  # Kept for re-runs (kb_populate, kb_upgrade)
+├── examples/                   # Role YAMLs
+│
+├── raw/                        # 🚫 Raw materials (NOT indexed)
 │   ├── documents/unsorted/
 │   ├── reference/unsorted/
-│   └── media/unsorted/
+│   ├── work/unsorted/
+│   ├── chats/unsorted/
+│   ├── media/unsorted/
+│   ├── personal-context/unsorted/
+│   └── unsorted/
 │
-├── knowledge/                  # ✅ Clean knowledge (INDEXED)
-│   ├── domain/                 # Facts, market, technology
-│   ├── playbooks/              # Repeatable workflows
-│   ├── decisions/              # Immutable decision records
-│   ├── principles/             # Rules, beliefs, standards
-│   ├── insights/               # Higher-level synthesis
-│   ├── opinions/               # Subjective assessments with confidence
-│   ├── routing/                # Navigation tables for large bases
-│   └── open-questions/         # Unresolved questions
+├── processed/                  # 🚫 Converted artifacts (NOT indexed)
+├── assets/                     # 🚫 Binary originals (NOT indexed)
 │
-├── interactions/               # Session logs (NOT indexed directly)
-│   └── sessions/
+├── knowledge/                  # ✅ Clean knowledge — INDEXED
+│   ├── profile/, principles/, voice/
+│   ├── domain/, projects/, decisions/
+│   ├── playbooks/, insights/, opinions/
+│   ├── timelines/, routing/
+│   ├── open-questions/
+│   └── _archive/
 │
-└── review/                     # AI review queue (NOT indexed)
-    ├── needs-classification/
-    ├── needs-ai-decision/
-    └── needs-redaction/
+├── assets-index/               # ✅ Markdown descriptions of assets — INDEXED
+├── review/                     # 🚫 Review queues (NOT indexed)
+│   ├── needs-classification/
+│   ├── needs-ai-decision/
+│   ├── needs-redaction/
+│   └── excluded-sensitive/
+│
+├── interactions/               # 🚫 Session logs (NOT indexed directly)
+└── .repomix/output.xml         # 🚫 Generated index (regenerated locally)
 ```
+
+---
+
+## Running the watcher (auto-process raw files)
+
+The watcher monitors `raw/<sub>/unsorted/` and runs the ingest pipeline whenever you drop a file there.
+
+### macOS (double-click, no terminal needed)
+
+| Action | File |
+|--------|------|
+| Start watcher | Double-click `watcher-start.command` |
+| Stop watcher | Press Ctrl+C in the opened Terminal window — or, if you started in daemon mode, double-click `watcher-stop.command` |
+| Manual reindex | Double-click `reindex.command` |
+
+### Linux
+
+```bash
+./watcher.sh              # foreground, Ctrl+C to stop
+./watcher.sh --daemon     # background
+./watcher.sh --status
+./watcher.sh --stop
+./reindex.sh              # one-shot reindex
+```
+
+### Windows
+
+| Action | File |
+|--------|------|
+| Start watcher | Double-click `watcher-start.bat` |
+| Stop watcher | Close the cmd window or Ctrl+C |
+| Manual reindex | Double-click `reindex.bat` |
 
 ---
 
 ## User Commands
 
-Commands you tell your AI agent in the IDE chat:
+Commands you tell your AI agent in the IDE chat.
+
+> 🚨 **Before any command works in a new chat, send first:**
+> *"Read AGENTS.md and use it as the primary instruction for everything that follows."*
 
 | Command | What it does | Cost | When to use |
 |---------|-------------|------|-------------|
 | `!save` | Save session summary with key decisions and insights | ~2K tokens | After productive sessions (45+ min) |
 | `!reflect` | Synthesize higher-level insights from accumulated facts | ~15K tokens | Auto-triggered or on demand |
 | `!audit` | Full AI review: contradictions, gaps, merge candidates | ~50–100K tokens | Every 2–4 weeks |
+| `!review` | Process the `review/` queues — turn flagged materials into `knowledge/` pages, redact sensitive content, ask questions when input is needed | ~5–30K tokens | When `review/needs-ai-decision/` accumulates after ingest |
+| `!populate` | Re-generate `DATA_PLACEMENT_EXAMPLES.md` (run after editing your role YAML) | ~50 tokens | After tweaking `examples/<role>.yml` |
 | `!super` | Toggle operating mode: default ↔ super | 0 tokens | When you need maximum learning speed |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens | See Operating Modes |
 | `!super status` | Show current operating mode | 0 tokens | Quick check |

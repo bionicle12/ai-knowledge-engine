@@ -96,3 +96,33 @@ Forbidden:
 5. Delete the processed package from review/
 6. Run ./reindex.sh
 ```
+
+---
+
+## The `!review` command
+
+The user can issue `!review` in chat to ask the agent to drain the queue. Contract:
+
+1. **Scan in this order** (highest signal first):
+   - `review/needs-redaction/` — sensitive material; either redact and re-route, or archive in `excluded-sensitive/`
+   - `review/needs-ai-decision/` — main work
+   - `review/needs-classification/` — uncertain type
+2. **For every item** the agent reports:
+   - **Source file**: which review package (path)
+   - **Decision**: `extract` / `redact` / `archive` / `defer-to-user`
+   - **Targets**: which `knowledge/<category>/<slug>.md` files were created or updated
+   - **Why**: 1-2 sentences of rationale
+3. **Long-form-book guard**: if the review package contains the "⚠️ Likely long-form reference book" block (added by `kb_ingest.py` for ≥25k-word PDF/EPUB/DOCX), the agent **must**:
+   - NOT copy prose into `knowledge/voice/`
+   - Write a takeaways note in `knowledge/principles/<book-slug>-takeaways.md` (5–15 bullets, in the user's words)
+   - Update `knowledge/principles/<role>-bookshelf.md` (create if missing)
+   - Reference the asset path via `source:` frontmatter
+4. **Defer-to-user** when input is required — ask **one specific question per item**, batched at the end. Never block on the whole queue waiting for an answer.
+5. **Delete the review package** once processed. Append a `review` entry to `log.md`.
+6. **Reindex** at the end (or remind the user to).
+
+If the queue is empty, respond with: *"Review queue is empty — nothing to process."*
+
+If the queue is huge (>20 items), process the first 5–10 and ask the user whether to continue.
+
+---

@@ -368,3 +368,38 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   python3 scripts/sync_translations.py --to-head --lang ru
   python3 scripts/check_translations.py --update-status
   ```
+
+## [0.9.0] - 2026-05-16
+
+> Real-world feedback round: deployed on macOS, found six UX issues, fixed all of them.
+
+### Added
+- `knowledge-base/shell/install.sh` — flattens the `setup/` payload into the project root and removes the empty `setup/` folder afterward. Eliminates the nested-`knowledge-base/` problem reported from a real macOS deployment.
+- macOS double-click launchers (Finder-friendly, no terminal navigation needed):
+  - `shell/watcher-start.command` — opens a Terminal window with the watcher running
+  - `shell/watcher-stop.command` — stops a daemonized watcher
+  - `shell/reindex.command` — one-shot manual reindex
+- Windows equivalents: `shell/watcher-start.bat`, `shell/reindex.bat`
+- `templates/START_HERE.md.template` — auto-generated post-deployment cheat sheet that reminds the user to start every new chat with the "Read AGENTS.md…" line
+- `!review` command — drains the review queue, processes each item with explicit reporting, honors the long-form-book hint, asks the user one question per item when input is required
+- `!populate` command — regenerates `DATA_PLACEMENT_EXAMPLES.md` after a role YAML edit
+
+### Changed
+- **Deployment flow** rewritten in `02_INIT.md` and `00_OVERVIEW.md`:
+  - User copies `knowledge-base/` to their project as `setup/`
+  - Agent runs `bash setup/shell/install.sh` to flatten the payload into the project root
+  - No more nested `knowledge-base/` inside the project — files live at the project root
+- `kb_populate.py` moved from `scripts/` → `knowledge-base/scripts/` (it's a deployment-time tool, not a maintainer tool); path resolution updated to find `examples/` in either layout
+- `templates/AGENTS.md.template` — explicit "Read AGENTS.md first" workflow callout at the top, plus `!review` and `!populate` rows in the commands table
+- `04_REVIEW.md` — added a full `!review` command spec with long-form-book guard, defer-to-user pattern, batched questions
+- Main `README.md` and `i18n/ru/README.md` — new "Running the watcher" section with platform-specific instructions, updated commands table with `!review`/`!populate`, project-root layout reflecting the new deployment flow, explicit "Read AGENTS.md first" warning
+
+### Test stats
+- 142 tests still passing (the kb_populate move didn't change behavior)
+
+### Translation impact
+- After committing, the 18 RU files become stale (HEAD moved). Run:
+  ```
+  python3 scripts/sync_translations.py --to-head --lang ru
+  python3 scripts/check_translations.py --update-status
+  ```

@@ -1,27 +1,27 @@
 # Translation Status
 
-> Source HEAD: `1237e83`
+> Source HEAD: `069af84`
 
 ## ru
 
 | File | State | Source commit | Drift |
 |------|-------|---------------|-------|
-| `i18n/ru/README.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/00_OVERVIEW.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/01_PREREQUISITES.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/02_INIT.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/03_PIPELINE.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/04_REVIEW.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/05_INDEX.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/06_AGENTS_TEMPLATE.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/07_INTERACTION_LOOP.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/08_PORTABLE.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/09_LINT.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/10_LOG.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/11_PROVENANCE.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/12_NLP_PREPROCESS.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/13_AUTORUN.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/knowledge-base/README.md` | ✅ in sync | `1237e83` | — |
-| `i18n/ru/quick-start/INIT_GUIDE.md` | ✅ in sync | `1237e83` | — |
+| `i18n/ru/README.md` | ✅ in sync | `069af84` | — |
+| `i18n/ru/knowledge-base/00_OVERVIEW.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/01_PREREQUISITES.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/02_INIT.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/03_PIPELINE.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/04_REVIEW.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/05_INDEX.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/06_AGENTS_TEMPLATE.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/07_INTERACTION_LOOP.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/08_PORTABLE.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/09_LINT.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/10_LOG.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/11_PROVENANCE.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/12_NLP_PREPROCESS.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/13_AUTORUN.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/knowledge-base/README.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
+| `i18n/ru/quick-start/INIT_GUIDE.md` | ⚠️ stale | `069af84` | source updated since translation (0 commits) |
 

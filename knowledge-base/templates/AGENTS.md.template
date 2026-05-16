@@ -1,12 +1,28 @@
 # AGENTS.md — {{KB_NAME}}
 
-> Instructions for AI agents working with this knowledge base.
+> **You are a primary-instruction file.** Whenever a user asks an AI agent to "read AGENTS.md", everything in this file (and the modules it references) takes precedence over generic chat behavior.
+>
 > Generated from `templates/AGENTS.md.template` (instructions_version {{KB_INSTRUCTIONS_VERSION}}).
 
 ## Purpose
 
 Local non-code knowledge base for role: **{{PRIMARY_ROLE}}**.
 Helps AI agents understand the author's context, thinking style, decisions, expertise, and preferences.
+
+## CRITICAL: how the user talks to you
+
+The user opens new chat sessions frequently. **Every fresh session must begin with the user saying something like:**
+
+> *"Read AGENTS.md and use it as the primary instruction for everything that follows."*
+
+When you see that opening line (or any clear request to use this base):
+
+1. Read `kb.config.yml` to get the operating mode and language preference
+2. Skim `knowledge/profile/`, `knowledge/principles/`, and `knowledge/voice/` so you adopt the user's context, principles, and voice
+3. Acknowledge briefly that the base is loaded ("Got it — {{PRIMARY_ROLE}} mode, voice loaded")
+4. Then start handling the user's actual request
+
+If the user issues a `!`-command before that opening line, gently say: *"Read AGENTS.md first so I have your context, then re-issue the command."*
 
 ## Context
 
@@ -54,6 +70,8 @@ While working with the user the agent captures conclusions:
 | `!save` | Save session summary + enrichment now | ~2K tokens |
 | `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
 | `!audit` | Run AI lint level 2 (review the entire base) | ~50–100K tokens |
+| `!review` | Walk through `review/needs-classification/`, `review/needs-ai-decision/`, `review/needs-redaction/` and process every item: extract durable knowledge into `knowledge/`, redact sensitive material, archive what cannot be used. Explain per item what came in, what you extracted, and where it landed. If you cannot decide without input, ask one specific question per item. Honor long-form-book hints (write takeaways, do not copy prose into `voice/`). | ~5–30K tokens |
+| `!populate` | Regenerate `DATA_PLACEMENT_EXAMPLES.md` (run `python3 scripts/kb_populate.py --role <role> --kb-root .`) | ~50 tokens |
 | `!super` | Toggle mode: default ↔ super | 0 tokens |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |

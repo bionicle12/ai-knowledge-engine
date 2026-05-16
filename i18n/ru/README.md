@@ -1,8 +1,8 @@
 ---
 translation_of: README.md
-source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
-source_version: 0.8.1
-translated_at: 2026-05-16
+source_commit: 069af84d1cdad91b3ff8b3d5290c6f5391ac9b7f
+source_version: 0.9.0
+translated_at: 2026-05-17
 translator: human
 ---
 
@@ -17,9 +17,9 @@ translator: human
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#требования)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#требования)
-[![Tests](https://img.shields.io/badge/tests-134_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-142_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](../../VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](../../VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [English](../../README.md) · [Быстрый старт](#быстрый-старт) · [Возможности](#возможности) · [Архитектура](#архитектура) · [Примеры](#примеры-ролей)
@@ -68,20 +68,46 @@ cp -r quick-start/ /path/to/your-project/docs/ai-init/
 ### Full: База знаний
 
 ```bash
-# 1. Установить зависимости
-npm install -g repomix
-pip install pyyaml python-slugify python-docx python-pptx pypdf pandas openpyxl
-pip install spacy rake-nltk keybert
-python3 -m spacy download ru_core_news_md
-
-# 2. Скопировать knowledge-base/ в проект
+# 1. Скопировать knowledge-base/ из этого репо в свой проект как `setup/`
 cp -r knowledge-base/ /path/to/your-project/setup/
 
-# 3. Сказать AI-агенту:
-"Прочитай setup/knowledge-base/README.md и разверни базу знаний для [ваша роль]"
+# 2. Открыть проект в IDE с AI-агентом
+cd /path/to/your-project
+
+# 3. В чате отправить РОВНО эту фразу:
+#
+#    "Прочитай setup/README.md и setup/00_OVERVIEW.md, затем разверни
+#     базу знаний для [моя роль] прямо в корне этого проекта.
+#     Запусти setup/shell/install.sh когда будешь готов её материализовать."
 ```
 
-Агент задаст уточняющие вопросы о вашей роли, создаст структуру папок, настроит NLP-пайплайны и выполнит первую индексацию.
+Агент:
+1. Задаст уточняющие вопросы про роль (или придумает кастомную если ни одна встроенная не подходит)
+2. Запустит `bash setup/shell/install.sh` — распакует setup/ в корень проекта и создаст структуру папок
+3. Параметризует `kb.config.yml`, `AGENTS.md`, `KNOWLEDGE_STRUCTURE.md`
+4. Сгенерирует `DATA_PLACEMENT_EXAMPLES.md` (детерминированно, 0 токенов) через `kb_populate.py`
+5. Сгенерирует `START_HERE.md` — первое что прочитаешь после развёртывания
+6. Прогонит `kb_doctor.py` для smoke-проверки
+
+После развёртывания корень проекта выглядит так:
+
+```
+your-project/
+├── START_HERE.md              ← читай первым
+├── AGENTS.md                  ← инструкции для агента
+├── kb.config.yml
+├── DATA_PLACEMENT_EXAMPLES.md ← персональный «куда что класть»
+├── reindex.sh, watcher.sh     ← Linux/CLI
+├── reindex.command            ← macOS double-click
+├── watcher-start.command      ← macOS double-click
+├── watcher-stop.command       ← macOS double-click
+├── reindex.bat, watcher-start.bat ← Windows double-click
+├── scripts/, shell/, templates/, examples/
+├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+└── .repomix/                  ← готовый контекст для AI
+```
+
+> ⚠️ **Критично:** в каждой новой сессии чата начинай с фразы: *"Прочитай AGENTS.md и используй его как основную инструкцию для всего, что следует дальше."* Без этого агент не знает, что у тебя есть база знаний. `START_HERE.md` напоминает об этом.
 
 ---
 
@@ -153,15 +179,52 @@ cp -r knowledge-base/ /path/to/your-project/setup/
 
 ---
 
+## Запуск watcher (авто-обработка raw)
+
+Watcher следит за `raw/<sub>/unsorted/` и запускает ingest pipeline при появлении новых файлов.
+
+### macOS (двойной клик, без терминала)
+
+| Действие | Файл |
+|----------|------|
+| Запустить watcher | Двойной клик на `watcher-start.command` |
+| Остановить | Ctrl+C в открывшемся окне Terminal — или, если запускался в daemon-режиме, двойной клик на `watcher-stop.command` |
+| Ручной reindex | Двойной клик на `reindex.command` |
+
+### Linux
+
+```bash
+./watcher.sh              # foreground, Ctrl+C для остановки
+./watcher.sh --daemon     # в фоне
+./watcher.sh --status
+./watcher.sh --stop
+./reindex.sh              # одноразовый reindex
+```
+
+### Windows
+
+| Действие | Файл |
+|----------|------|
+| Запустить watcher | Двойной клик на `watcher-start.bat` |
+| Остановить | Закрыть окно cmd или Ctrl+C |
+| Ручной reindex | Двойной клик на `reindex.bat` |
+
+---
+
 ## Команды пользователя
 
-Команды, которые вы говорите AI-агенту в чате IDE:
+Команды, которые вы говорите AI-агенту в чате IDE.
+
+> 🚨 **Перед любой командой в новом чате отправьте сначала:**
+> *"Прочитай AGENTS.md и используй его как основную инструкцию для всего, что следует дальше."*
 
 | Команда | Что делает | Стоимость |
 |---------|-----------|----------|
 | `!save` | Сохранить summary сессии | ~2K токенов |
 | `!reflect` | Синтезировать higher-level insights | ~15K токенов |
 | `!audit` | Полный AI-ревью базы | ~50–100K токенов |
+| `!review` | Обработать очереди в `review/` — превратить материалы в страницы `knowledge/`, отредактировать чувствительное, спросить пользователя если нужно | ~5–30K токенов |
+| `!populate` | Перегенерировать `DATA_PLACEMENT_EXAMPLES.md` (после редактирования YAML роли) | ~50 токенов |
 | `!super` | Переключить режим: default ↔ super | 0 токенов |
 | `!super on/off` | Явно включить/выключить super mode | 0 токенов |
 | `!super status` | Показать текущий режим | 0 токенов |

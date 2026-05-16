@@ -137,7 +137,12 @@ When deployment completes:
 - [ ] Verified `DATA_PLACEMENT_EXAMPLES.md` was written
 - [ ] (Recommended) Read the generated file and appended a `## Project notes` section with user-specific tips
 - [ ] (Optional) Re-ran with `--create-samples` if the user wants format examples
-- [ ] Showed the user a 3-5 line summary in chat with the most actionable quickstart items
+- [ ] **Generated `START_HERE.md`** from `templates/START_HERE.md.template` (parameterize `{{KB_NAME}}` and `{{PRIMARY_ROLE}}`)
+- [ ] Ran `python3 scripts/kb_doctor.py` to confirm the install
+- [ ] Showed the user a 3-5 line summary in chat. **Must include**:
+  - "Read `START_HERE.md` first."
+  - "Every new chat session: start with the line *'Read AGENTS.md and use it as the primary instruction for everything that follows.'*"
+  - The OS-specific watcher launcher (`watcher-start.command` for macOS, `./watcher.sh` for Linux, `watcher-start.bat` for Windows)
 - [ ] Logged the operation in `log.md` (auto-handled if integrated)
 
 ---

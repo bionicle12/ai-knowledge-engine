@@ -1,0 +1,84 @@
+# Start here — {{KB_NAME}}
+
+> Auto-generated at the end of deployment. Read this once.
+
+## How to talk to the AI
+
+Whenever you open a **new chat** with an AI agent (Claude, GPT, Cursor, Codex, etc.) and want it to work with this knowledge base, **start with this exact line**:
+
+```
+Read AGENTS.md and use it as the primary instruction for everything that follows.
+```
+
+(or in Russian:)
+
+```
+Прочитай AGENTS.md и используй его как основную инструкцию для всего, что следует дальше.
+```
+
+If you skip this step the agent has no idea this knowledge base exists, will ignore your custom voice and rules, and the special commands below will not work.
+
+## Commands you can use in chat
+
+After the agent has read `AGENTS.md`, these commands work:
+
+| Command | What it does | Cost |
+|---------|--------------|------|
+| `!save` | Save a session summary now (decisions, conclusions, processed materials) | ~2K tokens |
+| `!reflect` | Synthesize higher-level insights from accumulated facts | ~15K tokens |
+| `!audit` | Full AI review of the base — contradictions, gaps, merge candidates | ~50–100K tokens |
+| `!review` | Process the `review/` queue: pick up files routed for AI judgment, extract knowledge, ask for input where needed | ~5–30K tokens |
+| `!populate` | Re-generate `DATA_PLACEMENT_EXAMPLES.md` (when you've changed your role YAML) | ~50 tokens |
+| `!super` | Toggle operating mode: default ↔ super | 0 tokens |
+| `!super on` / `!super off` | Force a mode | 0 tokens |
+| `!super status` | Show current mode | 0 tokens |
+
+## How to run the watcher
+
+The watcher auto-processes any file you drop into `raw/<sub>/unsorted/`.
+
+### macOS
+- **Start:** double-click `watcher-start.command` (in this folder)
+- **Stop:** press Ctrl+C in the terminal window that opened
+
+### Linux
+- **Start:** `./watcher.sh` from a terminal
+- **Or background:** `./watcher.sh --daemon` then `./watcher.sh --stop` to stop
+
+### Windows
+- **Start:** double-click `watcher-start.bat`
+- **Stop:** close the cmd window or Ctrl+C
+
+## Manual reindex
+
+If you didn't run the watcher and want to process accumulated raw files now:
+
+- **macOS:** double-click `reindex.command`
+- **Linux:** `./reindex.sh`
+- **Windows:** double-click `reindex.bat`
+
+## What goes where
+
+See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was generated for **{{PRIMARY_ROLE}}**.
+
+## If something feels off
+
+| Problem | Fix |
+|---------|-----|
+| Agent ignores my voice / rules | You forgot the "Read AGENTS.md..." opening line. Say it now. |
+| Files keep landing in `review/needs-ai-decision/` | Say `!review` in chat. The agent will go through the queue. |
+| Generated `DATA_PLACEMENT_EXAMPLES.md` doesn't fit me | Edit `examples/<role>.yml`, then say `!populate`. |
+| Watcher won't pick up files | Check `./watcher.sh --status`. Make sure files are in `raw/<sub>/unsorted/`, not just `raw/`. |
+| Need a smoke test of the install | Run `./doctor.sh` (or `python3 scripts/kb_doctor.py`). |
+
+## Where to find more
+
+- `AGENTS.md` — full instructions for the AI
+- `KNOWLEDGE_STRUCTURE.md` — what every folder is for
+- `DATA_PLACEMENT_EXAMPLES.md` — your personalized "what to drop where"
+- `00_OVERVIEW.md` … `14_INITIAL_POPULATION.md` — original deployment instructions (kept for reference)
+- `kb.config.yml` — your configuration
+
+## One-line summary
+
+> Drop files in `raw/`, double-click `watcher-start.command`, talk to the agent in chat — but **always start every new chat with "Read AGENTS.md..."** first.
