@@ -193,6 +193,42 @@ if [ -d "$KB_DIR" ]; then
   fi
 fi
 
+# Promote double-click launchers from shell/ up to the project root.
+# After this, shell/ contains only POSIX *.sh wrappers, and Finder/Explorer-
+# friendly *.command / *.bat files live one level up where they are
+# discoverable.
+if [ -d "$PROJECT_ROOT/shell" ]; then
+  promoted=0
+  shopt -s nullglob
+  for launcher in "$PROJECT_ROOT/shell"/*.command "$PROJECT_ROOT/shell"/*.bat; do
+    base="$(basename "$launcher")"
+    target="$PROJECT_ROOT/$base"
+    if [ -e "$target" ]; then
+      # Same name already at root — skip (do not overwrite)
+      continue
+    fi
+    mv "$launcher" "$target"
+    chmod +x "$target" 2>/dev/null || true
+    promoted=$((promoted + 1))
+  done
+  shopt -u nullglob
+  if [ "$promoted" -gt 0 ]; then
+    echo "📌 promoted $promoted double-click launcher(s) from shell/ to project root"
+  fi
+fi
+
+# Drop stray duplicates of *.sh from the project root that should live only
+# in shell/. The agent (or the user) sometimes copies these — finalize cleans
+# up so the final layout is canonical.
+for name in watcher.sh reindex.sh lint.sh doctor.sh finalize.sh install.sh; do
+  if [ -f "$PROJECT_ROOT/$name" ] && [ -f "$PROJECT_ROOT/shell/$name" ]; then
+    if cmp -s "$PROJECT_ROOT/$name" "$PROJECT_ROOT/shell/$name"; then
+      rm -f "$PROJECT_ROOT/$name"
+      echo "🧹 removed duplicate ./$name (canonical copy lives at shell/$name)"
+    fi
+  fi
+done
+
 # Remove the original setup/ folder unless told otherwise
 if [ "$KEEP_SETUP" = false ]; then
   if [ -d "$SETUP_DIR" ]; then

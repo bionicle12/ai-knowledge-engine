@@ -11,9 +11,9 @@ local-first NLP and automatic context indexing.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#requirements)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-150_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-162_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.9.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](i18n/ru/README.md)
@@ -95,13 +95,13 @@ your-project/
 ├── AGENTS.md                  ← agent instructions
 ├── kb.config.yml              ← config
 ├── DATA_PLACEMENT_EXAMPLES.md ← what to drop where (role-specific)
-├── reindex.sh, watcher.sh     ← Linux/CLI
 ├── reindex.command            ← macOS double-click
 ├── watcher-start.command      ← macOS double-click
 ├── watcher-stop.command       ← macOS double-click
 ├── reindex.bat, watcher-start.bat ← Windows double-click
+├── shell/                     ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
 ├── scripts/                   ← Python pipeline
-├── shell/, templates/, examples/
+├── templates/, examples/
 ├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
 └── .repomix/                  ← AI-ready output
 ```
@@ -191,10 +191,15 @@ your-project/
 ├── repomix.config.json         # Indexer config
 ├── requirements.txt
 │
-├── reindex.sh / reindex.command / reindex.bat       # Manual reindex
-├── watcher.sh / watcher-start.command / watcher-start.bat   # Auto pipeline
+│   # Double-click launchers (macOS / Windows) live at the root:
+├── reindex.command, reindex.bat                      # Manual reindex
+├── watcher-start.command, watcher-start.bat          # Auto pipeline
 ├── watcher-stop.command                              # macOS daemon stop
-├── lint.sh, doctor.sh                                # Health checks
+│
+├── shell/                      # Linux / CLI: *.sh wrappers
+│   ├── watcher.sh, reindex.sh
+│   ├── lint.sh, doctor.sh
+│   └── (launchers were promoted to root by finalize.sh)
 │
 ├── scripts/                    # Python pipeline (do not modify lightly)
 │   ├── kb_ingest.py            # Raw → processed → knowledge
@@ -205,7 +210,6 @@ your-project/
 │   ├── kb_populate.py          # Generate DATA_PLACEMENT_EXAMPLES.md
 │   ├── kb_doctor.py            # Smoke test
 │   └── kb_common.py            # Shared utilities
-├── shell/                      # POSIX wrappers + macOS/Windows launchers
 ├── templates/                  # Kept for re-runs (kb_populate, kb_upgrade)
 ├── examples/                   # Role YAMLs
 │
@@ -257,11 +261,11 @@ The watcher monitors `raw/<sub>/unsorted/` and runs the ingest pipeline whenever
 ### Linux
 
 ```bash
-./watcher.sh              # foreground, Ctrl+C to stop
-./watcher.sh --daemon     # background
-./watcher.sh --status
-./watcher.sh --stop
-./reindex.sh              # one-shot reindex
+./shell/watcher.sh              # foreground, Ctrl+C to stop
+./shell/watcher.sh --daemon     # background
+./shell/watcher.sh --status
+./shell/watcher.sh --stop
+./shell/reindex.sh              # one-shot reindex
 ```
 
 ### Windows

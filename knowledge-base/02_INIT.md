@@ -60,14 +60,17 @@ my-project/
 ├── START_HERE.md
 ├── repomix.config.json
 ├── requirements.txt
-├── reindex.sh / reindex.command / reindex.bat
-├── watcher.sh / watcher-start.command / watcher-start.bat
-├── lint.sh, doctor.sh
-├── scripts/, shell/, templates/, examples/
+├── reindex.command, watcher-start.command, watcher-stop.command   (macOS — double-click)
+├── reindex.bat, watcher-start.bat                                  (Windows — double-click)
+├── shell/        ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
+├── scripts/      ← Python pipeline
+├── templates/, examples/
 ├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
 ├── .repomix/
 └── .venv/
 ```
+
+`finalize.sh` automatically promotes the `*.command` / `*.bat` launchers from `shell/` to the project root (so they're discoverable in Finder/Explorer for double-clicking). The `*.sh` wrappers stay only in `shell/` — invoking them is a Linux/CLI thing.
 
 If finalize fails (conflicts, missing files), the project stays in the pre-finalize state — nothing is partially flattened, the user can retry.
 

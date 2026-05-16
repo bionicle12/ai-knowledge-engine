@@ -3,21 +3,24 @@
 # Manages a daemonized kb_watch.py process.
 #
 # Usage:
-#   ./watcher.sh                # foreground (Ctrl+C to stop)
-#   ./watcher.sh --daemon       # background; logs to .watcher.log
-#   ./watcher.sh --stop
-#   ./watcher.sh --status
-#   ./watcher.sh --verbose
+#   ./shell/watcher.sh                # foreground (Ctrl+C to stop)
+#   ./shell/watcher.sh --daemon       # background; logs to .watcher.log
+#   ./shell/watcher.sh --stop
+#   ./shell/watcher.sh --status
+#   ./shell/watcher.sh --verbose
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+
+# Resolve the project root (parent of shell/ where this script lives).
+SHELL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+PROJECT_ROOT="$(cd "$SHELL_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
 
 PIDFILE=".watcher.pid"
 LOGFILE=".watcher.log"
 
 if [ -x ".venv/bin/python" ]; then
-  PYTHON=".venv/bin/python"
+  PYTHON="./.venv/bin/python"
 elif command -v python3 >/dev/null 2>&1; then
   PYTHON="python3"
 else
@@ -27,6 +30,8 @@ fi
 
 if [ ! -f "scripts/kb_watch.py" ]; then
   echo "❌ scripts/kb_watch.py not found"
+  echo "   Looked in: $PROJECT_ROOT/scripts/"
+  echo "   Did the agent finish deployment? Try: ls $PROJECT_ROOT"
   exit 2
 fi
 

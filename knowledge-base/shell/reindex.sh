@@ -4,23 +4,32 @@
 # POSIX-friendly: works on Linux and macOS.
 #
 # Usage:
-#   ./reindex.sh              # full pipeline
-#   ./reindex.sh --no-watch   # skip the consolidation block
-#   ./reindex.sh --quick      # ingest + reindex only
+#   ./shell/reindex.sh              # full pipeline
+#   ./shell/reindex.sh --no-watch   # skip the consolidation block
+#   ./shell/reindex.sh --quick      # ingest + reindex only
 
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+
+# Resolve the project root (parent of shell/ where this script lives).
+SHELL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+PROJECT_ROOT="$(cd "$SHELL_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
 
 # Resolve Python (prefer venv)
 if [ -x ".venv/bin/python" ]; then
-  PYTHON=".venv/bin/python"
+  PYTHON="./.venv/bin/python"
 elif [ -x "venv/bin/python" ]; then
-  PYTHON="venv/bin/python"
+  PYTHON="./venv/bin/python"
 elif command -v python3 >/dev/null 2>&1; then
   PYTHON="python3"
 else
   echo "❌ Python 3 not found"
+  exit 2
+fi
+
+if [ ! -f "scripts/kb_ingest.py" ]; then
+  echo "❌ scripts/kb_ingest.py not found"
+  echo "   Looked in: $PROJECT_ROOT/scripts/"
   exit 2
 fi
 

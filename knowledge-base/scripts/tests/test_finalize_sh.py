@@ -147,3 +147,92 @@ def test_finalize_second_run_is_safe(tmp_path: Path):
     # Just verify the project state is intact
     assert (tmp_path / "AGENTS.md").is_file()
     assert (tmp_path / "scripts" / "kb_ingest.py").is_file()
+
+
+# ---------------------------------------------------------------------------
+# Launcher promotion + duplicate cleanup (0.9.3)
+# ---------------------------------------------------------------------------
+
+
+def _stage_project_with_launchers(root: Path) -> Path:
+    """Stage a project where knowledge-base/ has both shell/*.command and
+    duplicated *.sh at its own root — like what the agent currently does."""
+    kb = _stage_project(root)
+    sh = kb / "shell"
+    sh.mkdir(exist_ok=True)
+    # Real shell scripts live in shell/
+    (sh / "watcher.sh").write_text("echo watcher\n", encoding="utf-8")
+    (sh / "lint.sh").write_text("echo lint\n", encoding="utf-8")
+    # macOS launchers (also in shell/ before finalize)
+    (sh / "watcher-start.command").write_text("#!/bin/bash\necho start\n",
+                                              encoding="utf-8")
+    (sh / "watcher-stop.command").write_text("#!/bin/bash\necho stop\n",
+                                             encoding="utf-8")
+    (sh / "reindex.command").write_text("#!/bin/bash\necho reindex\n",
+                                        encoding="utf-8")
+    # Windows launchers
+    (sh / "watcher-start.bat").write_text("@echo start\r\n", encoding="utf-8")
+    # The agent currently also drops a *.sh duplicate at the kb root.
+    # finalize.sh should detect and remove these duplicates.
+    (kb / "watcher.sh").write_text("echo watcher\n", encoding="utf-8")
+    (kb / "lint.sh").write_text("echo lint\n", encoding="utf-8")
+    return kb
+
+
+def test_finalize_promotes_command_launchers_to_root(tmp_path: Path):
+    _stage_project_with_launchers(tmp_path)
+    result = _run_finalize(tmp_path)
+    assert result.returncode == 0, result.stderr
+    # macOS launchers should now be at project root
+    assert (tmp_path / "watcher-start.command").is_file()
+    assert (tmp_path / "watcher-stop.command").is_file()
+    assert (tmp_path / "reindex.command").is_file()
+    # Windows launcher too
+    assert (tmp_path / "watcher-start.bat").is_file()
+    # And NOT in shell/ anymore
+    assert not (tmp_path / "shell" / "watcher-start.command").exists()
+    assert not (tmp_path / "shell" / "reindex.command").exists()
+    assert not (tmp_path / "shell" / "watcher-start.bat").exists()
+
+
+def test_finalize_keeps_sh_in_shell_only(tmp_path: Path):
+    _stage_project_with_launchers(tmp_path)
+    result = _run_finalize(tmp_path)
+    assert result.returncode == 0
+    # *.sh should live in shell/ — duplicates at root removed
+    assert (tmp_path / "shell" / "watcher.sh").is_file()
+    assert (tmp_path / "shell" / "lint.sh").is_file()
+    assert not (tmp_path / "watcher.sh").exists(), \
+        "watcher.sh duplicate at root should be cleaned up"
+    assert not (tmp_path / "lint.sh").exists()
+
+
+def test_finalize_preserves_root_sh_when_different(tmp_path: Path):
+    """If a *.sh at the root differs from the shell/ copy, keep both —
+    user may have customized. Only identical copies are pruned."""
+    _stage_project_with_launchers(tmp_path)
+    # Make the root copy different
+    kb = tmp_path / "knowledge-base"
+    (kb / "watcher.sh").write_text("echo CUSTOM\n", encoding="utf-8")
+    result = _run_finalize(tmp_path)
+    assert result.returncode == 0
+    # Custom version preserved at root
+    assert (tmp_path / "watcher.sh").read_text() == "echo CUSTOM\n"
+    # shell/ copy still there too
+    assert (tmp_path / "shell" / "watcher.sh").is_file()
+
+
+def test_finalize_promotion_does_not_overwrite_existing_root_launcher(tmp_path: Path):
+    _stage_project_with_launchers(tmp_path)
+    kb = tmp_path / "knowledge-base"
+    # Pre-existing root launcher with custom content (someone customized)
+    (kb / "watcher-start.command").write_text(
+        "#!/bin/bash\necho USER_CUSTOM\n", encoding="utf-8"
+    )
+    result = _run_finalize(tmp_path)
+    assert result.returncode == 0
+    # Root version preserved as-is
+    assert (tmp_path / "watcher-start.command").read_text() == \
+        "#!/bin/bash\necho USER_CUSTOM\n"
+    # shell/ duplicate also kept since promotion was skipped
+    assert (tmp_path / "shell" / "watcher-start.command").is_file()

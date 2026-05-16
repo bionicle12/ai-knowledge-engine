@@ -4,7 +4,20 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+if [ -f "$SCRIPT_DIR/shell/reindex.sh" ]; then
+  PROJECT_ROOT="$SCRIPT_DIR"
+elif [ -f "$SCRIPT_DIR/../shell/reindex.sh" ]; then
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  echo "❌ Cannot find shell/reindex.sh near this launcher."
+  echo "   Looked at:"
+  echo "     $SCRIPT_DIR/shell/reindex.sh"
+  echo "     $SCRIPT_DIR/../shell/reindex.sh"
+  read -r -p "Press Enter to close..."
+  exit 1
+fi
+
+cd "$PROJECT_ROOT"
 
 if [ -f ".venv/bin/activate" ]; then
   # shellcheck disable=SC1091
@@ -16,17 +29,11 @@ fi
 
 clear
 echo "🔄 Manual reindex"
-echo "    project: $SCRIPT_DIR"
+echo "    project: $PROJECT_ROOT"
 echo "    --------------------------------------"
 echo ""
 
-if [ -f "shell/reindex.sh" ]; then
-  bash shell/reindex.sh
-elif [ -f "reindex.sh" ]; then
-  bash reindex.sh
-else
-  echo "❌ reindex.sh not found"
-fi
+bash shell/reindex.sh
 
 echo ""
 read -r -p "Press Enter to close..."

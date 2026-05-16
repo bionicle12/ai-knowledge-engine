@@ -2,7 +2,21 @@
 REM reindex.bat — double-click launcher to run a manual reindex (Windows).
 
 setlocal
-cd /d "%~dp0"
+
+set "SCRIPT_DIR=%~dp0"
+if exist "%SCRIPT_DIR%scripts\kb_ingest.py" (
+    set "PROJECT_ROOT=%SCRIPT_DIR%"
+) else if exist "%SCRIPT_DIR%..\scripts\kb_ingest.py" (
+    pushd "%SCRIPT_DIR%.."
+    set "PROJECT_ROOT=%CD%\"
+    popd
+) else (
+    echo ERROR: cannot find scripts\kb_ingest.py near this launcher
+    pause
+    exit /b 1
+)
+
+cd /d "%PROJECT_ROOT%"
 
 if exist ".venv\Scripts\activate.bat" (
     call .venv\Scripts\activate.bat
@@ -12,20 +26,13 @@ if exist ".venv\Scripts\activate.bat" (
 
 cls
 echo Manual reindex
-echo project: %CD%
+echo project: %PROJECT_ROOT%
 echo --------------------------------------
 echo.
 
-if exist "scripts\kb_ingest.py" (
-    python scripts\kb_ingest.py
-    if exist "scripts\kb_lint.py" (
-        python scripts\kb_lint.py --quick
-    )
-    where repomix >nul 2>nul
-    if %errorlevel% equ 0 repomix
-) else (
-    echo ERROR: scripts\kb_ingest.py not found
-)
+python scripts\kb_ingest.py
+python scripts\kb_lint.py --quick
+where repomix >nul 2>nul && repomix
 
 pause
 endlocal

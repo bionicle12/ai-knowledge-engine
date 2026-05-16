@@ -1,7 +1,7 @@
 ---
 translation_of: README.md
-source_commit: aaccaf31fb920a2191b427fb629ad6ac3ac70330
-source_version: 0.9.1
+source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_version: 0.9.3
 translated_at: 2026-05-17
 translator: human
 ---
@@ -17,9 +17,9 @@ translator: human
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#требования)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#требования)
-[![Tests](https://img.shields.io/badge/tests-150_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-162_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.9.1-blue.svg)](../../VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](../../VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [English](../../README.md) · [Быстрый старт](#быстрый-старт) · [Возможности](#возможности) · [Архитектура](#архитектура) · [Примеры](#примеры-ролей)
@@ -99,12 +99,12 @@ your-project/
 ├── AGENTS.md                  ← инструкции для агента
 ├── kb.config.yml
 ├── DATA_PLACEMENT_EXAMPLES.md ← персональный «куда что класть»
-├── reindex.sh, watcher.sh     ← Linux/CLI
-├── reindex.command            ← macOS double-click
-├── watcher-start.command      ← macOS double-click
-├── watcher-stop.command       ← macOS double-click
-├── reindex.bat, watcher-start.bat ← Windows double-click
-├── scripts/, shell/, templates/, examples/
+├── reindex.command            ← macOS двойной клик
+├── watcher-start.command      ← macOS двойной клик
+├── watcher-stop.command       ← macOS двойной клик
+├── reindex.bat, watcher-start.bat ← Windows двойной клик
+├── shell/                     ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
+├── scripts/, templates/, examples/
 ├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
 └── .repomix/                  ← готовый контекст для AI
 ```
@@ -196,11 +196,11 @@ Watcher следит за `raw/<sub>/unsorted/` и запускает ingest pip
 ### Linux
 
 ```bash
-./watcher.sh              # foreground, Ctrl+C для остановки
-./watcher.sh --daemon     # в фоне
-./watcher.sh --status
-./watcher.sh --stop
-./reindex.sh              # одноразовый reindex
+./shell/watcher.sh              # foreground, Ctrl+C для остановки
+./shell/watcher.sh --daemon     # в фоне
+./shell/watcher.sh --status
+./shell/watcher.sh --stop
+./shell/reindex.sh              # одноразовый reindex
 ```
 
 ### Windows

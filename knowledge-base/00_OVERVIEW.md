@@ -71,18 +71,22 @@ Layout BEFORE finalize:
         raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
 ```
 
-Layout AFTER finalize — flat at the project root:
+Layout AFTER finalize — flat at the project root, with launchers at the top level and `*.sh` wrappers in `shell/`:
 
 ```
 {user-project-root}/
 ├── kb.config.yml, AGENTS.md, KNOWLEDGE_STRUCTURE.md
 ├── DATA_PLACEMENT_EXAMPLES.md, START_HERE.md, repomix.config.json
-├── reindex.sh / reindex.command / reindex.bat
-├── watcher.sh / watcher-start.command / watcher-start.bat / watcher-stop.command
-├── lint.sh, doctor.sh, requirements.txt
-├── scripts/, shell/, templates/, examples/
+├── reindex.command, watcher-start.command, watcher-stop.command   (macOS launchers)
+├── reindex.bat, watcher-start.bat                                  (Windows launchers)
+├── requirements.txt
+├── shell/                            ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
+├── scripts/                          ← Python pipeline
+├── templates/, examples/
 └── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
 ```
+
+> Note: `finalize.sh` automatically promotes the `*.command` and `*.bat` launchers from `shell/` up to the project root (so users can double-click them in Finder/Explorer). The `*.sh` files stay only in `shell/` to keep the root tidy.
 
 The scripts in the user's KB are **identical** to the ones in this repo. When upgrading, `kb_upgrade.py` (Phase 4) compares versions and refreshes them.
 

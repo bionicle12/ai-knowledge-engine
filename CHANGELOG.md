@@ -456,3 +456,76 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   python3 scripts/sync_translations.py --to-head --lang ru
   python3 scripts/check_translations.py --update-status
   ```
+
+## [0.9.2] - 2026-05-17
+
+> Hotfix: shell wrappers and macOS launchers were resolving paths relative
+> to their own folder instead of the project root, so they couldn't find
+> `scripts/kb_watch.py`. Reported from a real macOS deployment.
+
+### Fixed
+- `shell/watcher.sh`, `shell/reindex.sh`, `shell/lint.sh`, `shell/doctor.sh`
+  now resolve **the project root** (parent of `shell/`) and `cd` there
+  before locating `scripts/`. Previously they did
+  `cd "$(dirname "$0")"` and ended up inside `shell/`, where
+  `scripts/kb_*.py` does not exist.
+- `shell/watcher-start.command`, `shell/watcher-stop.command`,
+  `shell/reindex.command` (macOS launchers) now detect the project root
+  whether the launcher lives in `shell/` or at the project root, with a
+  clear error message if `scripts/` cannot be found.
+- `shell/watcher-start.bat`, `shell/reindex.bat` (Windows launchers) — same
+  resolution logic.
+- All wrappers now report **where they looked** when a script is missing,
+  pointing at the resolved project root path.
+
+### Added
+- `knowledge-base/scripts/tests/test_shell_wrappers.py` — 8 regression
+  tests covering:
+  - Wrappers called from project root
+  - Wrappers called via absolute path from arbitrary CWD
+  - Helpful error message when `scripts/` is missing
+  - `.command` launcher located in `shell/` (default)
+  - `.command` launcher copied to project root (alternative layout)
+
+### Test stats
+- 158 tests passing (was 150)
+
+### Translation impact
+- After committing, the 18 RU files become stale (HEAD moved). Run:
+  ```
+  python3 scripts/sync_translations.py --to-head --lang ru
+  python3 scripts/check_translations.py --update-status
+  ```
+
+## [0.9.3] - 2026-05-17
+
+> Polish: cleaner final layout. `*.sh` wrappers live only in `shell/`, while
+> `*.command` / `*.bat` launchers are promoted to the project root by
+> `finalize.sh` so they're discoverable for double-clicking.
+
+### Changed
+- `shell/finalize.sh` now performs two extra cleanup steps after promoting
+  `knowledge-base/` to the project root:
+  1. **Promotes launchers** — moves every `*.command` and `*.bat` from
+     `shell/` up to the project root so Finder / Explorer can launch them.
+     Skips files that already exist at the root (preserves user customizations).
+  2. **Deduplicates `*.sh`** — if a `*.sh` exists both at the root and in
+     `shell/` and they are byte-identical, removes the root copy. Different
+     content (user customization) is preserved untouched.
+- Documentation updated to reflect the cleaner layout:
+  - `README.md`, `i18n/ru/README.md` — Linux invocation now shown as
+    `./shell/watcher.sh` etc.; project-root tree no longer lists `*.sh` at
+    the top level.
+  - `00_OVERVIEW.md`, `02_INIT.md` — same.
+  - `templates/START_HERE.md.template` — Linux instructions point at
+    `./shell/...`, troubleshooting tips updated.
+
+### Added
+- 4 new regression tests in `test_finalize_sh.py`:
+  - `test_finalize_promotes_command_launchers_to_root`
+  - `test_finalize_keeps_sh_in_shell_only`
+  - `test_finalize_preserves_root_sh_when_different`
+  - `test_finalize_promotion_does_not_overwrite_existing_root_launcher`
+
+### Test stats
+- 162 tests passing (was 158)

@@ -42,8 +42,8 @@ The watcher auto-processes any file you drop into `raw/<sub>/unsorted/`.
 - **Stop:** press Ctrl+C in the terminal window that opened
 
 ### Linux
-- **Start:** `./watcher.sh` from a terminal
-- **Or background:** `./watcher.sh --daemon` then `./watcher.sh --stop` to stop
+- **Start:** `./shell/watcher.sh` from a terminal
+- **Or background:** `./shell/watcher.sh --daemon` then `./shell/watcher.sh --stop` to stop
 
 ### Windows
 - **Start:** double-click `watcher-start.bat`
@@ -54,7 +54,7 @@ The watcher auto-processes any file you drop into `raw/<sub>/unsorted/`.
 If you didn't run the watcher and want to process accumulated raw files now:
 
 - **macOS:** double-click `reindex.command`
-- **Linux:** `./reindex.sh`
+- **Linux:** `./shell/reindex.sh`
 - **Windows:** double-click `reindex.bat`
 
 ## What goes where
@@ -68,8 +68,8 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 | Agent ignores my voice / rules | You forgot the "Read AGENTS.md..." opening line. Say it now. |
 | Files keep landing in `review/needs-ai-decision/` | Say `!review` in chat. The agent will go through the queue. |
 | Generated `DATA_PLACEMENT_EXAMPLES.md` doesn't fit me | Edit `examples/<role>.yml`, then say `!populate`. |
-| Watcher won't pick up files | Check `./watcher.sh --status`. Make sure files are in `raw/<sub>/unsorted/`, not just `raw/`. |
-| Need a smoke test of the install | Run `./doctor.sh` (or `python3 scripts/kb_doctor.py`). |
+| Watcher won't pick up files | Check `./shell/watcher.sh --status`. Make sure files are in `raw/<sub>/unsorted/`, not just `raw/`. |
+| Need a smoke test of the install | Run `./shell/doctor.sh` (or `python3 scripts/kb_doctor.py`). |
 
 ## Where to find more
 
