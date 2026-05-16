@@ -1,0 +1,164 @@
+# Example: Content creator
+
+role: "Content creator (writer / blogger / video / podcast)"
+
+description: |
+  Independent content creator earning from a personal audience: blog,
+  YouTube, newsletter, podcast, social media. The AI assistant captures
+  the creator's voice, recurring themes, audience preferences, monetization
+  experiments, and content calendar — and helps draft new pieces that
+  *sound like the creator*, not generic LLM prose.
+
+entities:
+  voice:
+    enabled: true
+    why: "Tone, vocabulary, sentence rhythm, signature moves"
+    knowledge_paths:
+      - "knowledge/voice/writing-style.md"
+      - "knowledge/voice/forbidden-phrases.md"
+
+  audience:
+    enabled: true
+    why: "Who reads/watches/listens — demographics, interests, what they ask for"
+    knowledge_paths:
+      - "knowledge/domain/audience.md"
+      - "knowledge/playbooks/audience-engagement.md"
+
+  themes:
+    enabled: true
+    why: "Recurring topics, signature beats, content pillars"
+    knowledge_paths:
+      - "knowledge/domain/content-themes.md"
+
+  formats:
+    enabled: true
+    why: "Long-form vs short, threads, videos, newsletters — what works for what"
+    knowledge_paths:
+      - "knowledge/playbooks/format-selection.md"
+
+  archive:
+    enabled: true
+    why: "Already published — to avoid repeating yourself and to cross-link"
+    knowledge_paths:
+      - "knowledge/projects/published/"
+
+  monetization:
+    enabled: true
+    why: "Sponsorships, products, courses, paid newsletters — what works"
+    knowledge_paths:
+      - "knowledge/playbooks/monetization.md"
+      - "knowledge/decisions/monetization-experiments.md"
+
+  research:
+    enabled: true
+    why: "Sources, interviews, references for upcoming pieces"
+    knowledge_paths:
+      - "knowledge/domain/research-bank.md"
+
+  workflow:
+    enabled: true
+    why: "Production pipeline: ideation → draft → edit → publish → distribute"
+    knowledge_paths:
+      - "knowledge/playbooks/production-workflow.md"
+
+  collaborations:
+    enabled: true
+    why: "Guest appearances, joint pieces, brand partnerships"
+    knowledge_paths:
+      - "knowledge/projects/collaborations/"
+
+raw_data_examples:
+  - "Drafts and outlines"
+  - "Published pieces (your own — for voice training)"
+  - "Audience replies, comments, DMs (anonymized)"
+  - "Analytics screenshots (Substack, YouTube, Spotify, X)"
+  - "Sponsor briefs and brand guidelines (yours)"
+  - "Recordings of podcasts/interviews"
+  - "Reference articles you found striking"
+  - "Notes about creators you admire"
+
+ai_assistant_tasks:
+  - "Drafting in your voice (with explicit voice constraints)"
+  - "Generating headline/title variants in your patterns"
+  - "Suggesting how to repurpose a long piece into thread/video/short"
+  - "Finding cross-links to your prior work"
+  - "Drafting newsletter intros that sound like you, not corporate"
+  - "Pre-flight check: does this piece contradict anything you've published?"
+  - "Sponsor brief reading: surfacing what to negotiate or push back on"
+
+placement_examples:
+  intro: |
+    Your voice is your moat. The harder it is for an LLM to imitate you
+    out of the box, the more valuable your knowledge base becomes — because
+    it captures the specific texture of your writing/speaking that nobody
+    else has.
+
+  by_artifact:
+    - artifact: "Your published pieces (canonical voice training)"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "newsletter-2026-05-best-issue.md"
+        - "essay-on-craft-final.md"
+        - "youtube-script-100k-views.md"
+      knowledge_target: "knowledge/voice/writing-style.md"
+      tip: "Mark your top 5–10 'most you' pieces — these become voice anchors."
+
+    - artifact: "Drafts and outlines (in any state)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "draft-essay-on-attention.md"
+        - "outline-podcast-ep-042.md"
+
+    - artifact: "Analytics screenshots and exports"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "Substack-stats-2026-05.png"
+        - "YouTube-retention-curve.png"
+      knowledge_target: "knowledge/domain/audience.md"
+
+    - artifact: "Audience comments and replies (anonymized)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "best-comments-on-essay-X.md"
+        - "Newsletter replies — themes.md"
+      tip: "Use first names only or anonymize entirely; PII gets routed to redaction."
+
+    - artifact: "Sponsor briefs and brand partnerships"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Sponsor X — Q3 brief.pdf"
+        - "Brand partnership negotiation history.md"
+      knowledge_target: "knowledge/playbooks/monetization.md"
+
+    - artifact: "Reference creators you admire (notes)"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "What I learn from Maria Popova.md"
+        - "Why this YouTuber works (analysis).md"
+
+    - artifact: "Podcast recordings (transcribed via STT)"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "podcast-ep-042-raw.mp3"
+        - "interview-with-X.wav"
+
+    - artifact: "Forbidden phrases (your anti-patterns)"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "Phrases I never want to use.md"
+      knowledge_target: "knowledge/voice/forbidden-phrases.md"
+      tip: "Anti-patterns are as important as your style — both teach the AI."
+
+  quickstart:
+    - "Drop your 3 best published pieces → raw/reference/unsorted/"
+    - "Write a 1-paragraph 'this is how I write' note → raw/personal-context/unsorted/"
+    - "List 10 phrases or words you'd never use → raw/personal-context/unsorted/"
+    - "Run ./reindex.sh — the AI now has voice fingerprints"
+    - "Ask: 'Draft a 200-word intro for my newsletter on topic X in my voice.'"
+
+  do_not_drop:
+    - "Audience PII (names, emails, addresses) without consent"
+    - "Confidential sponsor terms still under NDA"
+    - "Drafts a co-author hasn't agreed to share"
+    - "Comments that are abusive — these belong in moderation, not the KB"
+    - "Personal correspondence not related to creative work"

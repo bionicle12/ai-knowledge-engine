@@ -1,57 +1,59 @@
-# 13 — Auto-run: автоматический запуск при изменениях
+# 13 — Auto-run: automatic processing on changes
 
-> База знаний должна обновляться **автоматически** при появлении новых данных. Три режима: file watcher (daemon), git hook, cron.
-
----
-
-## Зачем
-
-Ручной запуск `./reindex.sh` после каждого изменения — friction, которая приводит к тому, что база устаревает. Автоматизация убирает этот барьер.
+> The knowledge base should refresh **automatically** when new data arrives. Three mechanisms: file watcher (daemon), git hook, cron.
+>
+> **Reference implementations:** `knowledge-base/scripts/kb_watch.py`, `knowledge-base/scripts/kb_reflect.py`, `knowledge-base/scripts/kb_nlp_batch.py`, `knowledge-base/shell/watcher.sh`, `knowledge-base/shell/reindex.sh`. The agent copies them at deployment time.
 
 ---
 
-## Режим 1: File watcher (рекомендуется для активной работы)
+## Why
 
-### Зависимости
+Manual `./reindex.sh` after every change is friction — and friction means the base goes stale. Automation removes that barrier.
+
+---
+
+## Mode 1: file watcher (recommended for active work)
+
+### Dependencies
 
 ```txt
-# В requirements.txt
+# In requirements.txt
 watchdog>=4.0
 ```
 
-### Контракт `scripts/kb_watch.py`
+### `scripts/kb_watch.py` contract
 
 ```python
 """
-kb_watch.py — File system watcher для knowledge base.
+kb_watch.py — File-system watcher for the knowledge base.
 
-Мониторит:
-- raw/*/unsorted/  — новые файлы для ingest
-- knowledge/       — изменения для reindex
+Watches:
+- raw/*/unsorted/  — new files for ingest
+- knowledge/       — edits that should trigger reindex
 
-При обнаружении нового файла в raw/:
-1. Ждёт 5 секунд (файл может быть в процессе записи)
-2. Запускает kb_ingest.py для нового файла
-3. Запускает NLP enrichment (если включён)
-4. Если complexity < threshold → авто-обработка
-5. Если complexity >= threshold → review/needs-ai-decision/
-6. Пишет в log.md
-7. Перегенерирует Repomix-индекс
+When a new file appears in raw/:
+1. Wait 5 seconds (the file may still be being written)
+2. Run kb_ingest.py for the new file
+3. Run NLP enrichment (if enabled)
+4. If complexity < threshold → auto-process
+5. If complexity >= threshold → review/needs-ai-decision/
+6. Append to log.md
+7. Regenerate the Repomix index
 
-При изменении файла в knowledge/:
-1. Ждёт 2 секунды (debounce)
-2. Перегенерирует Repomix-индекс
-3. Запускает quick lint (--quick)
-4. Пишет в log.md
+When a knowledge/ file changes:
+1. Wait 2 seconds (debounce)
+2. Regenerate the Repomix index
+3. Run quick lint (--quick)
+4. Append to log.md
 
 Usage:
     ./watcher.sh                               # Foreground
     ./watcher.sh --daemon                      # Background
-    ./watcher.sh --stop                        # Остановить
-    ./watcher.sh --verbose                     # С подробным логированием
+    ./watcher.sh --stop                        # Stop
+    ./watcher.sh --verbose                     # Verbose logging
 
 Exit:
-    Ctrl+C или SIGTERM для graceful shutdown
+    Ctrl+C or SIGTERM for graceful shutdown
 """
 
 from watchdog.observers import Observer
@@ -68,7 +70,7 @@ class RawFileHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
             return
-        # Debounce: ждём пока файл полностью записан
+        # Debounce: wait until the file is fully written
         self._pending[event.src_path] = time.time()
 
     def process_pending(self):
@@ -106,14 +108,14 @@ class KnowledgeChangeHandler(FileSystemEventHandler):
         return False
 ```
 
-### Запуск через `watcher.sh`
+### Running via `watcher.sh`
 
-В корне базы создаётся `watcher.sh` — обёртка над `kb_watch.py` с автоматической активацией venv:
+The base root contains `watcher.sh` — a wrapper around `kb_watch.py` with auto-venv activation:
 
 ```bash
 #!/bin/bash
-# watcher.sh — File watcher для Knowledge Base
-# Запускает kb_watch.py с автоматической активацией venv и управлением процессом.
+# watcher.sh — File watcher for the Knowledge Base.
+# Runs kb_watch.py with auto-venv activation and process management.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -122,16 +124,16 @@ cd "$SCRIPT_DIR"
 PIDFILE=".watcher.pid"
 LOGFILE=".watcher.log"
 
-# Активировать venv если есть
+# Activate venv if present
 if [ -f ".venv/bin/activate" ]; then
   source .venv/bin/activate
 elif [ -f "venv/bin/activate" ]; then
   source venv/bin/activate
 fi
 
-# Проверить наличие скрипта
+# Verify the script
 if [ ! -f "scripts/kb_watch.py" ]; then
-  echo "❌ scripts/kb_watch.py не найден"
+  echo "❌ scripts/kb_watch.py not found"
   exit 1
 fi
 
@@ -142,49 +144,49 @@ case "${1:-}" in
       if kill -0 "$PID" 2>/dev/null; then
         kill "$PID"
         rm -f "$PIDFILE"
-        echo "✅ Watcher остановлен (PID $PID)"
+        echo "✅ Watcher stopped (PID $PID)"
       else
         rm -f "$PIDFILE"
-        echo "⚠️ Процесс $PID уже не работает, pidfile удалён"
+        echo "⚠️  Process $PID was not running; pidfile removed"
       fi
     else
-      echo "⚠️ Watcher не запущен (нет $PIDFILE)"
+      echo "⚠️  Watcher is not running (no $PIDFILE)"
     fi
     ;;
   --status)
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-      echo "✅ Watcher работает (PID $(cat "$PIDFILE"))"
+      echo "✅ Watcher running (PID $(cat "$PIDFILE"))"
     else
-      echo "⚠️ Watcher не запущен"
+      echo "⚠️  Watcher not running"
     fi
     ;;
   --daemon)
     if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-      echo "⚠️ Watcher уже запущен (PID $(cat "$PIDFILE"))"
+      echo "⚠️  Watcher already running (PID $(cat "$PIDFILE"))"
       exit 1
     fi
-    echo "🔄 Запуск watcher в фоне..."
+    echo "🔄 Starting watcher in the background..."
     nohup python3 scripts/kb_watch.py "${@:2}" > "$LOGFILE" 2>&1 &
     echo $! > "$PIDFILE"
-    echo "✅ Watcher запущен (PID $!, лог: $LOGFILE)"
+    echo "✅ Watcher started (PID $!, log: $LOGFILE)"
     ;;
   --verbose)
-    echo "👁 Запуск watcher (verbose)..."
+    echo "👁  Starting watcher (verbose)..."
     python3 scripts/kb_watch.py --verbose
     ;;
   "")
-    echo "👁 Запуск watcher..."
-    echo "   Ctrl+C для остановки"
+    echo "👁  Starting watcher..."
+    echo "   Ctrl+C to stop"
     python3 scripts/kb_watch.py
     ;;
   *)
     echo "Usage: ./watcher.sh [--daemon|--stop|--status|--verbose]"
     echo ""
-    echo "  (без флагов)  Foreground mode (Ctrl+C для остановки)"
-    echo "  --daemon      Запуск в фоне"
-    echo "  --stop        Остановить фоновый watcher"
-    echo "  --status      Проверить, работает ли watcher"
-    echo "  --verbose     Foreground с подробным логированием"
+    echo "  (no flag)     Foreground mode (Ctrl+C to stop)"
+    echo "  --daemon      Run in background"
+    echo "  --stop        Stop background watcher"
+    echo "  --status      Check whether the watcher is running"
+    echo "  --verbose     Foreground with verbose logging"
     ;;
 esac
 ```
@@ -193,19 +195,19 @@ esac
 chmod +x watcher.sh
 ```
 
-### Команды
+### Commands
 
 ```bash
-# Foreground (для разработки)
+# Foreground (for development)
 ./watcher.sh
 
 # Background
 ./watcher.sh --daemon
 
-# Проверить статус
+# Status
 ./watcher.sh --status
 
-# Остановить
+# Stop
 ./watcher.sh --stop
 ```
 
@@ -236,9 +238,9 @@ systemctl --user status kb-watch
 
 ---
 
-## Режим 2: Git hook
+## Mode 2: git hook
 
-Для баз, которые под git-контролем.
+For bases under git control.
 
 ### post-commit hook
 
@@ -246,7 +248,7 @@ systemctl --user status kb-watch
 #!/bin/sh
 # .git/hooks/post-commit
 
-# Если изменены файлы в knowledge/ или knowledge-base/ → reindex
+# If knowledge/ files changed → reindex
 changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
 
 if echo "$changed_files" | grep -q "^knowledge/"; then
@@ -264,12 +266,12 @@ fi
 chmod +x .git/hooks/post-commit
 ```
 
-### pre-commit hook (опционально)
+### pre-commit hook (optional)
 
 ```bash
 #!/bin/sh
 # .git/hooks/pre-commit
-# Проверяет frontmatter перед коммитом
+# Validates frontmatter before committing
 
 if [ -f "scripts/kb_lint.py" ]; then
   python3 scripts/kb_lint.py --quick --only frontmatter
@@ -282,33 +284,33 @@ fi
 
 ---
 
-## Режим 3: Cron (периодические задачи)
+## Mode 3: cron (periodic tasks)
 
 ```bash
 # crontab -e
 
-# Каждый день в 3:00 — полный lint + reindex
+# Every day at 03:00 — full lint + reindex
 0 3 * * * cd /path/to/knowledge-base && ./lint.sh >> log.md 2>&1 && ./reindex.sh >> log.md 2>&1
 
-# Каждые 6 часов — quick lint
+# Every 6 hours — quick lint
 0 */6 * * * cd /path/to/knowledge-base && python3 scripts/kb_lint.py --quick >> /dev/null 2>&1
 
-# Каждое воскресенье в 2:00 — NLP re-enrichment всех processed файлов
+# Every Sunday at 02:00 — NLP re-enrichment of all processed files
 0 2 * * 0 cd /path/to/knowledge-base && python3 scripts/kb_nlp_batch.py >> log.md 2>&1
 ```
 
-> **Важно:** ПК может быть выключен — cron не гарантирует выполнение. Поэтому основная консолидация встроена в `reindex.sh` (см. ниже).
+> **Important:** the machine may be off — cron does not guarantee execution. The main consolidation block lives inside `reindex.sh` (see below).
 
 ---
 
-## Консолидация при reindex (вместо чистого cron)
+## Consolidation in reindex (instead of pure cron)
 
-Проблема: cron-задачи не срабатывают, если ПК выключен. Решение: встроить проверку в `reindex.sh` — если прошло > 24 часов с последней консолидации, выполнить её.
+Problem: cron tasks do not fire if the machine is off. Solution: bake a check into `reindex.sh` — if more than 24 hours have passed since the last consolidation, run it now.
 
-### Механизм
+### Mechanism
 
 ```bash
-# В reindex.sh добавить перед финальным repomix:
+# Add to reindex.sh before the final repomix call:
 
 CONSOLIDATION_MARKER=".last_consolidation"
 NOW=$(date +%s)
@@ -318,36 +320,35 @@ if [ -f "$CONSOLIDATION_MARKER" ]; then
   LAST=$(cat "$CONSOLIDATION_MARKER")
   ELAPSED=$((NOW - LAST))
 else
-  ELAPSED=$((DAY_SECONDS + 1))  # Первый запуск → консолидировать
+  ELAPSED=$((DAY_SECONDS + 1))  # First run → consolidate
 fi
 
 if [ $ELAPSED -gt $DAY_SECONDS ]; then
   echo "[reindex] Consolidation needed (${ELAPSED}s since last). Running..."
 
-  # 1. Полный lint (Python, 0 токенов)
+  # 1. Full lint (Python, 0 tokens)
   if [ -f "scripts/kb_lint.py" ]; then
     python3 scripts/kb_lint.py --output report
   fi
 
-  # 2. Подсчёт изменений с последней консолидации
-  #    Считаем записи в log.md после даты последней консолидации
+  # 2. Count changes since last consolidation
   CHANGES_SINCE=0
   if [ -f "log.md" ]; then
     LAST_DATE=$(date -d "@$LAST" -Iseconds 2>/dev/null || date -r "$LAST" -Iseconds 2>/dev/null || echo "")
     if [ -n "$LAST_DATE" ]; then
       CHANGES_SINCE=$(grep -c "^## \[" log.md 2>/dev/null || echo "0")
-      # Более точный подсчёт: скрипт kb_reflect.py --count-changes
+      # Better count: scripts/kb_reflect.py --count-changes
     fi
   fi
 
-  # 3. Проверка рефлексии (mode-aware)
+  # 3. Reflection check (mode-aware)
   #    mode=default: importance_threshold=25, min_interval=7d, require_changes=true
   #    mode=super:   importance_threshold=5,  min_interval=0,  require_changes=false
   MODE=$(python3 -c "import yaml; print(yaml.safe_load(open('kb.config.yml')).get('mode','default'))" 2>/dev/null || echo "default")
 
   REFLECT_TRIGGERED_BY_THRESHOLD=false
   if [ -f "scripts/kb_reflect.py" ]; then
-    # --check-threshold выводит "THRESHOLD_MET" если sum(importance) > порог (зависит от mode)
+    # --check-threshold prints "THRESHOLD_MET" if sum(importance) > threshold (mode-dependent)
     THRESHOLD_RESULT=$(python3 scripts/kb_reflect.py --check-threshold --dry-run 2>&1)
     if echo "$THRESHOLD_RESULT" | grep -q "THRESHOLD_MET"; then
       echo "[reindex] Importance threshold met → auto-triggering reflection (mode=$MODE)"
@@ -357,7 +358,7 @@ if [ $ELAPSED -gt $DAY_SECONDS ]; then
     fi
   fi
 
-  # 4. Еженедельная рефлексия (ТОЛЬКО если были изменения И НЕ запущена по threshold)
+  # 4. Weekly reflection (ONLY if there were changes AND not already triggered by threshold)
   REFLECTION_MARKER=".last_reflection"
   WEEK_SECONDS=604800
   if [ -f "$REFLECTION_MARKER" ]; then
@@ -371,7 +372,7 @@ if [ $ELAPSED -gt $DAY_SECONDS ]; then
   if [ "$REFLECT_TRIGGERED_BY_THRESHOLD" = true ]; then
     REFLECT_STATUS="triggered (importance threshold, mode=$MODE)"
   elif [ "$MODE" = "super" ]; then
-    # super mode: threshold=5 уже покрывает, но если не сработал и есть changes — запустить
+    # super mode: threshold=5 covers most, but if it didn't trigger and changes exist — run
     if [ "$CHANGES_SINCE" -gt 0 ] 2>/dev/null; then
       echo "[reindex] Super mode reflection: $CHANGES_SINCE changes found → running"
       if [ -f "scripts/kb_reflect.py" ]; then
@@ -393,38 +394,38 @@ if [ $ELAPSED -gt $DAY_SECONDS ]; then
     else
       echo "[reindex] Weekly reflection: no changes since last → skipping"
       REFLECT_STATUS="skipped (no changes, ${REFLECT_ELAPSED}s elapsed)"
-      # НЕ обновляем маркер — пусть дни копятся дальше (10, 15...)
-      # Запустится когда появятся изменения
+      # Do NOT update the marker — let days accumulate (10, 15...).
+      # Will fire when changes appear.
     fi
   else
     REFLECT_STATUS="skipped (< 7 days)"
   fi
 
-  # 5. NLP re-enrichment (если включён, 0 токенов)
+  # 5. NLP re-enrichment (if enabled, 0 tokens)
   if [ -f "scripts/kb_nlp_batch.py" ]; then
     python3 scripts/kb_nlp_batch.py --incremental
   fi
 
-  # 6. Super mode: авто-обработка review queue
+  # 6. Super mode: auto-process review queue
   REVIEW_STATUS="skipped"
   if [ "$MODE" = "super" ] && [ -d "review/needs-ai-decision" ]; then
     REVIEW_COUNT=$(find review/needs-ai-decision/ -name '*.md' 2>/dev/null | wc -l)
     if [ "$REVIEW_COUNT" -gt 0 ]; then
       echo "[reindex] Super mode: $REVIEW_COUNT items in review queue → AI processing"
       REVIEW_STATUS="auto-processed ($REVIEW_COUNT items)"
-      # AI-агент обработает при следующей IDE-сессии или скриптом
+      # The AI agent processes them on the next IDE session, or via a script
     fi
   fi
 
-  # 7. Super mode: lint L2 (AI-ревью) при консолидации
+  # 7. Super mode: lint L2 (AI review) on consolidation
   LINT_L2_STATUS="skipped"
   if [ "$MODE" = "super" ]; then
     echo "[reindex] Super mode: running lint L2 (AI review)"
     LINT_L2_STATUS="triggered (super mode)"
-    # AI-агент выполнит lint L2 при следующей IDE-сессии
+    # The AI agent runs lint L2 on the next IDE session
   fi
 
-  # 8. Обновить маркер консолидации
+  # 8. Update consolidation marker
   echo "$NOW" > "$CONSOLIDATION_MARKER"
   echo "" >> log.md
   echo "## [$(date -Iseconds)] consolidation | Daily consolidation (via reindex)" >> log.md
@@ -440,61 +441,61 @@ else
 fi
 ```
 
-### Что делает консолидация
+### What consolidation does
 
-| Шаг | Действие | Частота |
-|-----|---------|--------|
-| Full lint (Python) | Все проверки уровня 1 из `09_LINT.md` | Раз в сутки, 0 токенов |
-| Change detection | Подсчитать изменения в log.md с последней рефлексии | Раз в сутки, 0 токенов |
-| Importance check | Если `sum(importance)` > threshold → авто-`!reflect` | Раз в сутки, ~15K если сработал |
-| Weekly reflection | Сгенерировать insights (LLM) | ≥7 дней **И** есть изменения, ~15K токенов |
-| NLP batch | Инкрементальный re-enrichment новых processed/ | Раз в сутки, 0 токенов |
-| Access decay | Обновить recency scores в routing tables | Раз в сутки, 0 токенов |
+| Step | Action | Frequency |
+|------|--------|-----------|
+| Full lint (Python) | All level-1 checks from `09_LINT.md` | Once per day, 0 tokens |
+| Change detection | Count entries in log.md since last reflection | Once per day, 0 tokens |
+| Importance check | If `sum(importance)` > threshold → auto-`!reflect` | Once per day, ~15K if fired |
+| Weekly reflection | Generate insights (LLM) | ≥7 days **AND** changes, ~15K tokens |
+| NLP batch | Incremental re-enrichment of new processed/ | Once per day, 0 tokens |
+| Access decay | Update recency scores in routing tables | Once per day, 0 tokens |
 
-### Умное расписание рефлексии
+### Smart reflection schedule
 
 ```
-Дни без рефлексии:  1  2  3  4  5  6  7  8  9  10  ...
-Были изменения?     -  -  -  -  -  -  -  -  ✓  -   ...
-                                              ↑
-                                     Запуск! (>7 дней + есть изменения)
+Days without reflection:  1  2  3  4  5  6  7  8  9  10  ...
+Were there changes?       -  -  -  -  -  -  -  -  ✓  -   ...
+                                                    ↑
+                                          Run! (>7 days + changes)
 ```
 
-- Если **≤7 дней** → не запускать (ещё рано)
-- Если **>7 дней**, но **нет изменений** → не запускать, продолжить считать (10, 15, 20...)
-- Если **>7 дней** и **есть изменения** → запустить, обнулить маркер
-- Если **importance threshold** достигнут → **запустить немедленно** (вне зависимости от дней)
+- **≤7 days** → don't run (still early)
+- **>7 days** but **no changes** → don't run, keep counting (10, 15, 20...)
+- **>7 days** and **changes present** → run, reset marker
+- **importance threshold** reached → **run immediately** (regardless of days)
 
-Последний пункт важен: при активной работе с базой рефлексия запустится раньше 7 дней, предотвращая застой.
+The last point matters: in active sessions reflection fires before 7 days, preventing stagnation.
 
-### Гарантии
+### Guarantees
 
-- Консолидация **не чаще раза в сутки** (маркер `.last_consolidation`)
-- Срабатывает при **любом** вызове `reindex.sh` — ручном, из watcher, из git hook
-- Если ПК был выключен 3 дня — при первом reindex выполнит консолидацию
-- Не блокирует основной reindex — lint и reflection запускаются **до** repomix
+- Consolidation runs **at most once per day** (`.last_consolidation` marker)
+- Fires on **any** `reindex.sh` call — manual, watcher, git hook
+- If the machine was off for 3 days — first reindex performs consolidation
+- Does not block the main reindex — lint and reflection run **before** repomix
 
 ---
 
-## Таблица триггеров
+## Trigger table
 
-| Событие | Действие | Кто запускает |
-|---------|---------|--------------|
-| Новый файл в `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./watcher.sh` |
-| Файл изменён в `knowledge/` | Reindex + Quick lint | `./watcher.sh` или git hook |
-| `!save` в AI-сессии | Session capture (с enrichment) → Reindex | AI-агент |
-| `!reflect` | Рефлексия: генерация insights (~15K токенов) | AI-агент |
-| `!audit` | Lint уровня 2: AI-ревью (~50-100K токенов) | AI-агент |
-| Lint нашёл и исправил issues | Reindex | `kb_lint.py --fix` |
-| AI сделал query-writeback | Write page → Reindex | AI-агент |
-| Commit в git | Quick lint + Reindex | git hook |
-| Ежедневно | Full lint (Python) + Reindex | cron |
-| При reindex (>24ч) | Consolidation (lint + NLP batch + reflection indicator) | `reindex.sh` |
-| При reindex (>7д) | Weekly reflection (LLM insights) | `reindex.sh` |
+| Event | Action | Source |
+|-------|--------|--------|
+| New file in `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./watcher.sh` |
+| Edit in `knowledge/` | Reindex + quick lint | `./watcher.sh` or git hook |
+| `!save` in AI session | Session capture (with enrichment) → Reindex | AI agent |
+| `!reflect` | Reflection: insight generation (~15K tokens) | AI agent |
+| `!audit` | Lint level 2: AI review (~50–100K tokens) | AI agent |
+| Lint found and fixed issues | Reindex | `kb_lint.py --fix` |
+| AI did query-writeback | Write page → Reindex | AI agent |
+| Git commit | Quick lint + Reindex | git hook |
+| Daily | Full lint (Python) + Reindex | cron |
+| reindex (>24h) | Consolidation (lint + NLP batch + reflection) | `reindex.sh` |
+| reindex (>7d) | Weekly reflection (LLM insights) | `reindex.sh` |
 
 ---
 
-## Конфигурация в `kb.config.yml`
+## Configuration in `kb.config.yml`
 
 ```yaml
 autorun:
@@ -504,22 +505,22 @@ autorun:
     - "knowledge/"
   debounce_raw_seconds: 5
   debounce_knowledge_seconds: 2
-  auto_nlp: true                    # NLP enrichment при ingest
-  auto_lint_on_change: true         # Quick lint при изменении knowledge/
-  auto_reindex_on_change: true      # Reindex при изменении knowledge/
-  complexity_auto_threshold: 0.5    # Ниже → auto-extract, выше → review
-  consolidation_interval_hours: 24  # Минимальный интервал между консолидациями
-  consolidation_on_reindex: true    # Проверять при каждом reindex
+  auto_nlp: true                    # NLP enrichment on ingest
+  auto_lint_on_change: true         # Quick lint on knowledge/ edits
+  auto_reindex_on_change: true      # Reindex on knowledge/ edits
+  complexity_auto_threshold: 0.5    # below → auto-extract; above → review
+  consolidation_interval_hours: 24  # Min interval between consolidations
+  consolidation_on_reindex: true    # Check on every reindex
 ```
 
 ---
 
-## Интеграция
+## Integration
 
-- **03_PIPELINE:** watch вызывает ingest при новом файле; surprise filter проверяет дупликаты
-- **05_INDEX:** watch вызывает reindex при изменениях
-- **07_INTERACTION_LOOP:** консолидация проверяет reflection threshold и запускает insights
-- **09_LINT:** watch → quick lint; консолидация → полный lint с compression caps
-- **10_LOG:** все авто-операции записываются в log.md, включая consolidation
-- **11_PROVENANCE:** консолидация обновляет recency scores и проверяет bi-temporal validity
-- **12_NLP:** watch запускает NLP при ingest; консолидация — batch re-enrichment
+- **03_PIPELINE:** watch invokes ingest on a new file; surprise filter checks duplicates
+- **05_INDEX:** watch triggers reindex on changes
+- **07_INTERACTION_LOOP:** consolidation checks reflection threshold and triggers insights
+- **09_LINT:** watch → quick lint; consolidation → full lint
+- **10_LOG:** all auto operations are appended to log.md, including consolidation
+- **11_PROVENANCE:** consolidation refreshes recency scores and checks bi-temporal validity
+- **12_NLP:** watch runs NLP on ingest; consolidation runs batch re-enrichment

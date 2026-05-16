@@ -1,0 +1,124 @@
+# AI Knowledge Engine — kb.config.yml
+# Copy to your KB root as `kb.config.yml` and parameterize {{placeholders}}.
+# See 02_INIT.md and 11_PROVENANCE.md for field descriptions.
+
+# Bookkeeping
+instructions_version: "{{KB_INSTRUCTIONS_VERSION}}"   # populated from repo VERSION at deploy time
+deployed_at: "{{DEPLOYED_AT}}"                         # ISO-8601 date
+
+knowledge_base:
+  name: "{{KB_NAME}}"                                  # e.g., "personal-professional-kb"
+  mode: "default"                                      # default | super (toggle via !super)
+  language: "{{PRIMARY_LANGUAGE}}"                     # e.g., "ru", "en"
+  index_policy: "clean-knowledge-only"
+
+  roles:
+    primary: "{{PRIMARY_ROLE}}"                        # e.g., "Senior Software Engineer"
+    hobbies: []                                        # optional, e.g., ["AI music production"]
+
+# Privacy & indexing rules
+privacy:
+  raw_indexing_allowed: false
+  review_indexing_allowed: false
+  interactions_indexing_allowed: false
+  external_ai_allowed: false
+  require_redaction_for_chats: true
+
+# Language behavior (extraction & metadata)
+language_policy:
+  primary: "{{PRIMARY_LANGUAGE}}"
+  extraction_rule: "extract in primary language; preserve original terms/brand names verbatim"
+  metadata_language: "en"                              # for slugs, frontmatter keys
+
+# Entities to track (drives knowledge/* folders & routing)
+# Source-controlled: copy from examples/<role>.yml during deployment.
+entities: {}
+
+# NLP pipeline (see 12_NLP_PREPROCESS.md)
+nlp:
+  enabled: true
+  spacy_model: "{{SPACY_MODEL}}"                       # e.g., "ru_core_news_md", "en_core_web_md"
+  spacy_model_fallback: "xx_ent_wiki_sm"
+  keyword_top_n: 20
+  fuzzy_match_threshold: 0.8
+  complexity_threshold: 0.7                            # >= → review/needs-ai-decision/
+  skip_extensions: [".csv", ".xlsx"]
+
+# Auto-run behavior (see 13_AUTORUN.md)
+autorun:
+  watch_enabled: true
+  watch_dirs:
+    - "raw/*/unsorted/"
+    - "knowledge/"
+  debounce_raw_seconds: 5
+  debounce_knowledge_seconds: 2
+  auto_nlp: true
+  auto_lint_on_change: true
+  auto_reindex_on_change: true
+  complexity_auto_threshold: 0.5
+  consolidation_interval_hours: 24
+  consolidation_on_reindex: true
+
+# Mode profiles — token-spending behavior (see 07_INTERACTION_LOOP.md)
+mode_profiles:
+  default:
+    surprise:
+      engine: "python"            # python (NLP overlap) | ai (semantic)
+      ai_trigger_min_words: 3000  # AI fallback only for big docs
+      ai_max_per_day: 2
+    annotations:
+      engine: "python"
+    entity_resolution:
+      engine: "python"
+    importance_scoring:
+      engine: "ai"
+      with_reasoning: false
+    reflection:
+      trigger: "threshold+weekly"
+      importance_threshold: 25
+      min_interval_days: 7
+      require_changes: true
+      max_insights_per_run: 3
+    lint:
+      level2_trigger: "manual"    # manual | weekly | daily
+      level2_weekly_day: "sunday"
+      review_auto_process: false
+
+  super:
+    surprise:
+      engine: "ai"
+      ai_trigger_min_words: 0
+      ai_max_per_day: null
+    annotations:
+      engine: "ai"
+    entity_resolution:
+      engine: "ai"
+    importance_scoring:
+      engine: "ai"
+      with_reasoning: true
+    reflection:
+      trigger: "on-demand"
+      importance_threshold: 5
+      min_interval_days: 0
+      require_changes: false
+      max_insights_per_run: 5
+    lint:
+      level2_trigger: "daily"
+      review_auto_process: true
+
+# Lifecycle defaults (see 11_PROVENANCE.md)
+lifecycle:
+  default: "evolving"               # permanent | evolving | temporal
+  stale_warning_days: 30
+  confidence_decay_days: 90
+
+# Logging (see 10_LOG.md)
+logging:
+  rotation_threshold: 1000          # entries → rotate to log-archive/
+  archive_dir: "log-archive"
+
+# Indexer (see 05_INDEX.md)
+indexer:
+  tool: "repomix"                   # extensible: future support for other tools
+  config_file: "repomix.config.json"
+  output_path: ".repomix/output.xml"

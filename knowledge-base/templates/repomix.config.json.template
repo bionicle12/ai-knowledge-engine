@@ -1,0 +1,60 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": ".repomix/output.xml",
+    "style": "xml",
+    "compress": false,
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "showLineNumbers": false,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "topFilesLength": 20,
+    "headerText": "Local non-code knowledge base. Read AGENTS.md before use."
+  },
+  "include": [
+    "AGENTS.md",
+    "README.md",
+    "KNOWLEDGE_STRUCTURE.md",
+    "DATA_PLACEMENT_EXAMPLES.md",
+    "kb.config.yml",
+    "knowledge/**/*.md",
+    "assets-index/**/*.md"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "raw/**",
+      "processed/**",
+      "assets/**",
+      "review/**",
+      "interactions/**",
+      "setup/**",
+      "scripts/**",
+      "shell/**",
+      "templates/**",
+      ".repomix/**",
+      ".venv/**",
+      "venv/**",
+      "__pycache__/**",
+      "log.md",
+      "log-archive/**",
+      "lint-report.md",
+      ".last_consolidation",
+      ".last_reflection",
+      ".watcher.pid",
+      ".watcher.log",
+      "**/*.pdf", "**/*.docx", "**/*.pptx", "**/*.xlsx",
+      "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp", "**/*.gif",
+      "**/*.mp3", "**/*.wav", "**/*.mp4", "**/*.mov",
+      "**/*.zip", "**/*.tar.gz", "**/*.rar"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  },
+  "tokenCount": {
+    "encoding": "o200k_base"
+  }
+}

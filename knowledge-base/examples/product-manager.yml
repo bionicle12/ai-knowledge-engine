@@ -1,0 +1,163 @@
+# Example: Product Manager
+
+role: "Product Manager"
+
+description: |
+  A product manager who owns prioritization, user research, metrics, and the
+  product roadmap. The AI assistant helps with backlog grooming, hypothesis
+  framing, metric analysis, stakeholder communication, and writing product
+  documents (PRDs, RFCs, briefs) in the user's voice.
+
+entities:
+  product_strategy:
+    enabled: true
+    why: "Vision, OKRs, north-star metrics, strategic bets"
+    knowledge_paths:
+      - "knowledge/domain/product-strategy.md"
+      - "knowledge/decisions/"
+
+  user_research:
+    enabled: true
+    why: "Interviews, surveys, JTBD, user segments, personas"
+    knowledge_paths:
+      - "knowledge/domain/users.md"
+      - "knowledge/playbooks/user-interviewing.md"
+
+  metrics:
+    enabled: true
+    why: "Activation, retention, engagement, conversion, cohort analysis"
+    knowledge_paths:
+      - "knowledge/domain/metrics.md"
+      - "knowledge/playbooks/metric-analysis.md"
+
+  prioritization:
+    enabled: true
+    why: "RICE, ICE, Kano, opportunity sizing, trade-offs"
+    knowledge_paths:
+      - "knowledge/principles/prioritization.md"
+      - "knowledge/playbooks/backlog-grooming.md"
+
+  competitors:
+    enabled: true
+    why: "Competitive analysis, feature gaps, positioning"
+    knowledge_paths:
+      - "knowledge/domain/competitors.md"
+
+  stakeholders:
+    enabled: true
+    why: "Working with engineering, design, sales, exec — alignment patterns"
+    knowledge_paths:
+      - "knowledge/playbooks/stakeholder-alignment.md"
+      - "knowledge/voice/stakeholder-comms.md"
+
+  experiments:
+    enabled: true
+    why: "Hypotheses, A/B tests, results, what worked / didn't"
+    knowledge_paths:
+      - "knowledge/projects/experiments/"
+      - "knowledge/insights/experiment-learnings.md"
+
+  product_voice:
+    enabled: true
+    why: "How the PM writes specs, briefs, presentations"
+    knowledge_paths:
+      - "knowledge/voice/spec-writing.md"
+      - "knowledge/voice/communication-style.md"
+
+raw_data_examples:
+  - "PRDs and feature specs (DOCX, MD)"
+  - "User interview transcripts"
+  - "Quarterly OKRs and roadmaps"
+  - "Analytics dashboards (screenshots, exports)"
+  - "Competitor teardowns"
+  - "Customer feedback exports (Intercom, Zendesk)"
+  - "Recordings of stakeholder syncs"
+  - "Slack/Linear threads on product decisions"
+
+ai_assistant_tasks:
+  - "Drafting PRDs in your voice"
+  - "Prioritization frameworks applied to current backlog"
+  - "Experiment design and hypothesis framing"
+  - "Synthesizing findings from user interviews"
+  - "Metric analysis and root-cause investigation"
+  - "Drafting stakeholder updates and exec summaries"
+  - "Reviewing engineering proposals from a product lens"
+
+placement_examples:
+  intro: |
+    If you're a product manager, you sit in the middle of strategy, users,
+    metrics, and engineering. Your knowledge base captures *why* decisions
+    were made, not just *what* shipped — that context is what makes the AI
+    actually useful when you're staring at a tough trade-off.
+
+  by_artifact:
+    - artifact: "PRDs and feature specs"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "PRD-checkout-redesign.docx"
+        - "Spec: notification system v2.md"
+      knowledge_target: "knowledge/projects/"
+      tip: "Specs are gold — they capture both the decision and the rationale."
+
+    - artifact: "User interview transcripts and notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "interview-2026-05-15-saas-buyer.md"
+        - "Discovery call notes — onboarding pain points.md"
+      knowledge_target: "knowledge/domain/users.md"
+
+    - artifact: "Roadmap docs and OKRs"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Q2-2026-roadmap.pptx"
+        - "Annual OKRs (signed off).md"
+      knowledge_target: "knowledge/domain/product-strategy.md"
+
+    - artifact: "Analytics dashboards and exports"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "GA4-funnel-2026-05.png"
+        - "Mixpanel cohort export.csv"
+      knowledge_target: "knowledge/domain/metrics.md"
+
+    - artifact: "Competitor teardowns"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Competitor X — site & product teardown.md"
+        - "Pricing page screenshots batch.zip"
+      knowledge_target: "knowledge/domain/competitors.md"
+
+    - artifact: "Experiment results and post-mortems"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Experiment 042: pricing test results.md"
+        - "Post-mortem: failed onboarding redesign.md"
+      knowledge_target: "knowledge/projects/experiments/"
+
+    - artifact: "Decision documents (RFCs, ADRs)"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Decision: kill the mobile app.md"
+        - "Why we picked vendor X.md"
+      knowledge_target: "knowledge/decisions/"
+
+    - artifact: "Customer feedback exports"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Intercom-tickets-2026-q2.csv"
+        - "App Store reviews (1-star) export.json"
+      knowledge_target: "knowledge/domain/users.md"
+
+  quickstart:
+    - "Drop your latest OKR doc → raw/reference/unsorted/"
+    - "Two recent user interview transcripts → raw/work/unsorted/"
+    - "One competitor teardown you've written → raw/reference/unsorted/"
+    - "Run ./reindex.sh — your AI now thinks like *your* PM, not a generic one"
+    - "Ask: 'Draft a Q3 OKR for retention based on what we learned in Q2.'"
+
+  do_not_drop:
+    - "Real customer PII (names, emails, phone numbers)"
+    - "Confidential financials or compensation data of others"
+    - "NDA materials from partners or vendors"
+    - "Unpublished competitive intelligence acquired through dubious channels"
+    - "Internal HR conversations"

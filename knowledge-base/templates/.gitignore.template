@@ -1,0 +1,35 @@
+# AI Knowledge Engine — deployed KB .gitignore
+# Copy to your KB root as `.gitignore` (rename, removing .template).
+
+# Virtual env
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Repomix output (regenerated locally)
+.repomix/output.xml
+.repomix/
+
+# Operational state (regenerated, not source of truth)
+.last_consolidation
+.last_reflection
+.watcher.pid
+.watcher.log
+
+# Lint reports (regenerated)
+lint-report.md
+
+# Optional: ignore raw materials (sensitive). Uncomment if you don't want
+# to version-control source documents.
+# raw/
+# assets/
+# review/
+
+# Optional: ignore session logs (private). Uncomment to exclude.
+# interactions/
+# log.md
+
+# OS
+.DS_Store
+Thumbs.db

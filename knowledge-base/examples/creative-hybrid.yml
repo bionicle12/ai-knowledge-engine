@@ -154,3 +154,87 @@ example_conversations:
       "Я хочу через год начать зарабатывать на музыке.
        Какой реалистичный план, учитывая что я не знаю нот
        и работаю full-time программистом?"
+
+# ============================================================
+# Initial population helper (read by 14_INITIAL_POPULATION.md)
+# ============================================================
+placement_examples:
+  intro: |
+    Ты — мультидисциплинарный человек: программист по основной работе,
+    музыкант и геймдев в качестве хобби. У тебя гораздо больше
+    разнородных артефактов, чем у узкого специалиста. База знаний
+    собирает их в единое целое, чтобы AI понимал тебя как
+    "одного человека с тремя гранями", а не как набор разрозненных
+    сессий.
+
+  by_artifact:
+    - artifact: "Код, конфиги, ADR из рабочих проектов"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "ADR-001 выбор Rust для бэкенда.md"
+        - "Красивый GitHub Actions workflow.yml"
+      knowledge_target: "knowledge/domain/tech-stack.md"
+
+    - artifact: "Заметки по геймдизайну, балансу, механикам"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Game-design: economy v3.md"
+        - "Идея: PvP между корпорациями.md"
+      knowledge_target: "knowledge/domain/game-design.md"
+
+    - artifact: "Скриншоты и видео геймплея"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "playtest-2026-05-15.mp4"
+        - "ui-iteration-3.png"
+      knowledge_target: "knowledge/projects/games/"
+
+    - artifact: "Описания музыкальных проектов и треков"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Track-A-mixing-notes.md"
+        - "Stem-extraction-workflow.md"
+      knowledge_target: "knowledge/playbooks/music-production.md"
+      tip: "Проекты DAW (.als, .flp) клади как описание/notes, не сами файлы — они бинарные и большие."
+
+    - artifact: "Тексты песен и драфты"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "lyrics-draft-1.md"
+        - "Idea-for-chorus.txt"
+      knowledge_target: "knowledge/voice/songwriting-style.md"
+      tip: "Личный творческий артефакт — lifecycle: permanent (не устаревает)."
+
+    - artifact: "Референсы: треки, игры, статьи"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Reference-track-analysis.md"
+        - "blog-post-procedural-generation.pdf"
+      knowledge_target: "knowledge/domain/music-references.md"
+
+    - artifact: "Записи джемов и музыкальных экспериментов"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "jam-2026-05-15.mp3"
+        - "vocal-take-3.wav"
+
+    - artifact: "Межпредметные инсайты"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "Как рефакторинг похож на сведение трека.md"
+        - "Game economy ↔ распределённые системы.md"
+      knowledge_target: "knowledge/principles/cross-domain-insights.md"
+
+  quickstart:
+    - "Положи 1 заметку про принцип, который применяешь во всех 3 областях → raw/personal-context/unsorted/"
+    - "Любой README одного из своих рабочих или хобби-проектов → raw/reference/unsorted/"
+    - "Скриншот текущего game UI или music DAW → raw/media/unsorted/"
+    - "Запусти ./reindex.sh — AI начнёт понимать твою мультидисциплинарность"
+    - "Спроси AI: 'Что объединяет мой подход к коду и к музыке?' — после нескольких добавлений ответ будет содержательным"
+
+  do_not_drop:
+    - "Бинарные DAW-проекты (.als, .flp) — кладите описания, не файлы"
+    - "Чужие сэмплы и стемы без лицензии"
+    - "Чужой код без явной лицензии"
+    - "API-ключи и секреты"
+    - "Персональные данные коллег и партнёров"

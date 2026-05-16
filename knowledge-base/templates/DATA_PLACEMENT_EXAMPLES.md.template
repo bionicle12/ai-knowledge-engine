@@ -1,0 +1,47 @@
+# Data Placement Examples — {{KB_NAME}}
+
+> "I have this file — where do I put it?"
+> Generated for role: **{{PRIMARY_ROLE}}**.
+>
+> **This file is a starting skeleton.** During deployment, the AI agent reads
+> `examples/<role>.yml` (the `placement_examples:` section) and replaces this
+> file with role-specific guidance via the workflow described in
+> `14_INITIAL_POPULATION.md`. If you see only the generic table below, the
+> agent did not run the population step — ask it to do so explicitly.
+
+## General rule
+
+When in doubt, drop the file into `raw/unsorted/`. The pipeline will classify it or queue it for review.
+
+## Common cases
+
+| You have | Put it in |
+|----------|-----------|
+| A PDF/DOCX strategy doc, report, presentation | `raw/documents/unsorted/` |
+| An interesting article saved from the web | `raw/reference/unsorted/` |
+| An exported chat (Telegram, Slack, Discord) | `raw/chats/unsorted/` |
+| Audio/video recording (meeting, voice memo) | `raw/media/unsorted/` |
+| Random notes, screenshots, drafts | `raw/unsorted/` |
+| Personal context (history, preferences) | `raw/personal-context/unsorted/` |
+
+## After dropping
+
+1. (If watcher is running) — files are picked up automatically within ~5 seconds
+2. (Manual) — run `./reindex.sh` to trigger the pipeline
+3. Watch `log.md` to see what happened
+4. Check `review/needs-ai-decision/` if anything needs your AI agent's attention
+5. Check `knowledge/` to see freshly extracted knowledge
+
+## What NOT to drop
+
+- Secrets, API tokens, private keys, banking data
+- Third-party private chats without explicit permission
+- Medical or legal data of others
+- Material that would be embarrassing or harmful if leaked
+
+If a file is useful but sensitive, the pipeline routes it to `review/needs-redaction/`.
+You can also place it there manually.
+
+---
+
+> 🔧 Note: If the agent ran `14_INITIAL_POPULATION.md` properly, this file should contain a "Role-specific examples" section below. If it doesn't, ask the agent: *"Re-run initial population for my role."*

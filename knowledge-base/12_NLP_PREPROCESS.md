@@ -1,31 +1,31 @@
-# 12 — NLP-предобработка: NER и keyword extraction перед LLM
+# 12 — NLP preprocessing: NER and keyword extraction before LLM
 
-> Перед отправкой материала в LLM для анализа — прогоняем дешёвый NLP-пайплайн. LLM получает pre-resolved entities, связанные с существующими knowledge/ страницами.
-
----
-
-## Зачем
-
-- **Дешевле:** NER + keyword extraction на CPU, без API-вызовов
-- **Точнее:** Entity resolution сводит вариации («Docker Swarm» / «docker swarm» / «Swarm») к каноническому имени
-- **Быстрее:** LLM получает структурированный input вместо raw text
-- **Связность:** NLP автоматически находит ссылки на существующие knowledge/ страницы
+> Before sending material to an LLM for analysis we run a cheap NLP pipeline. The LLM receives pre-resolved entities linked to existing `knowledge/` pages.
 
 ---
 
-## Место в pipeline
+## Why
+
+- **Cheaper:** NER + keyword extraction run on CPU, no API calls
+- **More accurate:** entity resolution collapses variants ("Docker Swarm" / "docker swarm" / "Swarm") to a canonical name
+- **Faster:** the LLM gets structured input instead of raw text
+- **Linkage:** NLP automatically discovers references to existing `knowledge/` pages
+
+---
+
+## Place in the pipeline
 
 ```text
-raw/file → [Конвертация в MD] → processed/ → [NLP enrichment] → nlp-meta/ → [AI review / auto-extract]
+raw/file → [Convert to MD] → processed/ → [NLP enrichment] → nlp-meta/ → [AI review / auto-extract]
 ```
 
-NLP-шаг добавляется **после** конвертации в markdown и **до** AI-ревью.
+The NLP step sits **after** Markdown conversion and **before** AI review.
 
 ---
 
-## Зависимости
+## Dependencies
 
-Добавить в `requirements.txt`:
+Add to `requirements.txt`:
 
 ```txt
 # NLP pre-processing
@@ -34,37 +34,37 @@ rake-nltk>=1.0
 keybert>=0.8
 ```
 
-Установка модели spaCy:
+Install a spaCy model:
 
 ```bash
-# Русский
+# Russian
 python3 -m spacy download ru_core_news_md
 
-# Английский (если нужен)
+# English (if needed)
 python3 -m spacy download en_core_web_md
 
-# Мультиязычный (универсальный, но менее точный)
+# Multilingual (universal but less accurate)
 python3 -m spacy download xx_ent_wiki_sm
 ```
 
 ---
 
-## Контракт NLP-этапа
+## NLP-step contract
 
 ```python
 def nlp_enrich(text: str, knowledge_dir: str, lang: str = "auto") -> dict:
     """
-    NLP-обогащение текста перед отправкой в LLM.
+    NLP enrichment of text before sending to an LLM.
     
-    Этапы:
-    1. Language detection (если lang="auto")
+    Stages:
+    1. Language detection (if lang="auto")
     2. NER — Named Entity Recognition (spaCy)
     3. Keyword extraction — RAKE + KeyBERT
-    4. Entity resolution — fuzzy match с существующими knowledge/ pages
+    4. Entity resolution — fuzzy match against existing knowledge/ pages
     5. Complexity estimation
     
     Returns:
-        dict с entities, keywords, canonical_matches, complexity
+        dict with entities, keywords, canonical_matches, complexity
     """
 ```
 
@@ -73,7 +73,7 @@ def nlp_enrich(text: str, knowledge_dir: str, lang: str = "auto") -> dict:
 ```python
 import spacy
 
-nlp = spacy.load("ru_core_news_md")  # или en_core_web_md
+nlp = spacy.load("ru_core_news_md")  # or en_core_web_md
 doc = nlp(text)
 
 entities = []
@@ -86,40 +86,39 @@ for ent in doc.ents:
     })
 ```
 
-### 2. Keyword Extraction
+### 2. Keyword extraction
 
 ```python
 from rake_nltk import Rake
 from keybert import KeyBERT
 
-# RAKE — быстрый, rule-based
+# RAKE — fast, rule-based
 rake = Rake(language="russian")
 rake.extract_keywords_from_text(text)
 rake_keywords = rake.get_ranked_phrases_with_scores()[:20]
 
-# KeyBERT — embedding-based, точнее
+# KeyBERT — embedding-based, more accurate
 kw_model = KeyBERT()
 keybert_keywords = kw_model.extract_keywords(
     text, keyphrase_ngram_range=(1, 3), top_n=20
 )
 ```
 
-### 3. Entity Resolution (mode-aware)
+### 3. Entity resolution (mode-aware)
 
-#### `mode: default` — Python fuzzy match (0 токенов)
+#### `mode: default` — Python fuzzy match (0 tokens)
 
 ```python
 from difflib import SequenceMatcher
 
 def resolve_entities(entities: list, knowledge_dir: str) -> list:
     """
-    Для каждой найденной entity — ищем совпадение
-    с существующими knowledge/ страницами.
+    For each entity — find a match against existing knowledge/ pages.
     
-    Используем:
-    - Exact match по slug
+    Uses:
+    - Exact match by slug
     - Fuzzy match (SequenceMatcher ratio > 0.8)
-    - Словарь алиасов (если есть)
+    - Alias dictionary (if any)
     """
     knowledge_slugs = scan_knowledge_slugs(knowledge_dir)
     
@@ -137,41 +136,41 @@ def resolve_entities(entities: list, knowledge_dir: str) -> list:
                 entity["existing_page"] = knowledge_slugs[best_match[0]]
             else:
                 entity["canonical"] = entity["text"]
-                entity["existing_page"] = None  # кандидат на новую страницу
+                entity["existing_page"] = None  # candidate for a new page
     
     return entities
 ```
 
-> **Ограничения:** не понимает синонимы (`Dragonfly` ↔ `DragonflyDB` ↔ `Redis-совместимый кеш`), не обрабатывает мультиязычные варианты (`база данных` ↔ `database`).
+> **Limits:** does not understand synonyms (`Dragonfly` ↔ `DragonflyDB` ↔ `Redis-compatible cache`), does not handle multilingual variants (`база данных` ↔ `database`).
 
-#### `mode: super` — AI семантический (~500-1K токенов)
+#### `mode: super` — AI semantic (~500-1K tokens)
 
-AI-агент дополнительно:
-1. **Семантическое совпадение:** понимает, что `«кеш-слой»` = `«caching layer»` = `«DragonflyDB»` в контексте проекта
-2. **Иерархическая привязка:** entity может быть привязана к нескольким страницам на разных уровнях
-3. **Cross-language resolution:** `«база данных»` ↔ `«database»` ↔ `«БД»` без словарей
-4. **Context-aware:** понимает, что `«Redis»` в контексте кеширования → `[[caching]]`, а в контексте pub/sub → `[[messaging]]`
+The AI agent additionally:
+1. **Semantic match:** understands that `"cache layer"` = `"caching layer"` = `"DragonflyDB"` in this project's context
+2. **Hierarchical linkage:** an entity can be linked to several pages at different levels
+3. **Cross-language resolution:** `"база данных"` ↔ `"database"` ↔ `"DB"` without dictionaries
+4. **Context-aware:** understands that `"Redis"` in caching context → `[[caching]]`, in pub/sub context → `[[messaging]]`
 
 ```yaml
-# В kb.config.yml — управляется через mode_profiles:
+# In kb.config.yml — driven via mode_profiles:
 entity_resolution:
   # default: engine: "python"
   # super:   engine: "ai"     # AI primary + Python verification
 ```
 
-### 4. Complexity Estimation
+### 4. Complexity estimation
 
 ```python
 def estimate_complexity(text: str, entities: list, keywords: list) -> float:
     """
-    Оценка сложности материала (0.0 — 1.0).
+    Score the material's complexity (0.0 — 1.0).
     
-    Факторы:
-    - Длина текста (>2000 слов → +0.2)
-    - Количество unique entities (>15 → +0.2)
-    - Количество unresolved entities (>5 → +0.2)
-    - Наличие числовых данных / таблиц (→ +0.1)
-    - Наличие противоречивых маркеров ("однако", "но", "в отличие") (→ +0.1)
+    Factors:
+    - Length (>2000 words → +0.2)
+    - Unique entities (>15 → +0.2)
+    - Unresolved entities (>5 → +0.2)
+    - Numerical data / tables (→ +0.1)
+    - Contradiction markers ("however", "but", "in contrast") (→ +0.1)
     """
     score = 0.0
     # ... computation ...
@@ -180,9 +179,9 @@ def estimate_complexity(text: str, entities: list, keywords: list) -> float:
 
 ---
 
-## Файл NLP-метаданных
+## NLP metadata file
 
-Для каждого обработанного файла создаётся `processed/nlp-meta/<slug>.yml`:
+For each processed file `processed/nlp-meta/<slug>.yml` is created:
 
 ```yaml
 # processed/nlp-meta/2026-05-06__karpathy-llm-wiki.yml
@@ -230,29 +229,29 @@ unresolved_entities:
 
 ---
 
-## Как AI использует NLP-метаданные
+## How the AI uses NLP metadata
 
-При AI-ревью (04_REVIEW.md) агент читает NLP-метаданные **перед** основным текстом:
+During AI review (04_REVIEW.md) the agent reads the NLP metadata **before** the main text:
 
 ```markdown
-## AI Review с NLP-контекстом
+## AI review with NLP context
 
-Ты получаешь:
-1. NLP-мету: `processed/nlp-meta/<slug>.yml`
-2. Текст: `processed/markdown/<slug>.md`
+You receive:
+1. NLP meta: `processed/nlp-meta/<slug>.yml`
+2. Text: `processed/markdown/<slug>.md`
 
-NLP-мета уже содержит:
-- Извлечённые entities с привязкой к существующим knowledge/ страницам
-- Ключевые фразы с весами
-- Рекомендации, какие knowledge/ страницы обновить
-- Список неразрешённых entities (кандидаты на новые страницы)
+The NLP meta already contains:
+- Extracted entities linked to existing knowledge/ pages
+- Key phrases with weights
+- Suggestions for which knowledge/ pages to update
+- The unresolved-entities list (candidates for new pages)
 
-Используй эту информацию для более точного извлечения знаний.
+Use this to extract knowledge more precisely.
 ```
 
 ---
 
-## Конфигурация в `kb.config.yml`
+## Configuration in `kb.config.yml`
 
 ```yaml
 nlp:
@@ -261,16 +260,16 @@ nlp:
   spacy_model_fallback: "xx_ent_wiki_sm"
   keyword_top_n: 20
   fuzzy_match_threshold: 0.8
-  complexity_threshold: 0.7     # выше → review/needs-ai-decision/
-  skip_extensions: [".csv", ".xlsx"]  # таблицы не нуждаются в NER
+  complexity_threshold: 0.7     # higher → review/needs-ai-decision/
+  skip_extensions: [".csv", ".xlsx"]  # tables don't need NER
 ```
 
 ---
 
-## Интеграция
+## Integration
 
-- **03_PIPELINE:** NLP — шаг 4.5 между конвертацией и review
-- **04_REVIEW:** AI получает NLP-мету как контекст для ревью
-- **09_LINT:** lint проверяет, что NLP-мета существует для каждого processed файла
-- **10_LOG:** `nlp-enrich` записывается в лог
-- **13_AUTORUN:** watch mode автоматически запускает NLP
+- **03_PIPELINE:** NLP is step 4.5 between conversion and review
+- **04_REVIEW:** the AI receives NLP meta as review context
+- **09_LINT:** lint verifies that NLP meta exists for every processed file
+- **10_LOG:** `nlp-enrich` is recorded in the log
+- **13_AUTORUN:** watch mode runs NLP automatically

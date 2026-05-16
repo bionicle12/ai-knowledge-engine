@@ -1,20 +1,23 @@
-# 01 — Проверка окружения
+# 01 — Environment check
 
-> AI-агент должен выполнить эти проверки **до** создания структуры базы. Если чего-то не хватает — дать пользователю команды установки под его ОС.
+> The AI agent must run these checks **before** creating the knowledge base structure. If something is missing, give the user installation commands for their OS.
+>
+> **Reference template:** `knowledge-base/templates/requirements.txt`. The agent copies it into the deployed base root as `requirements.txt`.
+> **After deployment** run `python3 scripts/kb_doctor.py` — it automatically checks the environment, dependencies, structure, and the spaCy model.
 
 ---
 
-## Обязательные компоненты
+## Required components
 
-| Инструмент | Минимум | Рекомендация | Зачем |
-|---|---:|---:|---|
-| Node.js | `20.0.0+` | `22 LTS+` | Запуск Repomix |
-| Python | `3.11+` | `3.12+` | Локальный ingest-пайплайн |
-| Git | любая | актуальная | История изменений, hooks |
-| Repomix | любая | актуальная | Индексация знаний |
-| IDE с AI | обязательно | Codex / Cursor / JetBrains + AI | Ревью и работа с базой |
+| Tool | Minimum | Recommended | Why |
+|------|--------:|------------:|-----|
+| Node.js | `20.0.0+` | `22 LTS+` | Runs Repomix |
+| Python | `3.11+` | `3.12+` | Local ingest pipeline |
+| Git | any | latest | History, hooks |
+| Repomix | any | latest | Knowledge indexing |
+| IDE with AI | required | Codex / Cursor / JetBrains + AI | Review and base interaction |
 
-## Проверка
+## Verification
 
 ```bash
 node --version      # >= 20.0.0
@@ -23,62 +26,62 @@ git --version
 repomix --version
 ```
 
-Если `python` не найден, попробуй `python3`.
+If `python` is not found, try `python3`.
 
-## Установка Repomix
+## Installing Repomix
 
 ```bash
-# Глобально
+# Globally
 npm install -g repomix
 
-# Или без установки
+# Or zero-install
 npx repomix@latest
 ```
 
 ## Python virtual environment
 
 ```bash
-# Создать venv в корне базы
+# Create venv at the base root
 python3 -m venv .venv
 
-# Активировать
+# Activate
 source .venv/bin/activate        # Linux/macOS
 # .\.venv\Scripts\Activate.ps1   # Windows PowerShell
 
-# Установить зависимости
+# Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
 ## requirements.txt
 
-Создать в корне базы:
+Copy `templates/requirements.txt` from this repo into the base root. Pinned to minor versions for reproducibility:
 
-```txt
-pyyaml>=6.0
-python-slugify>=8.0
-python-docx>=1.1
-python-pptx>=0.6.23
-pypdf>=5.0
-pandas>=2.2
-openpyxl>=3.1
+```text
+pyyaml>=6.0,<7.0
+python-slugify>=8.0,<9.0
+python-frontmatter>=1.1,<2.0
+python-docx>=1.1,<2.0
+python-pptx>=0.6.23,<1.0
+pypdf>=5.0,<6.0
+pandas>=2.2,<3.0
+openpyxl>=3.1,<4.0
+spacy>=3.7,<4.0
+rake-nltk>=1.0,<2.0
+keybert>=0.8,<1.0
+watchdog>=4.0,<5.0
 ```
 
-Опционально (OCR, изображения):
+Optional (OCR, images): uncomment `pytesseract` and `Pillow` inside `requirements.txt`.
 
-```txt
-pytesseract>=0.3
-pillow>=10.0
-```
+## System utilities (optional)
 
-## Системные утилиты (опционально)
-
-| Утилита | Зачем |
-|---|---|
-| `pandoc` | DOCX/HTML/MD конвертации |
-| `poppler-utils` / `pdftotext` | Текст из PDF |
-| `tesseract` | OCR для сканов |
-| `ffmpeg` | Аудио из видео для STT |
+| Utility | Why |
+|---------|-----|
+| `pandoc` | DOCX/HTML/MD conversions |
+| `poppler-utils` / `pdftotext` | Text from PDF |
+| `tesseract` | OCR for scans |
+| `ffmpeg` | Audio from video for STT |
 
 ### Ubuntu
 
@@ -97,22 +100,22 @@ brew install pandoc poppler tesseract ffmpeg
 
 ```powershell
 winget install Gyan.FFmpeg
-# Tesseract и Poppler — через Chocolatey/Scoop, добавить в PATH
+# Tesseract and Poppler — via Chocolatey/Scoop, add to PATH
 ```
 
-Если Node.js из пакетного менеджера старее 20.0.0 — установить через `nvm`, `fnm` или NodeSource.
+If your package manager's Node.js is older than 20.0.0 — install via `nvm`, `fnm`, or NodeSource.
 
 ---
 
-## Контрольная проверка
+## Final check
 
-После установки все 4 команды должны работать без ошибок:
+After installation, all four commands should succeed:
 
 ```bash
 node --version && python3 --version && git --version && repomix --version
 ```
 
-Если PowerShell блокирует activate-скрипт:
+If PowerShell blocks the activate script:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned

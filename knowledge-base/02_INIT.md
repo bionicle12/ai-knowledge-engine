@@ -1,167 +1,170 @@
-# 02 — Инициализация базы знаний
+# 02 — Knowledge base initialization
 
-> Этот файл описывает фазу уточнения (вопросы пользователю) и создание структуры проекта.
-
----
-
-## Фаза 0: Уточнение намерения
-
-Перед созданием базы AI-агент **обязан** задать вопросы. Если часть ответов очевидна — предложить разумные значения по умолчанию.
-
-### Если пользователь НЕ указал роль
-
-Когда пользователь говорит "разверни базу" без конкретной роли, AI-агент:
-
-1. Сканирует `examples/*.yml` и показывает список доступных шаблонов:
-   ```
-   Доступные шаблоны ролей:
-   1. 📊 Директор по маркетингу — стратегия, бренд, аудитория, кампании
-   2. 💻 Senior Software Engineer — архитектура, код, дебаг, технологии
-   3. 🎨 Креативный гибрид — программист + музыка + геймдев
-   ```
-2. Дополнительно предлагает **креативные варианты**, которых нет в шаблонах:
-   ```
-   Или могу предложить:
-   4. 🎯 Продакт-менеджер — приоритизация, метрики, пользовательские исследования
-   5. ✍️ Контент-мейкер — тексты, соцсети, личный бренд, монетизация
-   6. 🔬 Исследователь / Аналитик — данные, гипотезы, публикации
-   7. 🏢 Основатель стартапа — продукт, команда, инвесторы, рынок
-   8. Своя роль — опиши, и я подготовлю конфигурацию
-   ```
-3. Пользователь выбирает номер или описывает свою роль
-
-### Если пользователь указал роль
-
-AI-агент ищет подходящий шаблон в `examples/` и переходит к **кастомизации** (см. ниже).
-
-### Кастомизация после выбора роли
-
-После выбора шаблона AI-агент **не просто копирует yml**, а задаёт уточняющие вопросы:
-
-1. **Посмотри сущности из шаблона — всё подходит или что-то лишнее/не хватает?**
-   - Показывает список entities с описанием
-   - Пользователь может убрать ненужные или добавить свои
-
-2. **Какие специфичные инструменты/технологии/подходы ты используешь?**
-   - Для программиста: "Какой стек? Rust, TypeScript, Python?"
-   - Для музыканта: "Какие DAW/инструменты? Suno, стемы через Demucs?"
-   - Для маркетолога: "Какие каналы и инструменты аналитики?"
-
-3. **Есть ли что-то уникальное в твоём подходе?**
-   - "Я не знаю нот, но делаю музыку через AI"
-   - "Я работаю один без команды"
-   - "У меня есть побочный проект-игра"
-
-4. **Хочешь дополнить или оставить как есть?**
-   - Если "как есть" — разворачиваем без дополнительных вопросов
-   - Если есть дополнения — AI интегрирует их в конфиг
-
-### Обязательные вопросы (после кастомизации)
-
-1. **Какие сырые данные будут загружаться?**
-   - Документы, презентации, чаты, код, аудио, видео, заметки, статьи
-
-2. **Что запрещено индексировать?**
-   - Секреты, токены, чужие приватные данные, медицинские/юридические данные
-
-3. **Нужен ли личный контекст?**
-   - Стиль мышления, творческие интересы, профессиональная история, предпочтения
-
-4. **Есть ли Git?**
-   - Если да — настроим автообновление через post-commit hook
+> This module covers the clarification phase (questions for the user) and the project structure creation.
+>
+> **Reference templates:** `knowledge-base/templates/kb.config.yml.template`, `KNOWLEDGE_STRUCTURE.md.template`, `DATA_PLACEMENT_EXAMPLES.md.template`, `.gitignore.template`. The agent copies them into the deployed base root and parameterizes the placeholders.
+> **Auto-init folders:** the structure can be created with one command — `python3 scripts/kb_ingest.py --init-dirs`.
 
 ---
 
-## Фаза 1: Создание структуры
+## Phase 0: clarify intent
 
-После уточнения AI-агент создаёт в корне проекта:
+Before creating the base, the AI agent **must** ask questions. Where the answers are obvious, propose sensible defaults.
+
+### When the user did NOT specify a role
+
+When the user says "deploy a base" without naming a role, the agent:
+
+1. Scans `examples/*.yml` and shows the available templates:
+   ```
+   Available role templates:
+   1. 📊 Marketing Director — strategy, brand, audience, campaigns
+   2. 💻 Senior Software Engineer — architecture, code, debugging, technologies
+   3. 🎨 Creative Hybrid — programmer + music + gamedev
+   ```
+2. Additionally suggests **creative options** not in the templates:
+   ```
+   Or I can suggest:
+   4. 🎯 Product Manager — prioritization, metrics, user research
+   5. ✍️ Content creator — copywriting, social media, personal brand, monetization
+   6. 🔬 Researcher / Analyst — data, hypotheses, publications
+   7. 🏢 Startup Founder — product, team, investors, market
+   8. Custom role — describe it, and I'll prepare a configuration
+   ```
+3. The user picks a number or describes their own role
+
+### When the user specified a role
+
+The AI agent finds a matching template in `examples/` and moves on to **customization** (see below).
+
+### Customization after picking a role
+
+After selecting a template the agent **does not just copy yml**, it asks clarifying questions:
+
+1. **Look at the entities in the template — does it all fit, or is something extra/missing?**
+   - Show the entity list with descriptions
+   - The user can drop unneeded ones or add custom
+
+2. **What specific tools/technologies/approaches do you use?**
+   - For a programmer: "What stack? Rust, TypeScript, Python?"
+   - For a musician: "Which DAW/tools? Suno, stems via Demucs?"
+   - For a marketer: "What channels and analytics tools?"
+
+3. **Anything unique about your approach?**
+   - "I don't read sheet music but I make music with AI"
+   - "I work alone, no team"
+   - "I have a side game project"
+
+4. **Want to add anything or keep as is?**
+   - "As is" → deploy without further questions
+   - Anything to add → AI integrates it into the config
+
+### Mandatory questions (after customization)
+
+1. **What raw data will be loaded?**
+   - Documents, presentations, chats, code, audio, video, notes, articles
+
+2. **What is forbidden to index?**
+   - Secrets, tokens, third-party private data, medical/legal data
+
+3. **Is personal context needed?**
+   - Thinking style, creative interests, professional history, preferences
+
+4. **Is there Git?**
+   - If yes — set up auto-update via post-commit hook
+
+---
+
+## Phase 1: create structure
+
+After clarification the AI agent creates in the project root:
 
 ```text
 knowledge-base/
-├── README.md                   # Что за база, как пользоваться
-├── AGENTS.md                   # Инструкция для AI-агента (из шаблона 06)
-├── KNOWLEDGE_STRUCTURE.md      # Описание каждой папки и правил
-├── DATA_PLACEMENT_EXAMPLES.md  # "Есть PDF → положи сюда"
-├── kb.config.yml               # Роль, сущности, правила
-├── repomix.config.json         # Конфиг индексации
-├── requirements.txt            # Python-зависимости
-├── reindex.sh                  # Скрипт обновления
+├── README.md                   # What this base is, how to use it
+├── AGENTS.md                   # AI agent instructions (from template 06)
+├── KNOWLEDGE_STRUCTURE.md      # Description of every folder and rules
+├── DATA_PLACEMENT_EXAMPLES.md  # "Got a PDF → drop it here"
+├── kb.config.yml               # Role, entities, rules
+├── repomix.config.json         # Indexer config
+├── requirements.txt            # Python dependencies
+├── reindex.sh                  # Update script
 │
 ├── scripts/
-│   └── kb_ingest.py            # Пайплайн обработки (см. 03_PIPELINE.md)
+│   └── kb_ingest.py            # Pipeline (see 03_PIPELINE.md)
 │
-├── raw/                        # Сырые данные (НЕ индексируется)
-│   ├── unsorted/               # Не знаю куда → сюда
-│   ├── work/unsorted/          # Рабочие документы
-│   ├── chats/unsorted/         # Экспорты чатов/переписок
-│   ├── media/unsorted/         # Видео, аудио, записи
-│   ├── personal-context/unsorted/  # Личный контекст
-│   └── reference/unsorted/     # Эталонные материалы, статьи
+├── raw/                        # Raw data (NOT indexed)
+│   ├── unsorted/               # Don't know where → here
+│   ├── work/unsorted/          # Working documents
+│   ├── chats/unsorted/         # Chat / conversation exports
+│   ├── media/unsorted/         # Video, audio, recordings
+│   ├── personal-context/unsorted/  # Personal context
+│   └── reference/unsorted/     # Reference materials, articles
 │
-├── processed/                  # Конвертированное (НЕ индексируется)
+├── processed/                  # Converted artifacts (NOT indexed)
 │   ├── markdown/
 │   ├── transcripts/
 │   ├── ocr/
 │   ├── tables/
 │   └── extracted-metadata/
 │
-├── knowledge/                  # ✅ Чистые знания → ИНДЕКСИРУЕТСЯ
-│   ├── profile/                # Профиль, экспертиза, сильные стороны
-│   ├── principles/             # Рабочие принципы, критерии качества
-│   ├── domain/                 # Предметная область, рынок, знания (≈ world network)
-│   ├── projects/               # Проекты, кейсы, результаты
-│   ├── decisions/              # Решения: что, почему, результат
-│   ├── voice/                  # Стиль речи, письма, объяснений
-│   ├── timelines/              # Хронология, этапы развития
-│   ├── playbooks/              # Повторяемые схемы работы (≈ experience network)
-│   ├── insights/               # Синтезированные выводы из фактов/опыта (higher-level)
-│   ├── opinions/               # Субъективные оценки с confidence и датой
-│   ├── routing/                # Routing tables для масштабированной навигации
-│   └── open-questions/         # Вопросы, которые база не закрывает
+├── knowledge/                  # ✅ Clean knowledge → INDEXED
+│   ├── profile/                # Profile, expertise, strengths
+│   ├── principles/             # Working principles, quality bars
+│   ├── domain/                 # Domain area, market, knowledge (≈ world network)
+│   ├── projects/               # Projects, cases, results
+│   ├── decisions/              # Decisions: what, why, outcome
+│   ├── voice/                  # Speaking, writing, explaining style
+│   ├── timelines/              # Chronology, growth stages
+│   ├── playbooks/              # Repeatable workflows (≈ experience network)
+│   ├── insights/               # Synthesized higher-level conclusions
+│   ├── opinions/               # Subjective takes with confidence and date
+│   ├── routing/                # Routing tables for scaled navigation
+│   └── open-questions/         # Questions the base does not answer
 │
-├── assets/                     # Бинарные оригиналы (НЕ индексируется)
+├── assets/                     # Binary originals (NOT indexed)
 │   ├── documents/
 │   ├── presentations/
 │   ├── media/
 │   ├── images/
 │   └── archives/
 │
-├── assets-index/               # ✅ MD-описания ассетов → ИНДЕКСИРУЕТСЯ
+├── assets-index/               # ✅ MD descriptions of assets → INDEXED
 │   ├── documents.md
 │   ├── presentations.md
 │   ├── media.md
 │   ├── images.md
 │   └── archives.md
 │
-├── review/                     # Очереди ревью (НЕ индексируется)
+├── review/                     # Review queues (NOT indexed)
 │   ├── needs-classification/
 │   ├── needs-ai-decision/
 │   ├── needs-redaction/
 │   └── excluded-sensitive/
 │
-├── interactions/               # Feedback loop (НЕ индексируется напрямую)
-│   ├── sessions/               # Папки диалогов с таймстампами
-│   ├── insights/               # Извлечённые паттерны
-│   └── meta-reviews/           # Периодический анализ
+├── interactions/               # Feedback loop (NOT indexed directly)
+│   ├── sessions/               # Dialog folders with timestamps
+│   ├── insights/               # Extracted patterns
+│   └── meta-reviews/           # Periodic analysis
 │
-├── setup/                      # Seed-инструкции (НЕ индексируется)
+├── setup/                      # Seed instructions (NOT indexed)
 └── .repomix/
     └── output.xml
 ```
 
 ---
 
-## Фаза 2: `kb.config.yml`
+## Phase 2: `kb.config.yml`
 
-AI-агент создаёт конфиг на основе ответов пользователя.
+The agent creates the config based on user answers.
 
-### Пример для смешанной роли (программист + хобби)
+### Example for a hybrid role (programmer + hobby)
 
 ```yaml
 knowledge_base:
   name: "personal-professional-kb"
   mode: "local-first"
-  language: "ru"
+  language: "en"
   index_policy: "clean-knowledge-only"
 
   roles:
@@ -178,36 +181,36 @@ privacy:
   require_redaction_for_chats: true
 
 language_policy:
-  primary: "ru"
-  extraction_rule: "извлекать на русском, сохранять оригинальные термины/названия"
-  metadata_language: "en"  # для slugов, имён файлов, frontmatter-ключей
+  primary: "en"
+  extraction_rule: "extract in primary language; preserve original terms / brand names verbatim"
+  metadata_language: "en"  # for slugs, filenames, frontmatter keys
 
 entities:
-  # Описываются пользователем через examples/ или вручную
-  # см. examples/*.yml
+  # Described by the user via examples/ or manually
+  # see examples/*.yml
 ```
 
 ---
 
-## Правила исключения
+## Exclusion rules
 
-НЕ добавлять в `knowledge/` и НЕ индексировать:
+Do NOT add to `knowledge/` and do NOT index:
 
-- пароли, токены, API-ключи, seed-фразы, приватные ключи
-- банковские реквизиты, паспортные данные, документы третьих лиц
-- чужие приватные переписки без права на обработку
-- медицинские данные других людей
-- персональные конфликты, сплетни, интимный контекст
-- неочищенные raw-экспорты чатов
+- passwords, tokens, API keys, seed phrases, private keys
+- banking details, passport data, third-party documents
+- third-party private chats without permission to process
+- medical data of others
+- personal conflicts, gossip, intimate context
+- unredacted raw chat exports
 
-Если материал полезный, но чувствительный → `review/needs-redaction/`.
-Если нельзя безопасно использовать → `review/excluded-sensitive/`.
+If the material is useful but sensitive → `review/needs-redaction/`.
+If it can't be safely used → `review/excluded-sensitive/`.
 
 ---
 
-## Frontmatter-метаданные
+## Frontmatter metadata
 
-Каждый файл в `knowledge/` должен начинаться с YAML-блока между `---`:
+Every file in `knowledge/` must start with a YAML block between `---`:
 
 ```markdown
 ---
@@ -215,17 +218,31 @@ source: "assets/documents/2026-05-06__q2-strategy.pdf"
 extracted_at: 2026-05-06
 last_verified: 2026-05-06
 confidence: high
-tags: [стратегия, рост, q2-2026]
+tags: [strategy, growth, q2-2026]
 supersedes: null
 ---
 
-# Стратегия роста Q2
+# Q2 growth strategy
 
-...содержимое...
+...content...
 ```
 
-Это позволяет AI-агенту:
-- видеть **откуда** знание и проверить источник
-- определить **актуальность** (когда извлечено, когда последний раз проверено)
-- фильтровать по тегам
-- понять цепочку замен (supersedes)
+This lets the AI agent:
+- see **where** the knowledge came from and verify the source
+- judge **freshness** (when extracted, when last verified)
+- filter by tags
+- understand the supersession chain (`supersedes`)
+
+---
+
+## Phase 3: Initial Population
+
+After creating the structure and config the agent **must** proceed to `14_INITIAL_POPULATION.md`:
+
+1. Read the chosen role template (`examples/<role>.yml`) and find the `placement_examples:` section.
+2. **If the role is custom (not in `examples/`)**: create `examples/<slug>.yml` from `templates/role.yml.template` first by walking the user through the placeholders. The YAML must exist on disk **before** populating.
+3. Run `python3 scripts/kb_populate.py --role <slug> --kb-root .` — deterministic generation, no LLM tokens.
+4. (Recommended) Read the generated file and append a `## Project notes` section with project-specific tips that don't fit in YAML (~1-2K tokens).
+5. Show the user a 3-5 line summary with the most actionable quickstart items.
+
+If the role template has no `placement_examples:` section — `kb_populate.py` exits with an error; add the section to the YAML and re-run.

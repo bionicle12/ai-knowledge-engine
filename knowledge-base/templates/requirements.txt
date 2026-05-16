@@ -1,0 +1,29 @@
+# AI Knowledge Engine — Python dependencies
+# Pinned to minor versions for reproducibility. Bump as needed.
+
+# Core
+pyyaml>=6.0,<7.0
+python-slugify>=8.0,<9.0
+python-frontmatter>=1.1,<2.0
+
+# Document conversion
+python-docx>=1.1,<2.0
+python-pptx>=0.6.23,<1.0
+pypdf>=5.0,<6.0
+pandas>=2.2,<3.0
+openpyxl>=3.1,<4.0
+
+# NLP enrichment (see 12_NLP_PREPROCESS.md)
+spacy>=3.7,<4.0
+rake-nltk>=1.0,<2.0
+keybert>=0.8,<1.0
+
+# File watcher (see 13_AUTORUN.md)
+watchdog>=4.0,<5.0
+
+# Optional: OCR & images. Uncomment if tesseract is installed system-wide.
+# pytesseract>=0.3,<1.0
+# Pillow>=10.0,<12.0
+
+# Testing (dev only — install with: pip install -r requirements-dev.txt)
+# pytest>=8.0,<9.0

@@ -1,17 +1,20 @@
-# 05 — Индексация и Repomix
+# 05 — Indexing and Repomix
 
-> Настройка Repomix-индекса: что индексируется, что исключается, автообновление.
+> Configure the Repomix index: what is indexed, what is excluded, how it auto-updates.
+>
+> **Reference template:** `knowledge-base/templates/repomix.config.json.template`. The agent copies it to the deployed base root as `repomix.config.json` and parameterizes if needed.
+> **Reference shell script:** `knowledge-base/shell/reindex.sh` is copied as `reindex.sh` to the base root.
 
 ---
 
-## Принцип: только чистые данные
+## Principle: clean data only
 
-В Repomix-индекс попадают **только**:
-- `knowledge/**/*.md` — извлечённые знания
-- `assets-index/**/*.md` — описания бинарных файлов
-- Мета-файлы: `AGENTS.md`, `README.md`, `KNOWLEDGE_STRUCTURE.md`, `kb.config.yml`
+The Repomix index contains **only**:
+- `knowledge/**/*.md` — extracted knowledge
+- `assets-index/**/*.md` — descriptions of binary files
+- Meta files: `AGENTS.md`, `README.md`, `KNOWLEDGE_STRUCTURE.md`, `kb.config.yml`
 
-**НЕ индексируются:** `raw/`, `processed/`, `assets/`, `review/`, `interactions/`, `setup/`, `scripts/`.
+**Not indexed:** `raw/`, `processed/`, `assets/`, `review/`, `interactions/`, `setup/`, `scripts/`.
 
 ---
 
@@ -30,7 +33,7 @@
     "fileSummary": true,
     "directoryStructure": true,
     "topFilesLength": 20,
-    "headerText": "Локальная non-code knowledge base. Прочитай AGENTS.md перед использованием."
+    "headerText": "Local non-code knowledge base. Read AGENTS.md before use."
   },
   "include": [
     "AGENTS.md",
@@ -73,7 +76,7 @@
 }
 ```
 
-`compress: false` — для текстовых знаний важны формулировки и нюансы.
+`compress: false` — for textual knowledge, exact wording and nuance matter.
 
 ---
 
@@ -89,21 +92,21 @@ if [ -f ".venv/bin/python" ]; then
   PYTHON=".venv/bin/python"
 fi
 
-echo "Запуск ingest-пайплайна..."
+echo "Running ingest pipeline..."
 $PYTHON scripts/kb_ingest.py
 
 echo "Quick lint..."
 $PYTHON scripts/kb_lint.py --quick || true
 
-echo "Генерация Repomix-индекса..."
+echo "Generating Repomix index..."
 repomix
 
-# Запись в лог
+# Append to log
 echo "" >> log.md
 echo "## [$(date -Iseconds)] reindex | Auto reindex" >> log.md
 echo "- Output: .repomix/output.xml" >> log.md
 
-echo "Готово: .repomix/output.xml"
+echo "Done: .repomix/output.xml"
 ```
 
 ```bash
@@ -112,56 +115,56 @@ chmod +x reindex.sh
 
 ---
 
-## Git hooks и автозапуск
+## Git hooks and auto-run
 
-См. `13_AUTORUN.md` — подробные инструкции по автоматическому запуску:
+See `13_AUTORUN.md` for the full automation setup:
 - File watcher (watchdog daemon)
 - Git hooks (post-commit, pre-commit)
-- Cron (периодический lint + reindex)
+- Cron (periodic lint + reindex)
 
 ---
 
-## Cross-references: конвенция `[[wikilinks]]`
+## Cross-references: the `[[wikilinks]]` convention
 
-Все файлы в `knowledge/` могут ссылаться друг на друга через wikilinks:
+Files in `knowledge/` cross-reference each other via wikilinks:
 
 ```markdown
-# Пример в knowledge/domain/caching.md
-Мы используем [[DragonflyDB]] как Redis-совместимый кеш (см. [[infrastructure-decisions]]).
-Отказались от [[NATS]] в пользу Redis pub/sub (см. [[decisions/2026-03__no-nats]]).
+# Example in knowledge/domain/caching.md
+We use [[DragonflyDB]] as a Redis-compatible cache (see [[infrastructure-decisions]]).
+We dropped [[NATS]] in favor of Redis pub/sub (see [[decisions/2026-03__no-nats]]).
 ```
 
-### Формат ссылок
+### Link formats
 
-| Формат | Резолвится в |
+| Format | Resolves to |
 |--------|-------------|
-| `[[slug]]` | Поиск `slug.md` по всем подпапкам `knowledge/` |
-| `[[domain/caching]]` | Точный путь: `knowledge/domain/caching.md` |
-| `[[decisions/2026-03__no-nats]]` | Точный путь: `knowledge/decisions/2026-03__no-nats.md` |
+| `[[slug]]` | Search for `slug.md` in any `knowledge/` subfolder |
+| `[[domain/caching]]` | Exact path: `knowledge/domain/caching.md` |
+| `[[decisions/2026-03__no-nats]]` | Exact path: `knowledge/decisions/2026-03__no-nats.md` |
 
-### Правила
+### Rules
 
-1. Slug — это имя файла без `.md`
-2. При конфликте slug (файлы с одинаковым именем в разных папках) — использовать полный путь
-3. `kb_lint.py` проверяет валидность всех wikilinks
-4. Несуществующие ссылки — lint error
-5. AI-агент при создании/обновлении knowledge/ страниц **обязан** добавлять wikilinks на связанные страницы
+1. Slug = filename without `.md`
+2. On slug conflict (same filename in multiple folders) — use the full path
+3. `kb_lint.py` validates every wikilink
+4. Broken links → lint error
+5. The AI agent **must** add wikilinks to related pages when creating/updating `knowledge/` files
 
-### Автоматическая инъекция (опционально)
+### Optional automation
 
-Python-скрипт может предлагать wikilinks:
+A Python helper can suggest wikilinks:
 ```python
 def suggest_wikilinks(text: str, knowledge_slugs: dict) -> list:
-    """Находит упоминания entity names из knowledge/ и предлагает обернуть в [[]]."""
+    """Find mentions of entity names from knowledge/ and suggest [[wrapping]]."""
 ```
 
 ---
 
-## Routing tables: навигация для масштабированных баз
+## Routing tables: navigation for scaled bases
 
-Когда `knowledge/` содержит > 50 файлов, плоский индекс становится context dump. Routing tables — двухуровневая навигация.
+When `knowledge/` holds > 50 files, a flat index becomes a context dump. Routing tables provide two-level navigation.
 
-### `knowledge/routing-table.md` (верхний уровень)
+### `knowledge/routing-table.md` (top level)
 
 ```markdown
 # Routing Table
@@ -174,31 +177,31 @@ def suggest_wikilinks(text: str, knowledge_slugs: dict) -> list:
 - [[rt/devops]] — CI/CD, monitoring, deployment, backups
 
 ## Meta
-- [[rt/profile]] — кто автор, экспертиза, предпочтения
-- [[rt/principles]] — рабочие принципы, критерии качества
-- [[rt/decisions-log]] — хронология ключевых решений
+- [[rt/profile]] — author, expertise, preferences
+- [[rt/principles]] — working principles, quality bars
+- [[rt/decisions-log]] — chronology of key decisions
 ```
 
-### `knowledge/routing/rt-infrastructure.md` (второй уровень)
+### `knowledge/routing/rt-infrastructure.md` (second level)
 
 ```markdown
 # Infrastructure
 
-## Ключевые страницы
-- [[domain/docker-swarm]] — почему Swarm, а не K8s
-- [[domain/caching]] — DragonflyDB, паттерны кеширования
-- [[domain/database]] — PostgreSQL 16, миграции, индексы
+## Key pages
+- [[domain/docker-swarm]] — why Swarm, not K8s
+- [[domain/caching]] — DragonflyDB, caching patterns
+- [[domain/database]] — PostgreSQL 16, migrations, indexes
 
-## Смежные области
-- → [[rt/devops]] для CI/CD и мониторинга
-- → [[rt/auth]] для инфраструктуры аутентификации
+## Adjacent areas
+- → [[rt/devops]] for CI/CD and monitoring
+- → [[rt/auth]] for authentication infrastructure
 ```
 
-### Навигация AI-агента
+### Agent navigation
 
-1. Читает `routing-table.md` (~20 строк)
-2. Определяет нужную тему → переходит к routing page
-3. Находит конкретные страницы → читает их
-4. **3 хопа** вместо чтения всего индекса
+1. Reads `routing-table.md` (~20 lines)
+2. Picks the right topic → jumps to a routing page
+3. Finds concrete pages → reads them
+4. **3 hops** instead of reading the entire index
 
-Routing table создаётся и поддерживается AI-агентом. Lint проверяет, что все ссылки в routing table валидны.
+The routing table is created and maintained by the AI agent. Lint verifies that all routing-table links are valid.

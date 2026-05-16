@@ -1,41 +1,41 @@
 # 04 — AI Review Queue
 
-> Workflow обработки материалов, которые Python-скрипт не смог автоматически превратить в знания.
+> Workflow for materials the Python pipeline could not turn into knowledge automatically.
 
 ---
 
-## Очереди
+## Queues
 
-| Папка | Когда попадает | Кто обрабатывает |
-|-------|---------------|------------------|
-| `review/needs-classification/` | Скрипт не определил тип/место | AI-агент |
-| `review/needs-ai-decision/` | Нужен смысловой анализ | AI-агент в IDE |
-| `review/needs-redaction/` | Обнаружены чувствительные данные | AI-агент + человек |
-| `review/excluded-sensitive/` | Нельзя использовать | Никто (архив) |
+| Folder | When entries land here | Who handles them |
+|--------|------------------------|------------------|
+| `review/needs-classification/` | Pipeline could not determine type/destination | AI agent |
+| `review/needs-ai-decision/` | Needs semantic analysis | AI agent in IDE |
+| `review/needs-redaction/` | Sensitive data detected | AI agent + human |
+| `review/excluded-sensitive/` | Cannot be used | Nobody (archive) |
 
-Весь `review/` исключён из Repomix-индекса.
+All of `review/` is excluded from the Repomix index.
 
 ---
 
-## Формат review-пакета
+## Review-package format
 
-Python-скрипт создаёт пакет для каждого материала в `review/needs-ai-decision/`:
+The Python pipeline writes a package for each item in `review/needs-ai-decision/`:
 
 ```markdown
 # AI Review: q2-growth-strategy.pdf
 
-## Источник
+## Source
 
-- Оригинал: assets/documents/2026-05-06__q2-growth-strategy.pdf
-- Конвертация: processed/markdown/2026-05-06__q2-growth-strategy.md
-- Определённый тип: стратегия / исследование / презентация
-- Уверенность: средняя
+- Original: assets/documents/2026-05-06__q2-growth-strategy.pdf
+- Conversion: processed/markdown/2026-05-06__q2-growth-strategy.md
+- Detected type: strategy / research / presentation
+- Confidence: medium
 
-## Почему нужен AI-ревью
+## Why review is needed
 
-Материал содержит стратегические решения, инсайты об аудитории и потенциально переиспользуемые фреймворки.
+The material contains strategic decisions, audience insights, and potentially reusable frameworks.
 
-## Предполагаемые цели извлечения
+## Likely extraction targets
 
 - knowledge/domain/
 - knowledge/projects/
@@ -43,56 +43,56 @@ Python-скрипт создаёт пакет для каждого матери
 - knowledge/playbooks/
 - assets-index/documents.md
 
-## Вопросы для AI-агента
+## Questions for the AI agent
 
-- Какие устойчивые знания извлечь?
-- Какие решения, принципы или фреймворки здесь есть?
-- Что временное и не должно стать глобальным знанием?
-- Есть ли противоречия с существующими файлами в knowledge/?
-- Нужна ли редакция перед индексацией?
+- What durable knowledge should be extracted?
+- What decisions, principles, or frameworks are present?
+- What is temporary and should not become permanent knowledge?
+- Are there contradictions with existing files in `knowledge/`?
+- Is redaction required before indexing?
 ```
 
 ---
 
-## Промпт для AI-агента при обработке review
+## Prompt for the AI agent when processing review
 
 ```markdown
-Ты работаешь с локальной non-code knowledge base.
+You are working with a local non-code knowledge base.
 
-Сначала прочитай:
+First read:
 - AGENTS.md
 - KNOWLEDGE_STRUCTURE.md
 - kb.config.yml
-- Выбранный файл из review/needs-ai-decision/
+- The chosen file from review/needs-ai-decision/
 
-Твоя задача: превратить материал в чистые знания для Repomix-индекса.
+Your task: turn the material into clean knowledge for the Repomix index.
 
-Правила:
-1. Извлеки durable knowledge: факты, принципы, решения, инсайты, фреймворки, стиль
-2. Не тащи сырой шум, временные детали и чувствительные данные
-3. Обнови релевантные файлы в knowledge/ (не создавай дубли)
-4. Добавь frontmatter: source, extracted_at, tags
-5. Обнови assets-index/ если описываешь бинарный ассет
-6. Если нужна очистка → review/needs-redaction/ с объяснением
-7. Если не хватает контекста → knowledge/open-questions/
-8. Сообщи, какие файлы обновлены и почему
+Rules:
+1. Extract durable knowledge: facts, principles, decisions, insights, frameworks, voice
+2. Do not carry over raw noise, transient details, or sensitive data
+3. Update relevant files in knowledge/ (do not create duplicates)
+4. Add frontmatter: source, extracted_at, tags
+5. Update assets-index/ when describing a binary asset
+6. If redaction is needed → review/needs-redaction/ with explanation
+7. If context is missing → knowledge/open-questions/
+8. Report which files were updated and why
 
-Запрещено:
-- Индексировать raw/ и review/ напрямую
-- Копировать длинные фрагменты чатов
-- Добавлять персональные данные третьих лиц
-- Создавать новые папки в knowledge/ без уточнения у пользователя
+Forbidden:
+- Indexing raw/ and review/ directly
+- Copying long chat fragments
+- Adding personal data of third parties
+- Creating new folders in knowledge/ without checking with the user
 ```
 
 ---
 
-## Workflow обработки
+## Processing workflow
 
 ```text
-1. Открыть review/needs-ai-decision/ в IDE
-2. Выбрать review-пакет
-3. Прочитать связанный файл из processed/
-4. Извлечь знания → обновить knowledge/
-5. Удалить обработанный пакет из review/
-6. Запустить ./reindex.sh
+1. Open review/needs-ai-decision/ in the IDE
+2. Pick a review package
+3. Read the linked file from processed/
+4. Extract knowledge → update knowledge/
+5. Delete the processed package from review/
+6. Run ./reindex.sh
 ```

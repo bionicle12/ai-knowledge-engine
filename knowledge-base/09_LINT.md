@@ -1,71 +1,73 @@
-# 09 — Lint: периодический health-check базы знаний
+# 09 — Lint: periodic health-check of the knowledge base
 
-> Операция lint проверяет здоровье **существующей** базы. В отличие от review (04), который обрабатывает входящие материалы, lint анализирует то, что уже находится в `knowledge/`.
-
----
-
-## Зачем
-
-База знаний деградирует без обслуживания: факты устаревают, страницы теряют связи, появляются противоречия. Lint выявляет эти проблемы до того, как AI-агент начнёт давать ответы на основе stale data.
+> The lint operation checks the health of an **existing** base. Unlike review (04), which handles incoming materials, lint analyzes what is already in `knowledge/`.
+>
+> **Reference implementation:** `knowledge-base/scripts/kb_lint.py`. The agent copies this script during deployment.
 
 ---
 
-## Два уровня проверки
+## Why
 
-### Уровень 1: Автоматический (Python)
+A knowledge base degrades without maintenance: facts age, pages lose links, contradictions creep in. Lint catches these issues before the AI agent starts answering from stale data.
 
-Выполняется `scripts/kb_lint.py` — детерминированные проверки без LLM.
+---
 
-| Проверка | Что делает | Severity |
-|----------|-----------|----------|
-| **Frontmatter integrity** | Все файлы в `knowledge/` имеют обязательные поля: `source`, `extracted_at`, `tags`, `lifecycle` | 🔴 error |
-| **Stale pages** | `last_verified` старше 30 дней. **Пропускает** `lifecycle: permanent` | 🟡 warning |
-| **Broken wikilinks** | `[[slug]]` ведёт на несуществующий файл | 🔴 error |
-| **Orphan pages** | Страницы без единого входящего `[[wikilink]]` из других страниц | 🟡 warning |
-| **Source hash mismatch** | `source_hash` не совпадает с hash файла в `assets/`. **Пропускает** `lifecycle: permanent` | 🔴 error |
-| **Empty categories** | Подпапки `knowledge/` без единого `.md` файла | 🟡 warning |
-| **Superseded chains** | Файл A `supersedes: B`, но B не в `_archive/`. **Не трогает** `lifecycle: permanent` | 🟡 warning |
-| **Duplicate slugs** | Два файла с одинаковым slug в разных подпапках | 🔴 error |
-| **Citation validity** | Span-level citations ссылаются на существующие файлы/строки | 🟡 warning |
-| **Domain overflow** | Подпапка `knowledge/` содержит > 15 `.md` файлов → предложить consolidation | 🟡 warning |
-| **Low importance + stale** | `importance < 3` + `lifecycle: temporal` + `last_accessed > 90 дней` → предложить архивировать | ℹ️ info |
-| **Annotation overflow** | Файл имеет > 5 `context_annotations` → предложить создать insight | ℹ️ info |
-| **Expired temporal** | `valid_until != null` + `valid_until < now` + файл не в `_archive/` | 🟡 warning |
+## Two levels of checks
 
-### Уровень 2: AI-ревью (LLM) — mode-aware
+### Level 1: automatic (Python)
 
-> ⚠️ **Стоимость:** 50-100K токенов на полный прогон (все knowledge/ файлы в контексте).
+Run by `scripts/kb_lint.py` — deterministic, no LLM.
+
+| Check | What it does | Severity |
+|-------|--------------|----------|
+| **Frontmatter integrity** | All `knowledge/` files have required fields: `source`, `extracted_at`, `tags`, `lifecycle` | 🔴 error |
+| **Stale pages** | `last_verified` older than 30 days. **Skips** `lifecycle: permanent` | 🟡 warning |
+| **Broken wikilinks** | `[[slug]]` points to a non-existent file | 🔴 error |
+| **Orphan pages** | Pages with no inbound `[[wikilink]]` from any other page | 🟡 warning |
+| **Source hash mismatch** | `source_hash` differs from the asset's actual hash. **Skips** `lifecycle: permanent` | 🔴 error |
+| **Empty categories** | `knowledge/` subfolders without any `.md` | 🟡 warning |
+| **Superseded chains** | File A `supersedes: B`, but B is not in `_archive/`. **Does not touch** `lifecycle: permanent` | 🟡 warning |
+| **Duplicate slugs** | Two files with the same slug in different subfolders | 🔴 error |
+| **Citation validity** | Span-level citations point to existing files/lines | 🟡 warning |
+| **Domain overflow** | A `knowledge/` subfolder contains > 15 `.md` → suggest consolidation | 🟡 warning |
+| **Low importance + stale** | `importance < 3` + `lifecycle: temporal` + `last_accessed > 90 days` → suggest archive | ℹ️ info |
+| **Annotation overflow** | A file has > 5 `context_annotations` → suggest creating an insight | ℹ️ info |
+| **Expired temporal** | `valid_until != null` + `valid_until < now` + file not in `_archive/` | 🟡 warning |
+
+### Level 2: AI review (LLM) — mode-aware
+
+> ⚠️ **Cost:** 50–100K tokens for a full pass (all `knowledge/` files in context).
 
 #### `mode: default`
-- Запускается **только** по команде `!audit` или еженедельно
-- Не чаще раза в неделю
+- Runs **only** on `!audit` or weekly
+- No more than once per week
 
 #### `mode: super`
-- Запускается **автоматически** при каждой консолидации (раз в 24ч)
-- AI также автоматически обрабатывает `review/needs-ai-decision/`
+- Runs **automatically** on every consolidation (every 24h)
+- The AI also auto-processes `review/needs-ai-decision/`
 
 ```yaml
-# В kb.config.yml — управляется через mode_profiles:
+# In kb.config.yml — driven via mode_profiles:
 lint:
   # default profile:
   level2_trigger: "manual"       # manual | weekly | daily
   level2_weekly_day: "sunday"
   # super profile:
-  # level2_trigger: "daily"      # при каждой консолидации
+  # level2_trigger: "daily"      # on every consolidation
   review_auto_process: false     # default: false, super: true
 ```
 
-| Проверка | Что делает |
-|----------|-----------|
-| **Contradictions** | Найти страницы с конфликтующими утверждениями |
-| **Missing cross-refs** | Страницы на похожие темы без ссылок друг на друга |
-| **Data gaps** | Области, где знаний недостаточно для уверенных ответов |
-| **Consolidation candidates** | Страницы, которые стоит объединить |
-| **Freshness recommendations** | Какие страницы стоит перепроверить/обновить |
+| Check | What it does |
+|-------|--------------|
+| **Contradictions** | Find pages with conflicting claims |
+| **Missing cross-refs** | Pages on similar topics with no links between them |
+| **Data gaps** | Areas where knowledge is too thin for confident answers |
+| **Consolidation candidates** | Pages worth merging |
+| **Freshness recommendations** | Which pages should be re-verified/updated |
 
+---
 
-
-## Формат lint-report
+## lint-report format
 
 ```markdown
 # Lint Report — 2026-05-06
@@ -108,17 +110,19 @@ Consider moving to knowledge/_archive/
 
 ---
 
-## Контракт `scripts/kb_lint.py`
+## `scripts/kb_lint.py` contract
 
 ```python
 """
-kb_lint.py — Automated health-check for knowledge base.
+kb_lint.py — Automated health-check for the knowledge base.
 
 Usage:
-    python3 scripts/kb_lint.py                    # Full lint
-    python3 scripts/kb_lint.py --quick            # Only errors
-    python3 scripts/kb_lint.py --fix              # Auto-fix where possible
-    python3 scripts/kb_lint.py --output report    # Write to lint-report.md
+    python3 scripts/kb_lint.py                          # Full lint
+    python3 scripts/kb_lint.py --quick                  # Errors only
+    python3 scripts/kb_lint.py --fix                    # Auto-fix where possible
+    python3 scripts/kb_lint.py --output report          # Write to lint-report.md
+    python3 scripts/kb_lint.py --only frontmatter       # Run a subset of checks
+    python3 scripts/kb_lint.py --json                   # Machine-readable output
 
 Exit codes:
     0 — no errors
@@ -129,25 +133,25 @@ Exit codes:
 
 ### Auto-fix capabilities
 
-С флагом `--fix` скрипт может:
-- Добавить недостающие frontmatter-поля с дефолтными значениями (lifecycle default: `evolving`)
-- Обновить `last_verified` для проверенных страниц
-- Переместить superseded файлы в `knowledge/_archive/` (**только** `evolving`/`temporal`, **не** `permanent`)
-- Удалить broken wikilinks (заменить на plain text)
+With `--fix`, the script can:
+- Add missing frontmatter fields with defaults (lifecycle default: `evolving`)
+- Refresh `last_verified` for verified pages
+- Move superseded files to `knowledge/_archive/` (**only** `evolving`/`temporal`, **not** `permanent`)
+- Remove broken wikilinks (replace with plain text)
 
-Auto-fix **не может** (требует AI или человека):
-- Резолвить противоречия
-- Создавать cross-references
-- Принимать решения об удалении/объединении
-- Изменять `lifecycle` без явного запроса пользователя
-- Архивировать файлы с `lifecycle: permanent`
+Auto-fix **cannot** (requires AI or human):
+- Resolve contradictions
+- Create cross-references
+- Decide deletion/merge
+- Change `lifecycle` without explicit user request
+- Archive `lifecycle: permanent` files
 
 ---
 
-## Запуск
+## Running lint
 
 ```bash
-# lint.sh — обёртка
+# lint.sh — wrapper
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
@@ -159,7 +163,7 @@ else
   python3 scripts/kb_lint.py "$@"
 fi
 
-# Запись в лог
+# Append to log
 echo "" >> log.md
 echo "## [$(date -Iseconds)] lint | Automated health-check" >> log.md
 echo "- Mode: $*" >> log.md
@@ -172,20 +176,20 @@ chmod +x lint.sh
 
 ---
 
-## Рекомендуемая частота
+## Recommended frequency
 
-| Режим | Частота | Кто запускает |
-|-------|---------|--------------|
-| `--quick` | При каждом reindex | Автоматически (в `reindex.sh`) |
-| Полный lint | Раз в неделю | Вручную или cron |
-| AI-ревью (уровень 2) | Раз в месяц | AI-агент в IDE по запросу |
+| Mode | Frequency | Who runs it |
+|------|-----------|-------------|
+| `--quick` | Every reindex | Automatically (in `reindex.sh`) |
+| Full lint | Weekly | Manual or cron |
+| AI review (level 2) | Monthly | AI agent in IDE on demand |
 
 ---
 
-## Интеграция с другими модулями
+## Integration with other modules
 
-- **03_PIPELINE:** ingest пишет frontmatter с source_hash → lint проверяет
-- **05_INDEX:** lint проверяет wikilinks → index обновляется
-- **10_LOG:** каждый lint записывается в `log.md`
-- **11_PROVENANCE:** lint проверяет citation validity, source hashes и lifecycle rules
-- **13_AUTORUN:** cron/watch запускает `--quick` при изменениях
+- **03_PIPELINE:** ingest writes frontmatter with `source_hash` → lint verifies
+- **05_INDEX:** lint validates wikilinks → index updates
+- **10_LOG:** every lint run is recorded in `log.md`
+- **11_PROVENANCE:** lint checks citation validity, source hashes, and lifecycle rules
+- **13_AUTORUN:** cron/watch runs `--quick` on changes

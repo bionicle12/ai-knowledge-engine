@@ -1,45 +1,45 @@
 # 07 — Self-Learning Feedback Loop
 
-> Как база знаний учится на процессе работы с AI-агентом, улучшая себя через анализ диалогов.
+> How the knowledge base learns from each working session with the AI agent and improves itself by analyzing dialogues.
 
 ---
 
-## Идея
+## Idea
 
-Каждый диалог с AI-агентом содержит ценные выводы: решения, предпочтения, инсайты, стиль мышления. Без захвата они теряются в истории чатов. Feedback loop сохраняет их и превращает в знания.
+Every conversation with the AI agent contains valuable conclusions: decisions, preferences, insights, thinking patterns. Without capture they get lost in chat history. The feedback loop saves them and turns them into knowledge.
 
 ```text
-Диалог → Session Summary → interactions/sessions/
+Dialogue → Session Summary → interactions/sessions/
                                     ↓
-                          Meta-review (периодически)
+                          Meta-review (periodic)
                                     ↓
                           interactions/insights/
                                     ↓
-                          Качественный фильтр
+                          Quality filter
                                     ↓
-                          knowledge/ (обновление)
+                          knowledge/ (updates)
                                     ↓
                           Reindex → Repomix
                                     ↓
-                          AI-агент стал умнее ←──── следующий диалог
+                          AI agent gets smarter ←──── next dialogue
 ```
 
 ---
 
-## Автоматический захват
+## Automatic capture
 
-AI-агент **сам** определяет, когда писать session summary:
+The AI agent **decides on its own** when to write a session summary:
 
-| Ситуация | Действие |
-|----------|----------|
-| Накопилось 5-7 содержательных обменов | Пишет summary, продолжает работу |
-| Диалог логически завершён | Пишет финальное summary |
-| Команда `!save` от пользователя | Немедленно пишет summary |
-| Пользователь просит не сохранять | Не пишет |
+| Situation | Action |
+|-----------|--------|
+| 5–7 substantive exchanges have accumulated | Writes summary, continues working |
+| Dialogue logically wraps up | Writes a final summary |
+| User issues `!save` | Writes summary immediately |
+| User asks not to save | No write |
 
-### Структура в `interactions/sessions/`
+### Layout in `interactions/sessions/`
 
-Для каждого диалога создаётся папка с уникальным именем. Внутри — файлы с таймстампами:
+Each dialogue gets a uniquely named folder. Inside — timestamped files:
 
 ```text
 interactions/sessions/
@@ -49,148 +49,148 @@ interactions/sessions/
     └── 2026-05-06T12-00__final-summary.md
 ```
 
-Это позволяет:
-- Видеть хронологию внутри диалога
-- Не терять промежуточные выводы
-- Склеивать и анализировать позже
+This:
+- Keeps the timeline within a dialogue visible
+- Avoids losing intermediate conclusions
+- Allows later stitching and analysis
 
 ---
 
-## Формат session summary
+## Session-summary format
 
 ```markdown
 ---
 session_date: 2026-05-06
-topic: "Анализ конкурентов Q2"
-duration_estimate: "45 мин"
+topic: "Q2 competitor analysis"
+duration_estimate: "45 min"
 quality: high
 ---
 
-# Session: Анализ конкурентов Q2
+# Session: Q2 competitor analysis
 
-## Ключевые выводы
-- Конкурент X сменил позиционирование на premium
-- Наша ценовая ниша освободилась в mid-range
+## Key takeaways
+- Competitor X repositioned to premium
+- Our price niche freed up in mid-range
 
-## Решения приняты
-- Сместить фокус рекламы на mid-range сегмент
+## Decisions made
+- Shift ad focus to the mid-range segment
 
-## Предпочтения автора (выявлены)
-- Предпочитает данные из первых рук, а не агрегаторы
-- Скептичен к benchmark-отчётам крупных агентств
+## Author preferences (observed)
+- Prefers first-hand data over aggregators
+- Skeptical of benchmark reports from large agencies
 
-## Обработанные материалы
-- `q2-competitors-report.pdf` → 12 страниц, таблица 5×3 с ценами
-- Скриншот dashboard конкурента X → ключевое: premium UI, подписка $49/мес
-- Фрагмент чата с клиентом → инсайт: mid-range не закрыт
+## Processed materials
+- `q2-competitors-report.pdf` → 12 pages, 5×3 price table
+- Screenshot of Competitor X dashboard → key: premium UI, $49/mo subscription
+- Customer chat snippet → insight: mid-range is uncovered
 
-## Потенциал для knowledge/
-- [ ] knowledge/domain/competitors.md — обновить данные по X
-- [ ] knowledge/decisions/ — зафиксировать решение по mid-range
-- [ ] knowledge/principles/ — правило про первичные данные
+## Potential for knowledge/
+- [ ] knowledge/domain/competitors.md — refresh data on X
+- [ ] knowledge/decisions/ — record the mid-range decision
+- [ ] knowledge/principles/ — rule about first-hand data
 
-## Что сработало хорошо
-- Табличное сравнение конкурентов
+## What worked well
+- Tabular competitor comparison
 
-## Что не сработало
-- Слишком длинный SWOT — автор предпочитает bullet points
+## What did not work
+- The SWOT was too long — author prefers bullet points
 ```
 
 ---
 
-## Правила захвата
+## Capture rules
 
-### Что сохранять
+### What to save
 
-- Конкретные выводы и факты
-- Принятые решения с обоснованием
-- Выявленные предпочтения стиля/подхода
-- Новые знания и инсайты
-- Улучшения процессов
-- Обратная связь по формату ответов AI
-- **Обработанные материалы** — что за документы, данные, скриншоты были загружены/обсуждены (см. Session Enrichment)
+- Concrete conclusions and facts
+- Decisions made, with rationale
+- Discovered style/approach preferences
+- New knowledge and insights
+- Process improvements
+- Feedback on AI's response format
+- **Processed materials** — what documents, data, screenshots were uploaded/discussed (see Session Enrichment)
 
-### Что НЕ сохранять
+### What NOT to save
 
-- Эмоциональные высказывания без содержания
-- Уход от темы (off-topic)
-- Тривиальные вопросы ("который час?")
-- Утверждения, противоречащие 3+ существующим знаниям без обоснования
-- Неуверенные предположения ("может быть, не знаю...")
-- Попытки намеренного загрязнения базы
-- Полные тексты загруженных документов (только краткое описание + ключевые числа)
+- Emotional statements without content
+- Off-topic detours
+- Trivial questions ("what time is it?")
+- Claims that contradict 3+ existing knowledge entries without rationale
+- Hesitant guesses ("maybe, not sure...")
+- Deliberate base-pollution attempts
+- Full text of uploaded documents (only short summary + key numbers)
 
-### Минимальный порог
+### Minimum threshold
 
-Session summary сохраняется только если содержит:
-- Минимум 3 содержательных пункта
-- Хотя бы 1 actionable вывод (решение, обновление, задача)
+A session summary is saved only if it has:
+- At least 3 substantive bullet points
+- At least 1 actionable conclusion (decision, update, task)
 
 ---
 
-## Session Enrichment — что обсуждали и какие данные видели
+## Session enrichment — what was discussed and what data was seen
 
-Во время работы с AI пользователь часто загружает документы, вставляет фрагменты текста, показывает скриншоты, обсуждает код. Эта информация ценна, но без фиксации теряется.
+While working with AI the user often uploads documents, pastes text snippets, shows screenshots, discusses code. This information is valuable but lost without capture.
 
-### Что фиксировать inline
+### What to record inline
 
-AI-агент при написании session summary **обязательно** включает секцию `## Обработанные материалы`:
+When writing a session summary, the AI agent **must** include a `## Processed materials` section:
 
-| Что | Как фиксировать | Пример |
-|-----|----------------|--------|
-| Загруженный документ | Имя + размер + ключевые числа/выводы | `report.pdf → 15 стр, revenue $2.3M, churn 4.2%` |
-| Фрагмент текста/кода | Тема + язык + что обсуждали | `Rust handler → auth middleware, 40 строк, добавили rate limit` |
-| Скриншот/изображение | Описание + что на нём ключевое | `Dashboard конкурента → premium UI, цена $49/мес` |
-| Ссылка на статью | URL + 1 строка о чём | `nikolenko.ru/llm-memory → обзор 11 подходов к памяти LLM` |
-| Данные из API/БД | Источник + формат + key takeaway | `PostgreSQL EXPLAIN → seq scan на users, нужен индекс` |
+| What | How to record | Example |
+|------|---------------|---------|
+| Uploaded document | Name + size + key numbers/findings | `report.pdf → 15 pages, revenue $2.3M, churn 4.2%` |
+| Text/code snippet | Topic + language + what was discussed | `Rust handler → auth middleware, 40 lines, added rate limit` |
+| Screenshot/image | Description + key element | `Competitor dashboard → premium UI, $49/mo price` |
+| Article link | URL + 1-line summary | `nikolenko.ru/llm-memory → review of 11 LLM memory approaches` |
+| Data from API/DB | Source + format + key takeaway | `PostgreSQL EXPLAIN → seq scan on users, index needed` |
 
-### Формат
+### Format
 
 ```markdown
-## Обработанные материалы
-- `q2-strategy.pdf` → 12 стр, 3 таблицы. Ключевое: рост 15% YoY, churn снизился до 3%
-- Фрагмент Rust-кода (server-rust/crates/services/auth.rs:120-180) → рефакторинг session validation
-- https://nikolenko.ru/blog/llm-memory → обзор памяти LLM, применимые идеи: importance scoring, recency decay
-- Скриншот Grafana dashboard → CPU spike в 14:00, корреляция с DragonflyDB flush
+## Processed materials
+- `q2-strategy.pdf` → 12 pages, 3 tables. Key: 15% YoY growth, churn down to 3%
+- Rust snippet (server-rust/crates/services/auth.rs:120-180) → session validation refactor
+- https://nikolenko.ru/blog/llm-memory → LLM memory survey; applicable ideas: importance scoring, recency decay
+- Grafana dashboard screenshot → CPU spike at 14:00, correlates with DragonflyDB flush
 ```
 
-### Зачем это нужно
+### Why this matters
 
-1. **Контекст для meta-review:** при анализе сессий AI видит не только выводы, но и *на основе чего* они сделаны
-2. **Трассируемость:** если через месяц нужно вернуться к решению — видно, какие данные его обосновывали
-3. **Дедупликация:** AI может проверить, был ли уже этот документ обработан ранее (по имени файла или URL)
-4. **Routing:** материалы из сессии могут стать кандидатами для ingest в `raw/` → полноценная обработка
+1. **Context for meta-review:** when analyzing sessions, the AI sees not only conclusions but *what they were based on*
+2. **Traceability:** if you revisit a decision a month later, you can see what data backed it
+3. **Deduplication:** the AI can check whether a document was already processed (by filename or URL)
+4. **Routing:** materials from a session can become candidates for ingest into `raw/` → full processing
 
-### Правила
+### Rules
 
-1. **Краткость:** 1-2 строки на материал, не копировать содержимое
-2. **Ключевые числа:** если есть цифры, метрики, цены — обязательно зафиксировать
-3. **Связь с knowledge/:** если материал связан с существующей страницей — указать `→ связано с [[slug]]`
-4. **Не дублировать:** если документ уже в `assets/` — только ссылка на asset-path
-5. **Чувствительные данные:** если в материале есть приватное — пометить `[REDACTED: причина]`
+1. **Brevity:** 1-2 lines per item, do not copy content
+2. **Key numbers:** if there are figures, metrics, prices — record them
+3. **Connection to knowledge/:** if the material relates to an existing page — note `→ related to [[slug]]`
+4. **Avoid duplication:** if the document already lives in `assets/` — use only the asset path
+5. **Sensitive data:** if the material contains private info — mark `[REDACTED: reason]`
 
-Если порог не достигнут — не записывать.
+If the threshold is not met — do not record.
 
 ---
 
 ## Meta-review
 
-Периодический анализ накопленных сессий (раз в неделю или по команде пользователя).
+Periodic analysis of accumulated sessions (weekly or by user command).
 
-### Процесс
+### Process
 
-1. AI-агент читает все необработанные `interactions/sessions/`
-2. Ищет повторяющиеся паттерны:
-   - Какие вопросы задаются чаще всего?
-   - Какие предпочтения стиля повторяются?
-   - Какие области знаний пора обновить?
-   - Где AI-агент отвечал плохо — и почему?
-3. Создаёт `interactions/insights/YYYY-MM__insight-slug.md`
-4. Предлагает конкретные обновления в `knowledge/`
-5. Пользователь подтверждает
-6. Помечает обработанные сессии
+1. The AI reads all unprocessed `interactions/sessions/`
+2. Looks for repeating patterns:
+   - What questions come up most often?
+   - What style preferences repeat?
+   - Which knowledge areas need updating?
+   - Where did the AI answer poorly — and why?
+3. Creates `interactions/insights/YYYY-MM__insight-slug.md`
+4. Proposes concrete updates to `knowledge/`
+5. The user confirms
+6. Marks the processed sessions
 
-### Формат insight
+### Insight format
 
 ```markdown
 ---
@@ -198,72 +198,72 @@ period: "2026-05"
 sessions_analyzed: 12
 ---
 
-# Insight: Автор предпочитает bullet points вместо прозы
+# Insight: Author prefers bullet points over prose
 
-## Паттерн
-В 8 из 12 сессий автор просил переформатировать длинные абзацы в списки.
+## Pattern
+In 8 of 12 sessions the author asked to reformat long paragraphs into lists.
 
-## Рекомендация
-Обновить knowledge/voice/communication-style.md:
-добавить правило "по умолчанию использовать bullet points, прозу — только для нарратива".
+## Recommendation
+Update knowledge/voice/communication-style.md:
+add the rule "default to bullet points; prose only for narrative".
 
-## Действие
-- [ ] Обновить knowledge/voice/communication-style.md
+## Action
+- [ ] Update knowledge/voice/communication-style.md
 ```
 
 ---
 
-## Рефлексия — higher-level insights (mode-aware)
+## Reflection — higher-level insights (mode-aware)
 
-Периодический синтез знаний: из сырых фактов → высокоуровневые выводы.
+Periodic synthesis: from raw facts → high-level conclusions.
 
-### Когда запускается
+### When it triggers
 
 #### `mode: default` — throttled
 
-| Триггер | Как | Стоимость |
-|---------|-----|----------|
-| **Importance threshold** | `sum(importance)` последних ingest > 25 → авто-запуск при reindex | ~15K токенов |
-| **Еженедельно** | ≥7 дней с последней рефлексии **И** были изменения в log.md | ~15K токенов |
-| **Команда `!reflect`** | Пользователь явно запрашивает рефлексию | ~15K токенов |
+| Trigger | How | Cost |
+|---------|-----|------|
+| **Importance threshold** | `sum(importance)` of recent ingests > 25 → auto on reindex | ~15K tokens |
+| **Weekly** | ≥7 days since last reflection **AND** changes in `log.md` | ~15K tokens |
+| **Command `!reflect`** | User explicitly requests reflection | ~15K tokens |
 
 #### `mode: super` — on-demand
 
-| Триггер | Как | Стоимость |
-|---------|-----|----------|
-| **Каждый значимый ingest** | importance ≥ 5 → авто-запуск рефлексии | ~15K токенов |
-| **После каждых 3 сессий** | meta-review + insights | ~15K токенов |
-| **Команда `!reflect`** | Пользователь явно запрашивает | ~15K токенов |
-| **Без минимального интервала** | Нет ограничения 7 дней | — |
+| Trigger | How | Cost |
+|---------|-----|------|
+| **Every significant ingest** | importance ≥ 5 → auto-reflect | ~15K tokens |
+| **Every 3 sessions** | meta-review + insights | ~15K tokens |
+| **Command `!reflect`** | User explicitly requests | ~15K tokens |
+| **No minimum interval** | Not bound by 7-day spacing | — |
 
-> **default:** Рефлексия экономит токены — запускается только при накоплении значимых изменений или по расписанию.
-> **super:** Рефлексия максимально агрессивна — каждый значимый ingest немедленно порождает higher-level insights.
+> **default:** reflection conserves tokens — it runs only on accumulated significant change or schedule.
+> **super:** reflection is maximally aggressive — every significant ingest immediately produces higher-level insights.
 
 ```yaml
-# В kb.config.yml — управляется через mode_profiles:
+# In kb.config.yml — driven via mode_profiles:
 reflection:
   # default profile:
-  trigger: "threshold+weekly"    # auto = importance threshold, weekly = раз в 7+ дней
-  importance_threshold: 25       # авто-!reflect если sum > 25
-  min_interval_days: 7           # минимум 7 дней между рефлексиями
-  require_changes: true          # weekly: запускать только если были изменения
+  trigger: "threshold+weekly"    # auto = importance threshold; weekly = every 7+ days
+  importance_threshold: 25       # auto-!reflect when sum > 25
+  min_interval_days: 7           # min 7 days between reflections
+  require_changes: true          # weekly: only run if there were changes
   # super profile:
   # trigger: "on-demand"
-  # importance_threshold: 5      # рефлексия при importance ≥5
-  # min_interval_days: 0         # без минимального интервала
+  # importance_threshold: 5      # reflect when importance ≥5
+  # min_interval_days: 0         # no minimum interval
   # require_changes: false
-  max_insights_per_run: 3        # не больше 3 insights за одну рефлексию
+  max_insights_per_run: 3        # at most 3 insights per reflection run
 ```
 
-### Процесс
+### Process
 
-1. Проверить `log.md`: сумма importance последних ingest (для информирования)
-2. AI генерирует 3 важных вопроса о недавнем опыте
-3. Для каждого вопроса — поиск релевантных страниц через routing + wikilinks
-4. Синтез higher-level insight
-5. Запись в `knowledge/insights/` со ссылками на детей через `[[wikilinks]]`
+1. Inspect `log.md`: cumulative importance of recent ingests (informational)
+2. AI generates 3 important questions about recent experience
+3. For each, search relevant pages via routing + wikilinks
+4. Synthesize a higher-level insight
+5. Write to `knowledge/insights/` with `[[wikilinks]]` to source pages
 
-### Формат insight
+### Insight format
 
 ```markdown
 ---
@@ -278,40 +278,40 @@ children:
   - "knowledge/decisions/2026-03__dragonfly.md"
 ---
 
-# Insight: кеширование — наш ключевой performance-рычаг
+# Insight: caching is our key performance lever
 
-Вывод: за 3 месяца мы трижды меняли кеш-слой...
+Conclusion: over 3 months we changed the caching layer three times...
 
-Связанные: [[caching]], [[dragonfly-migration]], [[cache-patterns]]
+Related: [[caching]], [[dragonfly-migration]], [[cache-patterns]]
 ```
 
-### Дерево знаний
+### Knowledge tree
 
 ```
-Уровень 0: domain/ + playbooks/     ← сырые факты
-Уровень 1: insights/               ← синтез из фактов
-Уровень 2: insights/ (meta-insights) ← синтез из insights
+Level 0: domain/ + playbooks/     ← raw facts
+Level 1: insights/                ← synthesis from facts
+Level 2: insights/ (meta-insights) ← synthesis from insights
 ```
 
-Правило: **не больше 3 уровней** (больше — агент тонет в противоречивых абстракциях).
+Rule: **no more than 3 levels** (more — and the agent drowns in conflicting abstractions).
 
 ---
 
-## Self-editing — эволюция заметок (mode-aware)
+## Self-editing — note evolution (mode-aware)
 
-Когда новое знание связано с существующим — старая страница обогащается аннотациями.
+When new knowledge is related to existing knowledge — the older page is enriched with annotations.
 
-### Когда срабатывает
+### When it fires
 
-- NLP entity resolution нашло совпадение entities нового материала с существующей knowledge/ страницей
-- Query-writeback создаёт страницу, пересекающуюся с существующей
+- NLP entity resolution found that the new material's entities match an existing `knowledge/` page
+- Query-writeback creates a page that overlaps with an existing one
 
-### `mode: default` — Python-only (0 токенов)
+### `mode: default` — Python-only (0 tokens)
 
 ```python
-# В kb_ingest.py — после NLP enrichment:
+# In kb_ingest.py — after NLP enrichment:
 def auto_annotate(new_page_path: str, nlp_meta: dict, knowledge_dir: str):
-    """Добавить context_annotation к связанным страницам. Без LLM."""
+    """Add a context_annotation to related pages. No LLM."""
     for entity in nlp_meta.get("entities", []):
         if entity.get("existing_page"):
             add_annotation(
@@ -319,37 +319,37 @@ def auto_annotate(new_page_path: str, nlp_meta: dict, knowledge_dir: str):
                 annotation={
                     "date": today(),
                     "related": new_page_path,
-                    # note генерируется шаблоном, НЕ LLM:
+                    # note is template-generated, NOT LLM:
                     "note": f"NLP-match: entity '{entity['canonical']}'"
                 }
             )
 ```
 
-### `mode: super` — AI содержательные аннотации (~1-3K токенов)
+### `mode: super` — AI substantive annotations (~1-3K tokens)
 
-AI-агент **читает** связанную страницу и новый материал, затем генерирует:
+The AI agent **reads** the related page and the new material, then produces:
 
-1. **Содержательную аннотацию:** не просто «NLP-match», а описание *в чём* связь
-2. **Предложение конкретных правок** к существующей странице (если новый материал дополняет/уточняет)
-3. **Обнаружение противоречий** между новым и существующим знанием
-4. **Рекомендацию merge/split** при >5 аннотаций
+1. **A substantive annotation:** not just "NLP-match" but a description of *what* the link is
+2. **Concrete edit suggestions** for the existing page (if the new material complements/refines it)
+3. **Contradiction detection** between new and existing knowledge
+4. **Merge/split recommendation** when there are >5 annotations
 
 ```python
-# В super mode — AI вместо шаблона:
+# In super mode — AI replaces the template:
 def ai_annotate(new_page_path: str, existing_page: str, knowledge_dir: str):
-    """AI генерирует содержательную аннотацию. ~1-3K токенов."""
-    # LLM prompt: "Сравни новый материал с существующей страницей.
-    # Что нового добавляет? Противоречит ли чему-то? Предложи конкретные правки."
+    """AI generates a substantive annotation. ~1-3K tokens."""
+    # LLM prompt: "Compare the new material with the existing page.
+    # What is new? Any contradictions? Suggest concrete edits."
     return {
         "date": today(),
         "related": new_page_path,
-        "note": "Benchmark показал падение throughput на 15% под >50k rps — дополняет секцию Performance",
-        "suggested_edit": "Добавить параграф о деградации под нагрузкой после строки 42",
-        "contradiction": None  # или описание противоречия
+        "note": "Benchmark showed throughput drop of 15% above 50k rps — extends the Performance section",
+        "suggested_edit": "Add a paragraph about degradation under load after line 42",
+        "contradiction": None  # or contradiction description
     }
 ```
 
-### Формат context_annotations
+### `context_annotations` format
 
 ```yaml
 # default mode:
@@ -362,114 +362,114 @@ context_annotations:
 context_annotations:
   - date: 2026-05-06
     related: "knowledge/domain/llm-wiki-pattern.md"
-    note: "Новый benchmark показал падение throughput — дополняет секцию Performance в [[caching]]"
-    suggested_edit: "Добавить параграф о деградации под нагрузкой"
+    note: "New benchmark showed throughput drop — extends Performance section in [[caching]]"
+    suggested_edit: "Add a paragraph about degradation under load"
     contradiction: null
 ```
 
-### Правила
+### Rules
 
-1. **default:** аннотации добавляются Python-скриптом (0 токенов), `note` — шаблонный текст
-2. **super:** аннотации генерируются AI (~1-3K токенов), `note` — содержательное описание связи
-3. Максимум **5 аннотаций** на страницу (больше → lint предложит создать insight)
-4. Файлы с `lifecycle: permanent` — аннотации добавляются, но основной текст не трогается
+1. **default:** annotations are appended by the Python script (0 tokens), `note` is template text
+2. **super:** annotations are generated by AI (~1-3K tokens), `note` is a substantive link description
+3. **Maximum 5 annotations** per page (more → lint suggests creating an insight)
+4. Files with `lifecycle: permanent` — annotations are added but the body is not touched
 
 ---
 
 ## Surprise-based filtering (mode-aware)
 
-Анти-дублирование на семантическом уровне. Поведение зависит от `mode` в `kb.config.yml`.
+Anti-duplication at the semantic level. Behavior depends on `mode` in `kb.config.yml`.
 
-### `mode: default` — Python-first (0 токенов)
+### `mode: default` — Python-first (0 tokens)
 
-| Когда | Стоимость | Как работает |
-|-------|----------|-------------|
-| Каждый ingest | 0 токенов | NLP entity overlap > 80% → «не сюрприз» |
-| Документ > 3000 слов (max 2/день) | ~2K токенов | AI fallback для крупных материалов |
+| When | Cost | How |
+|------|------|-----|
+| Every ingest | 0 tokens | NLP entity overlap > 80% → "not a surprise" |
+| Document > 3000 words (max 2/day) | ~2K tokens | AI fallback for large materials |
 
 ```python
 def is_surprise(nlp_meta: dict, knowledge_dir: str) -> bool:
-    """Проверка без LLM: сколько entities уже покрыты базой."""
+    """Decide without LLM: how many entities the base already covers."""
     entities = nlp_meta.get("entities", [])
     if not entities:
-        return True  # нет entities → считаем сюрпризом
+        return True  # no entities → treat as surprise
     
     resolved = [e for e in entities if e.get("existing_page")]
     overlap = len(resolved) / len(entities)
     
-    # > 80% entities уже в базе → не сюрприз
+    # > 80% entities already in base → not a surprise
     return overlap < 0.8
 ```
 
-> **Ограничения Python-режима:** не видит семантическую новизну — документ может иметь 90% тех же entities, но содержать принципиально новый вывод. Не обнаруживает противоречия на уровне смысла.
+> **Limitations of Python mode:** does not see semantic novelty — a document may share 90% of entities yet contain a fundamentally new conclusion. Does not catch contradictions at the meaning level.
 
-### `mode: super` — AI semantic analysis (~2-5K токенов)
+### `mode: super` — AI semantic analysis (~2-5K tokens)
 
-| Когда | Стоимость | Как работает |
-|-------|----------|-------------|
-| **Каждый** ingest | ~2-5K токенов | AI семантический анализ: «предсказуем ли этот факт из базы?» |
-| Без лимитов | — | Нет ограничений по размеру документа или частоте |
+| When | Cost | How |
+|------|------|-----|
+| **Every** ingest | ~2-5K tokens | AI semantic: "is this fact predictable from the base?" |
+| No limits | — | No cap on document size or frequency |
 
-AI-агент для каждого нового материала:
-1. Читает NLP-мету + 2-3 наиболее связанные knowledge/ страницы
-2. Оценивает: **«Содержит ли это что-то, чего база ещё не знает?»**
-3. Обнаруживает **противоречия** с существующими знаниями
-4. Оценивает **информационную ценность**: банальный пересказ vs. новый инсайт
+For every new material the AI agent:
+1. Reads the NLP meta + 2-3 most-related `knowledge/` pages
+2. Judges: **"Does this contain something the base does not yet know?"**
+3. Detects **contradictions** with existing knowledge
+4. Rates the **information value**: trivial restatement vs. genuine insight
 
 ```yaml
-# В kb.config.yml — управляется через mode_profiles:
+# In kb.config.yml — driven via mode_profiles:
 surprise:
   # default profile:
   engine: "python"             # python | ai
-  ai_trigger_min_words: 3000   # AI fallback только для крупных
-  ai_max_per_day: 2            # не чаще 2 раз в день
+  ai_trigger_min_words: 3000   # AI fallback only for large
+  ai_max_per_day: 2            # at most 2/day
   # super profile:
-  # engine: "ai"               # AI для всех
-  # ai_trigger_min_words: 0    # без лимита по размеру
-  # ai_max_per_day: null       # без лимита по частоте
+  # engine: "ai"               # AI for all
+  # ai_trigger_min_words: 0    # no size cap
+  # ai_max_per_day: null       # no frequency cap
 ```
 
-### Результат
+### Outcome
 
-- **Сюрприз** → genuine new knowledge, добавить
-- **Не сюрприз** → предложить обновить `context_annotations` вместо создания новой страницы
-- **Противоречит** → добавить + создать запись в `knowledge/open-questions/`
+- **Surprise** → genuine new knowledge, add it
+- **Not a surprise** → propose updating `context_annotations` instead of creating a new page
+- **Contradicts** → add it AND create an entry in `knowledge/open-questions/`
 
 ---
 
-## Антисаботаж
+## Anti-sabotage
 
-Качественный фильтр защищает базу от деградации:
+A quality filter protects the base from degradation:
 
-1. **Фактчекинг:** если вывод противоречит 3+ существующим знаниям — не добавлять, а создать вопрос в `knowledge/open-questions/`
-2. **Повторяемость:** однократное предпочтение — не паттерн. Записывать как паттерн только после 3+ повторений
-3. **Конструктивность:** эмоциональные или деструктивные высказывания отфильтровываются на этапе session summary
-4. **Прозрачность:** каждое обновление `knowledge/` фиксирует source (какая сессия или insight) в frontmatter
+1. **Fact-check:** if a conclusion contradicts 3+ existing facts — do not add it; create a question in `knowledge/open-questions/`
+2. **Repeatability:** a single occurrence is not a pattern. Record as pattern only after 3+ repeats
+3. **Constructive bias:** emotional or destructive statements are filtered at the session-summary stage
+4. **Transparency:** every `knowledge/` update records the source (which session or insight) in frontmatter
 
 ---
 
 ## Query → Wiki Writeback
 
-Ценные ответы AI-агента сохраняются **сразу** в `knowledge/`, не дожидаясь meta-review.
+Valuable AI answers are saved into `knowledge/` **immediately**, without waiting for meta-review.
 
-### Когда сохранять
+### When to save
 
-| Критерий | Пример |
-|----------|--------|
-| Синтез из 3+ источников | Сравнение архитектур, обзор подходов |
-| Архитектурное решение с обоснованием | «Почему Docker Swarm, а не K8s» |
-| Сравнительный анализ | Таблица trade-offs, pros/cons |
-| Пользователь явно сказал «сохрани» | `!save` или «зафиксируй это в базе» |
-| Ответ противоречит knowledge/ | → `knowledge/open-questions/` |
+| Criterion | Example |
+|-----------|---------|
+| Synthesis from 3+ sources | Architecture comparison, approach overview |
+| Architectural decision with rationale | "Why Docker Swarm, not K8s" |
+| Comparative analysis | Trade-off table, pros/cons |
+| User explicitly said "save" | `!save` or "lock this into the base" |
+| Answer contradicts knowledge/ | → `knowledge/open-questions/` |
 
-### Когда НЕ сохранять
+### When NOT to save
 
-- Тривиальные ответы (однострочные)
-- Код без архитектурного обоснования
-- Ответы, которые полностью дублируют существующую knowledge/ страницу
-- Ответы низкой confidence без верификации
+- Trivial answers (one-liners)
+- Code without architectural rationale
+- Answers that fully duplicate an existing `knowledge/` page
+- Low-confidence answers without verification
 
-### Формат writeback-страницы
+### Writeback page format
 
 ```markdown
 ---
@@ -479,35 +479,34 @@ extracted_at: 2026-05-07
 confidence: medium
 verification_method: "ai-review"
 tags: [architecture, comparison]
-query: "Почему LLM Wiki лучше RAG для нашего масштаба?"
+query: "Why is LLM Wiki better than RAG at our scale?"
 ---
 
-# RAG vs LLM Wiki: анализ для нашего проекта
+# RAG vs LLM Wiki: analysis for our project
 
-## Вывод
+## Conclusion
 ...
 
-## Обоснование
+## Rationale
 ...
 
-## Связанные страницы
+## Related pages
 - [[knowledge-management]]
 - [[decisions/2026-05__kb-architecture]]
 ```
 
-### После writeback
+### After writeback
 
-1. Записать в `log.md` (`query-writeback` операция)
-2. Добавить `[[wikilinks]]` на связанные knowledge/ страницы
-3. Обновить routing table если страница не вписывается в существующие routing pages
-4. При следующем reindex — страница попадает в Repomix-индекс
+1. Append to `log.md` (`query-writeback` operation)
+2. Add `[[wikilinks]]` to related `knowledge/` pages
+3. Update the routing table if the page does not fit existing routing pages
+4. On the next reindex — the page enters the Repomix index
 
 ---
 
-## Логирование
+## Logging
 
-Все операции feedback loop записываются в `log.md` (см. `10_LOG.md`):
-- `session-capture` — при записи session summary
-- `query-writeback` — при сохранении ценного ответа
-- Meta-review результаты — при создании insights
-
+All feedback-loop operations are recorded in `log.md` (see `10_LOG.md`):
+- `session-capture` — when a session summary is written
+- `query-writeback` — when a valuable answer is saved
+- Meta-review results — when insights are created

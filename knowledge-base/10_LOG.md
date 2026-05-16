@@ -1,26 +1,26 @@
-# 10 — Хронологический лог операций
+# 10 — Operations log (chronology)
 
-> Append-only файл `log.md` фиксирует все операции с базой знаний: ingest, lint, review, query-writeback, session-capture. Это единая timeline эволюции базы.
-
----
-
-## Зачем
-
-- AI-агент видит **что происходило** с базой в хронологическом порядке
-- Быстро определить: когда последний раз ревьюили, что добавляли, что менялось
-- Парсится unix-утилитами для быстрого поиска
-- Отделяет operational history от knowledge content
+> The append-only `log.md` records every operation against the knowledge base: ingest, lint, review, query-writeback, session-capture. It is the single timeline of base evolution.
 
 ---
 
-## Расположение
+## Why
+
+- The AI agent can see **what happened** to the base in chronological order
+- Quickly answer: when was the last review, what was added, what changed
+- Parsable by Unix utilities for fast search
+- Keeps operational history separate from knowledge content
+
+---
+
+## Location
 
 ```
 knowledge-base/
-└── log.md     # ← append-only, НЕ индексируется Repomix
+└── log.md     # ← append-only, NOT indexed by Repomix
 ```
 
-Добавить в `repomix.config.json` → `ignore.customPatterns`:
+Add to `repomix.config.json` → `ignore.customPatterns`:
 ```json
 "log.md",
 "lint-report.md"
@@ -28,31 +28,34 @@ knowledge-base/
 
 ---
 
-## Формат записи
+## Entry format
 
-Каждая запись начинается с heading level 2 в стандартном формате:
+Each entry starts with a level-2 heading in this exact format:
 
 ```
 ## [ISO-timestamp] operation-type | Human-readable title
 ```
 
-### Типы операций
+### Operation types
 
-| Тип | Когда |
-|-----|-------|
-| `ingest` | Новый raw-файл обработан pipeline |
-| `lint` | Запуск health-check |
-| `review` | AI-ревью материала из review/ |
-| `query-writeback` | Ценный ответ сохранён в knowledge/ |
-| `session-capture` | Session summary записан в interactions/ |
-| `update` | Ручное обновление страницы в knowledge/ |
-| `archive` | Страница перемещена в _archive/ |
-| `reindex` | Repomix-индекс перегенерирован |
-| `nlp-enrich` | NLP-предобработка нового материала |
+| Type | When |
+|------|------|
+| `ingest` | A new raw file was processed by the pipeline |
+| `lint` | A health-check ran |
+| `review` | AI processed a `review/` item |
+| `query-writeback` | A valuable answer was saved into `knowledge/` |
+| `session-capture` | A session summary was written to `interactions/` |
+| `update` | Manual edit of a `knowledge/` page |
+| `archive` | A page was moved to `_archive/` |
+| `reindex` | Repomix index regenerated |
+| `nlp-enrich` | NLP enrichment for new material |
+| `consolidation` | Daily consolidation block ran (see 13_AUTORUN.md) |
+| `reflect` | Reflection trigger fired |
+| `populate` | `DATA_PLACEMENT_EXAMPLES.md` regenerated |
 
 ---
 
-## Примеры записей
+## Example entries
 
 ```markdown
 # Operations Log
@@ -74,7 +77,7 @@ knowledge-base/
 - Report: lint-report.md
 
 ## [2026-05-07T10:15:00+03:00] query-writeback | Docker Swarm vs K8s comparison
-- Question: "Почему Docker Swarm вместо K8s для нашего масштаба?"
+- Question: "Why Docker Swarm instead of K8s at our scale?"
 - Created: knowledge/decisions/2026-05-07__swarm-vs-k8s.md
 - Cross-refs added: [[docker-swarm]], [[infrastructure-decisions]]
 - Confidence: medium
@@ -93,41 +96,42 @@ knowledge-base/
 
 ---
 
-## Быстрый поиск
+## Quick search
 
 ```bash
-# Последние 10 операций
+# Last 10 operations
 grep "^## \[" log.md | tail -10
 
-# Все ingest за май
+# All ingest entries in May
 grep "^## \[2026-05" log.md | grep "ingest"
 
-# Все ошибки lint
+# All lint runs that found errors
 grep -A5 "^## \[" log.md | grep -B1 "Errors: [1-9]"
 
-# Сколько операций каждого типа
+# How many of each operation type
 grep "^## \[" log.md | sed 's/.*\] //' | sed 's/ |.*//' | sort | uniq -c | sort -rn
 ```
 
 ---
 
-## Кто пишет в лог
+## Who writes to the log
 
-| Источник | Как |
-|----------|-----|
-| `kb_ingest.py` | Автоматически после обработки каждого файла |
-| `kb_lint.py` | Автоматически после каждого запуска |
-| `reindex.sh` | Автоматически после перегенерации индекса |
-| AI-агент | При query-writeback и session-capture |
-| `kb_watch.py` (через `./watcher.sh`) | При автоматической обработке нового файла |
+| Source | How |
+|--------|-----|
+| `kb_ingest.py` | Automatically after each file is processed |
+| `kb_lint.py` | Automatically after each run |
+| `reindex.sh` | Automatically after regenerating the index |
+| AI agent | On query-writeback and session-capture |
+| `kb_watch.py` (via `./watcher.sh`) | On automatic processing of a new file |
+| `kb_reflect.py --generate` | On reflection trigger |
 
 ---
 
-## Правила
+## Rules
 
-1. **Append-only:** записи НЕ редактируются и НЕ удаляются
-2. **ISO timestamps:** всегда с timezone offset
-3. **Bullet-list body:** детали операции — bulleted list под heading
-4. **Не индексируется:** log.md исключён из Repomix (operational data, не знание)
-5. **Ротация:** при >1000 записей — архивировать в `log-archive/YYYY.md` и начать новый
-6. **Git-friendly:** каждая запись — atomic append, минимальные merge-конфликты
+1. **Append-only:** entries are NOT edited and NOT deleted
+2. **ISO timestamps:** always with timezone offset
+3. **Bullet-list body:** operation details — bulleted list under the heading
+4. **Not indexed:** `log.md` is excluded from Repomix (operational data, not knowledge)
+5. **Rotation:** when > 1000 entries — archive to `log-archive/YYYY.md` and start a new file
+6. **Git-friendly:** each entry is an atomic append → minimal merge conflicts

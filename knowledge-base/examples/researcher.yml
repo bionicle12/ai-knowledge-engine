@@ -1,0 +1,158 @@
+# Example: Researcher / Analyst
+
+role: "Researcher / Analyst"
+
+description: |
+  Independent or institutional researcher: literature review, hypothesis
+  generation, data analysis, paper writing. Equally suitable for ML
+  researchers, market analysts, social scientists, or biotech researchers.
+  The AI assistant helps maintain a personal literature graph, surface
+  contradictions across papers, and draft new sections in the researcher's
+  voice.
+
+entities:
+  domain:
+    enabled: true
+    why: "Subject matter: theories, schools of thought, key papers, open problems"
+    knowledge_paths:
+      - "knowledge/domain/"
+      - "knowledge/principles/research-stance.md"
+
+  literature:
+    enabled: true
+    why: "Read, partially-read, and to-read papers with summaries"
+    knowledge_paths:
+      - "knowledge/domain/literature.md"
+      - "knowledge/insights/literature-synthesis.md"
+
+  hypotheses:
+    enabled: true
+    why: "Active hypotheses, ones rejected, why, and lessons"
+    knowledge_paths:
+      - "knowledge/decisions/hypotheses.md"
+      - "knowledge/open-questions/"
+
+  methodology:
+    enabled: true
+    why: "Methods used, statistical approaches, data sources, analysis pipelines"
+    knowledge_paths:
+      - "knowledge/playbooks/methodology.md"
+      - "knowledge/principles/methodology-quality.md"
+
+  data:
+    enabled: true
+    why: "Datasets, preprocessing, sampling decisions"
+    knowledge_paths:
+      - "knowledge/domain/data-sources.md"
+
+  experiments:
+    enabled: true
+    why: "Experiment runs, parameters, results, interpretations"
+    knowledge_paths:
+      - "knowledge/projects/experiments/"
+
+  voice:
+    enabled: true
+    why: "Writing style for papers, abstracts, blog posts; rigor norms"
+    knowledge_paths:
+      - "knowledge/voice/academic-writing.md"
+      - "knowledge/voice/blog-style.md"
+
+  collaborators:
+    enabled: true
+    why: "Co-authors, reviewers, advisors — communication preferences"
+    knowledge_paths:
+      - "knowledge/playbooks/collaboration.md"
+
+raw_data_examples:
+  - "Papers (PDF) — read and to-read"
+  - "Notes from conferences and seminars"
+  - "Drafts of your own papers"
+  - "Lab notebooks and experiment logs"
+  - "Datasets summaries and metadata"
+  - "Code or notebooks (with notes about what you tried)"
+  - "Email exchanges with collaborators (anonymized)"
+
+ai_assistant_tasks:
+  - "Literature review: find related work, contradictions, gaps"
+  - "Drafting paper sections in your voice"
+  - "Reviewing your own draft for rigor and clarity"
+  - "Generating alternative hypotheses"
+  - "Suggesting experiments to disambiguate two theories"
+  - "Translating dense academic prose into a blog post"
+  - "Maintaining a personal citation graph"
+
+placement_examples:
+  intro: |
+    Researchers accumulate insight in scattered forms — PDF margins, lab
+    notebooks, throwaway scripts, conference scribbles. A knowledge base
+    that surfaces *what you've already thought about* is the difference
+    between repeating yourself and building cumulatively.
+
+  by_artifact:
+    - artifact: "Read papers (PDFs)"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "Karpathy-2025-llm-wiki.pdf"
+        - "Smith-et-al-2024-novel-method.pdf"
+      knowledge_target: "knowledge/domain/literature.md"
+      tip: "PDF text extraction works best on born-digital papers; scanned PDFs need OCR."
+
+    - artifact: "Lab notes and experiment logs"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "2026-05-15-pilot-experiment-logs.md"
+        - "Notebook: parameter sweep run #042.md"
+      knowledge_target: "knowledge/projects/experiments/"
+
+    - artifact: "Drafts of your own papers"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "draft-method-section-v3.md"
+        - "Abstract iterations.md"
+      knowledge_target: "knowledge/voice/academic-writing.md"
+
+    - artifact: "Conference talks (slides + recordings)"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "ICML-2026-keynote-recording.mp4"
+        - "NeurIPS-poster-deck.pptx"
+
+    - artifact: "Notes from seminars and reading groups"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Reading-group-2026-05-12.md"
+        - "Seminar: bayesian deep learning.md"
+
+    - artifact: "Dataset descriptions"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Dataset X v3.0 — schema and provenance.md"
+      knowledge_target: "knowledge/domain/data-sources.md"
+
+    - artifact: "Email/chat with collaborators (anonymized)"
+      destination: "raw/chats/unsorted/"
+      examples:
+        - "Discussion with co-author about reviewer 2.md"
+      tip: "Sensitive content gets routed to review/needs-redaction/ automatically."
+
+    - artifact: "Hypotheses you considered then rejected"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Why we abandoned hypothesis H3.md"
+      knowledge_target: "knowledge/decisions/hypotheses.md"
+      tip: "Failed hypotheses are gold — they prevent revisiting dead ends."
+
+  quickstart:
+    - "Drop the most-cited paper in your subfield → raw/documents/unsorted/"
+    - "Your most recent draft (any state) → raw/work/unsorted/"
+    - "One file describing your main dataset → raw/reference/unsorted/"
+    - "Run ./reindex.sh — your AI now has your reference frame"
+    - "Ask: 'What papers have I read that disagree with claim X in my draft?'"
+
+  do_not_drop:
+    - "Unpublished data of collaborators without explicit permission"
+    - "Personally identifying data of human research subjects"
+    - "Pre-print manuscripts under embargo"
+    - "Confidential reviewer comments (NeurIPS-style anonymity matters)"
+    - "Raw clinical or genetic data with patient identifiers"

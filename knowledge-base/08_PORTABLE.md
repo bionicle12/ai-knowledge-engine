@@ -1,169 +1,169 @@
-# 08 — Портабельность: использование базы в других проектах
+# 08 — Portability: using the base across other projects
 
-> Как подключить обученную базу знаний к рабочим проектам, чтобы AI-агент использовал накопленную экспертизу при работе с кодом.
+> How to plug a trained knowledge base into your working projects so the AI agent uses the accumulated expertise while writing code.
 
 ---
 
-## Проблема
+## The problem
 
-База знаний живёт в отдельном проекте. Но работа происходит в **других проектах** — репозиториях с кодом, где AI-агент тоже должен знать автора: стиль, решения, принципы, предпочтения.
+The knowledge base lives in its own project. But work happens in **other projects** — code repositories where the AI agent should also know the author: voice, decisions, principles, preferences.
 
-## Рекомендуемая схема: соседний проект + ссылка
+## Recommended layout: sibling project + reference
 
 ```text
 ~/www/main/
-├── knowledge-base/          # ← База знаний (отдельный проект)
+├── knowledge-base/          # ← The KB (separate project)
 │   ├── AGENTS.md
 │   ├── knowledge/
 │   ├── interactions/
 │   └── .repomix/output.xml
 │
-├── highway-clicker/         # ← Рабочий проект
-│   ├── AGENTS.md            # содержит ссылку на базу
+├── highway-clicker/         # ← Working project
+│   ├── AGENTS.md            # contains a pointer to the base
 │   └── ...
 │
-└── another-project/         # ← Ещё один проект
+└── another-project/         # ← Another project
     ├── AGENTS.md
     └── ...
 ```
 
-### Почему соседний проект, а не внутри?
+### Why a sibling project, not nested?
 
-- База знаний — **про автора**, а не про конкретный проект
-- Одна база обслуживает множество проектов
-- Обновления базы не засоряют git-историю рабочих проектов
-- Можно бэкапить/переносить отдельно
+- The KB is **about the author**, not about a specific project
+- One base serves many projects
+- KB updates do not pollute the git history of working projects
+- It can be backed up / moved separately
 
 ---
 
-## Подключение к рабочему проекту
+## Plugging into a working project
 
-### Вариант 1: Секция в AGENTS.md проекта (рекомендуется)
+### Option 1: section in the project's AGENTS.md (recommended)
 
-Добавить в `AGENTS.md` рабочего проекта:
+Add to the working project's `AGENTS.md`:
 
 ```markdown
 ## Personal Knowledge Base
 
-Рядом с этим проектом находится персональная база знаний автора.
+Next to this project sits the author's personal knowledge base.
 
-- Путь: `../knowledge-base/`
-- Индекс: `../knowledge-base/.repomix/output.xml`
-- Профиль: `../knowledge-base/knowledge/profile/`
-- Принципы: `../knowledge-base/knowledge/principles/`
+- Path: `../knowledge-base/`
+- Index: `../knowledge-base/.repomix/output.xml`
+- Profile: `../knowledge-base/knowledge/profile/`
+- Principles: `../knowledge-base/knowledge/principles/`
 
-### Когда использовать
+### When to use it
 
-- Перед архитектурными решениями — прочитай `knowledge/principles/`
-- Для стиля кода/текста — прочитай `knowledge/voice/`
-- Для контекста проекта — прочитай `knowledge/projects/`
-- При обсуждении идей — используй полный индекс `.repomix/output.xml`
+- Before architectural decisions — read `knowledge/principles/`
+- For code/text voice — read `knowledge/voice/`
+- For project context — read `knowledge/projects/`
+- When discussing ideas — use the full index `.repomix/output.xml`
 
 ### Session capture
 
-При работе в этом проекте — записывай session summaries в базу знаний:
-- Путь: `../knowledge-base/interactions/sessions/`
-- Формат папки: `YYYY-MM-DD__<project-name>__<topic>/`
-- Автоматический capture работает по тем же правилам (см. 07_INTERACTION_LOOP.md)
-- Реиндекс вручную: `cd ../knowledge-base && ./reindex.sh`
+While working in this project — write session summaries into the KB:
+- Path: `../knowledge-base/interactions/sessions/`
+- Folder format: `YYYY-MM-DD__<project-name>__<topic>/`
+- Auto-capture follows the same rules (see 07_INTERACTION_LOOP.md)
+- Reindex manually: `cd ../knowledge-base && ./reindex.sh`
 ```
 
-### Вариант 2: Симлинк на индекс
+### Option 2: symlink to the index
 
 ```bash
-# В рабочем проекте
+# In the working project
 ln -s ../knowledge-base/.repomix/output.xml .kb-context.xml
 ```
 
-Добавить в `AGENTS.md`:
+Add to `AGENTS.md`:
 ```markdown
 ## Personal Context
-Прочитай `.kb-context.xml` для контекста автора перед стратегическими решениями.
+Read `.kb-context.xml` for author context before strategic decisions.
 ```
 
-### Вариант 3: Копия индекса (для изолированных окружений)
+### Option 3: copy the index (for isolated environments)
 
-Если проект не на той же машине:
+If the project is not on the same machine:
 
 ```bash
 cp ../knowledge-base/.repomix/output.xml ./docs/kb-context.xml
 ```
 
-Обновлять вручную при необходимости. Подходит для CI/CD или удалённых окружений.
+Update manually as needed. Suits CI/CD or remote environments.
 
 ---
 
-## Session capture из рабочего проекта
+## Session capture from a working project
 
-Когда AI-агент работает в `highway-clicker` и хочет записать выводы:
+When the AI agent works in `highway-clicker` and wants to record conclusions:
 
-1. Пишет session summary в `../knowledge-base/interactions/sessions/`
-2. Использует формат: `YYYY-MM-DD__highway-clicker__<topic>/`
-3. Добавляет тег проекта в frontmatter:
+1. Writes a session summary into `../knowledge-base/interactions/sessions/`
+2. Uses format: `YYYY-MM-DD__highway-clicker__<topic>/`
+3. Adds a project tag in frontmatter:
 
 ```markdown
 ---
 session_date: 2026-05-06
 project: "highway-clicker"
-topic: "Рефакторинг WebSocket auth"
+topic: "WebSocket auth refactor"
 quality: high
 ---
 
-# Session: Рефакторинг WebSocket auth
+# Session: WebSocket auth refactor
 
-## Ключевые выводы
-- Решили использовать SIWE для MetaMask вместо кастомной подписи
+## Key takeaways
+- Decided to use SIWE for MetaMask instead of a custom signature
 - ...
 ```
 
-4. Реиндекс базы — **вручную**: `cd ../knowledge-base && ./reindex.sh`
-   - Не автоматически, чтобы не замедлять работу в рабочем проекте
+4. Reindex the KB **manually**: `cd ../knowledge-base && ./reindex.sh`
+   - Not automatic, to avoid slowing down the working project
 
 ---
 
-## Дообучение при работе в проекте
+## Continued learning from working projects
 
-База продолжает учиться, даже когда ты работаешь не в ней:
+The base keeps learning even when you are not in it:
 
 ```text
-Работа в highway-clicker
+Working in highway-clicker
         ↓
-AI пишет session summary → ../knowledge-base/interactions/sessions/
+AI writes session summary → ../knowledge-base/interactions/sessions/
         ↓
-Когда удобно: cd ../knowledge-base && ./reindex.sh
+When convenient: cd ../knowledge-base && ./reindex.sh
         ↓
-Meta-review → knowledge/ обновляется
+Meta-review → knowledge/ updates
         ↓
-Следующий сеанс в highway-clicker — AI уже умнее
+Next session in highway-clicker — the AI is smarter
 ```
 
-### Что попадает в базу из рабочих проектов
+### What flows into the KB from working projects
 
-- Архитектурные решения и их обоснования
-- Выявленные предпочтения стиля кода
-- Паттерны дебага, которые сработали
-- Инструменты и подходы, которые понравились/не понравились
-- Межпроектные инсайты
+- Architectural decisions and their rationale
+- Discovered code-style preferences
+- Debugging patterns that worked
+- Tools and approaches you liked / disliked
+- Cross-project insights
 
-### Что НЕ попадает
+### What does NOT flow in
 
-- Код проекта (он уже в git)
-- Секреты и конфиги проекта
-- Детали, специфичные только для одного проекта без переиспользуемой ценности
+- Project code (already in git)
+- Project secrets and configs
+- Details specific to a single project with no reusable value
 
 ---
 
-## Перенос базы на другую машину
+## Moving the base to another machine
 
 ```bash
-# Упаковать (без .venv и бинарных ассетов)
+# Pack (without .venv and binary assets)
 tar czf knowledge-base-portable.tar.gz \
   --exclude='.venv' \
   --exclude='assets/' \
   --exclude='.repomix/' \
   knowledge-base/
 
-# На новой машине
+# On the new machine
 tar xzf knowledge-base-portable.tar.gz
 cd knowledge-base
 python3 -m venv .venv
@@ -172,72 +172,71 @@ pip install -r requirements.txt
 ./reindex.sh
 ```
 
-Если нужны ассеты — добавить `assets/` в архив (увеличит размер).
+If you need assets — add `assets/` to the archive (increases size).
 
 ---
 
-## Множественные проекты — как не запутаться
+## Multiple projects — staying organized
 
-| Вопрос | Ответ |
-|--------|-------|
-| Где живёт база? | Один раз, рядом с проектами (`../knowledge-base/`) |
-| Где AI пишет session summary? | Всегда в `../knowledge-base/interactions/sessions/` |
-| Как различать проекты? | По имени папки сессии: `2026-05-06__highway-clicker__topic/` |
-| Когда реиндексить? | Автоматически (см. `13_AUTORUN.md`) или `./reindex.sh` |
-| Нужен ли AGENTS.md в каждом проекте? | Да, с секцией «Personal Knowledge Base» |
-| Можно ли разные базы для разных ролей? | Да, но обычно одна база на человека |
+| Question | Answer |
+|----------|--------|
+| Where does the KB live? | Once, next to projects (`../knowledge-base/`) |
+| Where does the AI write session summaries? | Always in `../knowledge-base/interactions/sessions/` |
+| How do projects stay distinct? | By session-folder name: `2026-05-06__highway-clicker__topic/` |
+| When to reindex? | Automatically (see `13_AUTORUN.md`) or `./reindex.sh` |
+| Need an `AGENTS.md` in every project? | Yes, with a "Personal Knowledge Base" section |
+| Different bases for different roles? | Possible, but usually one base per person |
 
 ---
 
 ## Dynamic Context Enrichment
 
-AI-агент подгружает знания **не целиком**, а по ссылкам — по мере необходимости.
+The AI agent loads knowledge **lazily** through links — only what it needs.
 
-### Проблема
+### Problem
 
-Загрузка всего `.repomix/output.xml` (~100KB+) расходует контекст. Большинство знаний для конкретной задачи не нужны.
+Loading the entire `.repomix/output.xml` (~100KB+) burns context. Most knowledge is irrelevant for any given task.
 
-### Решение: ленивая загрузка через routing
+### Solution: lazy loading via routing
 
 ```text
-routing-table.md (20 строк)
-        ↓ AI определяет тему
-routing/rt-infrastructure.md (15 строк)
-        ↓ AI находит нужные страницы
+routing-table.md (20 lines)
+        ↓ AI picks the topic
+routing/rt-infrastructure.md (15 lines)
+        ↓ AI finds the right pages
 domain/docker-swarm.md + domain/caching.md
-        ↓ AI следует [[wikilinks]] если нужен контекст
+        ↓ AI follows [[wikilinks]] when more context is needed
 decisions/2026-03__swarm-deployment.md
 ```
 
-**Итого: ~4 файла вместо всего индекса.**
+**~4 files instead of the entire index.**
 
-### В AGENTS.md рабочего проекта
+### In the working project's AGENTS.md
 
 ```markdown
 ## Dynamic Context Loading
 
-При работе с базой знаний:
-1. Сначала прочитай `../knowledge-base/knowledge/routing-table.md`
-2. Определи 1-2 релевантных routing pages по теме задачи
-3. Прочитай только нужные knowledge/ страницы
-4. Если нужен дополнительный контекст — следуй [[wikilinks]]
-5. НЕ читай весь .repomix/output.xml если можно обойтись 3-5 страницами
+When working with the KB:
+1. First read `../knowledge-base/knowledge/routing-table.md`
+2. Pick 1-2 relevant routing pages by topic
+3. Read only the needed `knowledge/` pages
+4. If more context is needed — follow `[[wikilinks]]`
+5. Do NOT read the whole `.repomix/output.xml` if 3-5 pages will do
 
-Это экономит контекст и позволяет работать с большими базами.
+This conserves context and keeps work fast on large bases.
 ```
 
-### Live-обогащение контекста
+### Live context enrichment
 
-Во время работы AI может **динамически** подгружать знания:
+While answering, the AI can **dynamically** pull in knowledge:
 
-1. В процессе ответа обнаружил `[[wikilink]]` в загруженной странице
-2. Понял, что связанная страница даст более точный ответ
-3. Подгрузил её и интегрировал в рассуждение
-4. Если обнаружил пробел — создал `query-writeback` страницу
+1. Spotted a `[[wikilink]]` in a loaded page
+2. Decided the linked page would sharpen the answer
+3. Pulled it in and folded it into reasoning
+4. If a gap appeared — created a `query-writeback` page
 
-Это превращает базу из **статического справочника** в **живую систему**, которая:
-- Обновляется при ingest (автоматически через `13_AUTORUN.md`)
-- Обогащается при query-writeback (см. `07_INTERACTION_LOOP.md`)
-- Подгружается по запросу через routing + wikilinks
-- Проверяется lint'ом (см. `09_LINT.md`)
-
+This turns the base from a **static reference** into a **living system** that:
+- Updates on ingest (automatically — see `13_AUTORUN.md`)
+- Enriches itself on query-writeback (see `07_INTERACTION_LOOP.md`)
+- Loads on demand via routing + wikilinks
+- Is checked by lint (see `09_LINT.md`)

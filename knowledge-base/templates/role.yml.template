@@ -1,0 +1,94 @@
+# Role template — custom role definition
+#
+# Use this template when the user's role isn't covered by examples/*.yml
+# in the upstream repo. The agent walks through it with the user, fills
+# in the placeholders, and saves the result as
+#   knowledge-base/examples/<short-role-slug>.yml
+# in the deployed KB before running kb_populate.py.
+
+# Short, human-readable role title.
+role: "{{ROLE_TITLE}}"
+
+# Free-form description of the role and what makes the AI assistant useful here.
+description: |
+  {{ROLE_DESCRIPTION}}
+
+# Entities to track. Each entity gets one or more knowledge/ paths created for
+# it during deployment, and is mentioned in the routing table.
+#
+# Keep entity keys snake_case. The 'why' field helps the agent understand
+# when to use that entity and which kb-pages to read.
+entities:
+  # Required minimum: 3-5 entities for a typical role.
+  example_entity:
+    enabled: true
+    why: "{{WHY_THIS_MATTERS}}"
+    knowledge_paths:
+      - "knowledge/domain/{{ENTITY_FILE}}.md"
+
+# Examples of raw artefacts the user is likely to drop into raw/.
+# Used by 14_INITIAL_POPULATION as a hint, separately from placement_examples.
+raw_data_examples:
+  - "{{ARTIFACT_TYPE_1}}"
+  - "{{ARTIFACT_TYPE_2}}"
+  - "{{ARTIFACT_TYPE_3}}"
+
+# Tasks where the AI assistant should be useful, phrased from the user's POV.
+ai_assistant_tasks:
+  - "{{TASK_1}}"
+  - "{{TASK_2}}"
+  - "{{TASK_3}}"
+
+# ============================================================================
+# placement_examples
+# ============================================================================
+# Used by kb_populate.py to generate DATA_PLACEMENT_EXAMPLES.md
+# Required for kb_populate.py to work; if absent, the agent falls back to
+# the generic skeleton from templates/DATA_PLACEMENT_EXAMPLES.md.template.
+# ============================================================================
+placement_examples:
+  intro: |
+    {{1-2 paragraph intro speaking directly to someone in this role.
+    What artefacts do they accumulate? Why should they care about
+    capturing them?}}
+
+  # Concrete artefacts the user has and where to drop them.
+  # 5-9 entries is a healthy range. Each entry MUST have:
+  #   - artifact (string): the kind of thing (human-readable)
+  #   - destination (string): a raw/<sub>/unsorted/ path
+  # And SHOULD have:
+  #   - examples (list): 1-3 sample filenames or file types
+  #   - knowledge_target (string): where it eventually ends up
+  #   - tip (string): one-liner about pipeline behavior or context
+  by_artifact:
+    - artifact: "{{ARTIFACT_NAME}}"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "{{example-filename-1}}.md"
+        - "{{example-filename-2}}.docx"
+      knowledge_target: "knowledge/{{category}}/"
+      tip: "{{Optional one-liner about how this is processed.}}"
+
+    - artifact: "{{ANOTHER_ARTIFACT}}"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "{{example.pdf}}"
+      knowledge_target: "knowledge/{{another-category}}/"
+
+  # 3-5 concrete first steps the user can do right now to see value.
+  # Order them by impact. Always end with: run reindex / verify.
+  quickstart:
+    - "{{First file to drop, with the exact destination}}"
+    - "{{Second file to drop}}"
+    - "{{Third file to drop}}"
+    - "Run ./reindex.sh — your AI now has role context"
+    - "Ask: '{{One concrete prompt that demonstrates value}}'"
+
+  # 3-5 concrete things the user must NOT drop.
+  # Be specific; 'no secrets' is too vague — say 'API keys, .env files, seed
+  # phrases'. Tailor to the role.
+  do_not_drop:
+    - "{{Specific PII/secret type}}"
+    - "{{Specific compliance/legal concern}}"
+    - "{{Domain-specific don't}}"
+    - "{{Privacy-of-others concern}}"

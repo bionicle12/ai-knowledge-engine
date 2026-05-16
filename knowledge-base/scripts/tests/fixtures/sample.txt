@@ -1,0 +1,3 @@
+Plain text fixture.
+
+Used to validate kb_ingest passthrough handling and complexity heuristics.

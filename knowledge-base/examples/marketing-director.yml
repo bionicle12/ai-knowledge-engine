@@ -76,3 +76,86 @@ ai_assistant_tasks:
   - "Подготовка брифов для подрядчиков"
   - "Анализ воронки и метрик"
   - "Генерация гипотез для экспериментов"
+
+# ============================================================
+# Initial population helper (read by 14_INITIAL_POPULATION.md)
+# ============================================================
+placement_examples:
+  intro: |
+    Если ты директор по маркетингу или лидер маркетинговой команды,
+    у тебя точно есть: исследования рынка, презентации стратегий,
+    отчёты по кампаниям, экспорты дашбордов, заметки с интервью.
+    Всё это превращается в персональный movement engine, который
+    помогает AI давать рекомендации в твоём tone of voice и с
+    пониманием твоих принципов.
+
+  by_artifact:
+    - artifact: "Исследования рынка и сегментации"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "Q2-2026 Market Sizing.pdf"
+        - "Customer Segmentation Report.docx"
+      knowledge_target: "knowledge/domain/audience.md"
+
+    - artifact: "Презентации стратегий и результатов"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "Q2 Brand Strategy.pptx"
+        - "2026-Annual-Review.pptx"
+      knowledge_target: "knowledge/projects/"
+      tip: "Текст слайдов извлечётся через python-pptx; визуалы — в assets/."
+
+    - artifact: "Брифы кампаний и креативные брифы"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Brief: летняя кампания 2026.md"
+        - "Креативный бриф для агентства X.docx"
+      knowledge_target: "knowledge/playbooks/campaign-planning.md"
+
+    - artifact: "Записи созвонов с командой/клиентами/инвесторами"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "Discovery call с клиентом A.mp4"
+        - "Внутренний sync по Q2 KPI.mp3"
+
+    - artifact: "Скриншоты дашбордов и метрик"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "GA4-conversion-funnel.png"
+        - "Mixpanel-retention.png"
+      knowledge_target: "knowledge/domain/metrics.md"
+
+    - artifact: "Брендбуки и tone-of-voice гайды"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Brand Guidelines v3.pdf"
+        - "Tone of Voice Manifesto.md"
+      knowledge_target: "knowledge/voice/brand-voice.md"
+
+    - artifact: "Анализ конкурентов и benchmarks"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Competitor X — site teardown.md"
+        - "SimilarWeb-export-march-2026.csv"
+      knowledge_target: "knowledge/domain/competitors.md"
+
+    - artifact: "Экспорты отзывов клиентов и интервью"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Customer-interviews-batch-12.md"
+        - "App Store reviews export.csv"
+      knowledge_target: "knowledge/domain/audience.md"
+
+  quickstart:
+    - "Любой брендбук в PDF → raw/documents/unsorted/"
+    - "Презентация последней успешной кампании → raw/documents/unsorted/"
+    - "1-2 customer interview transcripts → raw/work/unsorted/"
+    - "Запусти ./reindex.sh — AI получит понимание твоего бренда"
+    - "Спроси AI: 'Напиши мне draft email на нашем tone of voice про X' — увидишь разницу"
+
+  do_not_drop:
+    - "Персональные данные клиентов (PII): имена, email, телефоны"
+    - "Коммерческая тайна без явного разрешения"
+    - "Контракты и финансовые документы третьих лиц"
+    - "Приватные переписки сотрудников"
+    - "NDA-материалы партнёров"

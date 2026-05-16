@@ -1,68 +1,68 @@
-# Repomix — Универсальный гайд инициализации для AI-агента
+# Repomix — Universal initialization guide for AI agents
 
-> **Назначение:** Этот документ — инструкция для AI-агента. Прочитай его и выполни шаги для быстрой интеграции Repomix в любой проект пользователя.
+> **Purpose:** This document is an instruction set for an AI agent. Read it and follow the steps to integrate Repomix into any user project quickly.
 >
-> **Что делает Repomix:** пакует кодовую базу в один XML/Markdown файл, оптимизированный для LLM. Это позволяет агенту получить полную карту проекта за один `view_file` вместо сканирования сотен файлов по одному, экономя токены и время.
+> **What Repomix does:** packs a codebase into a single XML/Markdown file optimized for LLMs. The agent gets a full project map in one `view_file` instead of scanning hundreds of files individually — saving tokens and time.
 
 ---
 
-## Фаза 0: Предварительный анализ
+## Phase 0: pre-analysis
 
-Перед инициализацией **задай пользователю уточняющие вопросы** (если ответы не очевидны из структуры проекта):
+Before initialization, **ask the user clarifying questions** (skip what's obvious from the project structure):
 
-### Обязательные вопросы:
-1. **Тип проекта?** (frontend / backend / fullstack / monorepo / non-code knowledge base)
-2. **Стек?** (языки, фреймворки — определяет include-паттерны)
-3. **Есть ли Git?** (определяет git hook vs standalone скрипт)
-4. **Есть ли легаси/архивные папки**, которые нужно исключить из основного индекса?
-5. **Приоритет: экономия токенов или полнота информации?**
-   - Максимальная экономия → `compress: true`, `removeComments: true`, `removeEmptyLines: true`
-   - Полнота (нужны комментарии для понимания) → `compress: false`, `removeComments: false`
+### Mandatory questions
+1. **Project type?** (frontend / backend / fullstack / monorepo / non-code knowledge base)
+2. **Stack?** (languages, frameworks — drives include patterns)
+3. **Is there Git?** (drives git hook vs standalone script)
+4. **Any legacy / archive folders** to exclude from the main index?
+5. **Priority: token economy or completeness?**
+   - Maximum economy → `compress: true`, `removeComments: true`, `removeEmptyLines: true`
+   - Completeness (need comments for context) → `compress: false`, `removeComments: false`
 
-### Автоматический анализ (выполни сам):
+### Automated analysis (do it yourself)
 ```bash
-# Структура проекта
+# Project structure
 find . -maxdepth 3 -type d ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/target/*' ! -path '*/dist/*' ! -path '*/__pycache__/*' ! -path '*/venv/*' | sort
 
-# Количество файлов по типам
+# File counts by type
 find . -type f ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/target/*' ! -path '*/dist/*' | sed 's/.*\.//' | sort | uniq -c | sort -rn | head -20
 
-# Наличие Git
+# Is this a Git repo
 git rev-parse --is-inside-work-tree 2>/dev/null && echo "GIT: YES" || echo "GIT: NO"
 
-# Наличие husky / git hooks
+# Husky / git hooks
 ls -la .husky/ 2>/dev/null || ls -la .git/hooks/ 2>/dev/null
 
-# Наличие AGENTS.md
+# AGENTS.md presence
 test -f AGENTS.md && echo "AGENTS.md: EXISTS" || echo "AGENTS.md: MISSING"
 
-# Общий размер исходников (без бинарных)
+# Source size (excluding binaries)
 find . -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.py' -o -name '*.rs' -o -name '*.go' -o -name '*.java' -o -name '*.kt' -o -name '*.swift' -o -name '*.css' -o -name '*.html' -o -name '*.md' -o -name '*.sql' -o -name '*.sh' -o -name '*.yml' -o -name '*.yaml' -o -name '*.toml' -o -name '*.json' \) ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path '*/target/*' ! -path '*/dist/*' | wc -l
 ```
 
 ---
 
-## Фаза 1: Установка
+## Phase 1: install
 
-### Проверить наличие:
+### Check presence
 ```bash
 command -v repomix && repomix --version
 ```
 
-### Установить глобально (если отсутствует):
+### Install globally (if missing)
 ```bash
 npm install -g repomix
 ```
 
-> Альтернатива без глобальной установки: `npx repomix` (каждый раз скачивает).
+> Alternative without global install: `npx repomix` (downloads each time).
 
 ---
 
-## Фаза 2: Конфигурация
+## Phase 2: configure
 
-Создай `repomix.config.json` в корне проекта, используя шаблон ниже. Адаптируй `include` и `ignore.customPatterns` под конкретный стек.
+Create `repomix.config.json` at the project root using the template below. Adapt `include` and `ignore.customPatterns` to the stack.
 
-### Базовый шаблон:
+### Base template
 ```json
 {
   "$schema": "https://repomix.com/schemas/latest/schema.json",
@@ -97,7 +97,7 @@ npm install -g repomix
 }
 ```
 
-### Include-паттерны по стеку:
+### Include patterns by stack
 
 #### Frontend (React / Vue / Angular / Svelte)
 ```json
@@ -151,17 +151,17 @@ npm install -g repomix
 ```
 
 #### Fullstack / Monorepo
-Комбинируй паттерны из нескольких стеков. Рекомендуй пользователю исключить legacy/архивные папки.
+Combine patterns from several stacks. Recommend that the user exclude legacy / archive folders.
 
-#### Non-code Knowledge Base (маркетинг, стратегия, документация)
+#### Non-code knowledge base (marketing, strategy, documentation)
 ```json
 "include": [
   "**/*.md", "**/*.txt", "**/*.csv", "**/*.json", "**/*.yml", "**/*.yaml"
 ]
 ```
-> Бинарные форматы (docx, pdf, pptx, изображения, видео) Repomix НЕ парсит. Конвертируй их в Markdown перед индексацией — см. раздел «Knowledge Base проекты» ниже.
+> Repomix does NOT parse binary formats (docx, pdf, pptx, images, video). Convert them to Markdown before indexing — see "Knowledge Base projects" below.
 
-### Универсальные ignore-паттерны (добавь всегда):
+### Universal ignore patterns (always add)
 ```json
 "customPatterns": [
   "**/node_modules/**", "**/target/**", "**/dist/**",
@@ -186,14 +186,14 @@ npm install -g repomix
 
 ---
 
-## Фаза 3: Инфраструктура
+## Phase 3: infrastructure
 
-### Создать выходную папку:
+### Create the output folder
 ```bash
 mkdir -p .repomix
 ```
 
-### Добавить в .gitignore (если Git есть):
+### Add to .gitignore (if Git is in use)
 ```
 # Repomix (AI context index, regenerated locally)
 .repomix/
@@ -201,40 +201,40 @@ mkdir -p .repomix
 
 ---
 
-## Фаза 4: Первая генерация и оценка
+## Phase 4: first generation and assessment
 
 ```bash
 repomix
 ```
 
-Проанализируй вывод:
-- **Total Files** — сколько файлов попало в индекс
-- **Total Tokens** — бюджет токенов (ориентиры ниже)
-- **Security** — если обнаружены секреты, предупреди пользователя
+Inspect the output:
+- **Total Files** — how many files entered the index
+- **Total Tokens** — token budget (benchmarks below)
+- **Security** — if secrets are detected, warn the user
 
-### Ориентиры по размеру:
-| Токены | Оценка | Действие |
-|--------|--------|----------|
-| < 100K | Отлично | Без изменений |
-| 100K–500K | Нормально | Оптимизации опциональны |
-| 500K–1M | Много | Рекомендуй включить `compress`, убрать docs/tests |
-| > 1M | Слишком много | Разбей на профили по подсистемам |
+### Size benchmarks
+| Tokens | Verdict | Action |
+|--------|---------|--------|
+| < 100K | Excellent | No changes |
+| 100K–500K | Normal | Optimization optional |
+| 500K–1M | Heavy | Recommend `compress`, drop docs/tests |
+| > 1M | Too heavy | Split into per-subsystem profiles |
 
-### Если индекс слишком большой — стратегии уменьшения:
-1. **Включить compress** (Tree-sitter): снижает на 50-70%
-2. **removeComments**: ещё -10-20%
-3. **removeEmptyLines**: ещё -5-10%
-4. **Исключить тесты**: `"**/*.test.*"`, `"**/*.spec.*"`, `"**/tests/**"`, `"**/__tests__/**"`
-5. **Исключить docs**: `"docs/**"` если документация объёмная
-6. **Разбить на профили** (см. Фаза 6)
+### If the index is too big — strategies for shrinking
+1. **Enable `compress`** (Tree-sitter): cuts 50–70%
+2. **`removeComments`**: another -10–20%
+3. **`removeEmptyLines`**: another -5–10%
+4. **Exclude tests:** `"**/*.test.*"`, `"**/*.spec.*"`, `"**/tests/**"`, `"**/__tests__/**"`
+5. **Exclude docs:** `"docs/**"` if documentation is large
+6. **Profiles** (see Phase 6)
 
 ---
 
-## Фаза 5: Автообновление
+## Phase 5: auto-update
 
-### Вариант A: Git-проект с Husky
+### Option A: Git project with Husky
 
-Создай `.husky/post-commit`:
+Create `.husky/post-commit`:
 ```bash
 #!/bin/sh
 
@@ -249,11 +249,11 @@ fi
 chmod +x .husky/post-commit
 ```
 
-> Если `.husky/post-commit` уже существует — добавь блок repomix в конец файла, не заменяй существующие хуки.
+> If `.husky/post-commit` already exists — append the repomix block; do not replace existing hooks.
 
-### Вариант B: Git-проект без Husky
+### Option B: Git project without Husky
 
-Создай `.git/hooks/post-commit`:
+Create `.git/hooks/post-commit`:
 ```bash
 #!/bin/sh
 if command -v repomix > /dev/null 2>&1; then
@@ -265,9 +265,9 @@ fi
 chmod +x .git/hooks/post-commit
 ```
 
-### Вариант C: Проект без Git
+### Option C: project without Git
 
-Создай скрипт переиндексации в корне проекта:
+Create a reindex script at the project root:
 
 **Linux/macOS** — `reindex.sh`:
 ```bash
@@ -304,28 +304,28 @@ chmod +x reindex.sh  # Linux/macOS only
 
 ---
 
-## Фаза 6: Профили (опционально)
+## Phase 6: profiles (optional)
 
-Для крупных проектов — создай отдельные конфиги для подсистем:
+For large projects — separate configs per subsystem:
 
 ```bash
-# Только бэкенд
+# Backend only
 repomix --include "server/**" -o .repomix/backend.xml
 
-# Только фронтенд
+# Frontend only
 repomix --include "frontend/**" -o .repomix/frontend.xml
 
-# Только инфраструктура
+# Infra only
 repomix --include "start/**" --include "configs/**" --include "Dockerfile" --include "docker-compose*" -o .repomix/infra.xml
 ```
 
-Агент выбирает нужный профиль в зависимости от задачи.
+The agent picks the right profile per task.
 
 ---
 
-## Фаза 7: Обновление AGENTS.md
+## Phase 7: update AGENTS.md
 
-Добавь в AGENTS.md проекта секцию (адаптируй под конкретный проект):
+Add this section to the project's `AGENTS.md` (adapt to the project):
 
 ```markdown
 ## Context Engineering: Repomix
@@ -350,36 +350,36 @@ repomix --include "start/**" --include "configs/**" --include "Dockerfile" --inc
 
 ---
 
-## Чеклист инициализации (быстрая справка)
+## Initialization checklist (quick reference)
 
 ```
-[ ] repomix установлен глобально (npm install -g repomix)
-[ ] repomix.config.json создан в корне с адаптированными include/ignore
-[ ] .repomix/ добавлена в .gitignore
-[ ] Первая генерация выполнена, размер оценён
-[ ] Автообновление настроено (git hook / скрипт)
-[ ] AGENTS.md обновлён секцией Context Engineering
+[ ] repomix installed globally (npm install -g repomix)
+[ ] repomix.config.json created at root with adapted include/ignore
+[ ] .repomix/ added to .gitignore
+[ ] First generation done; size assessed
+[ ] Auto-update set up (git hook / script)
+[ ] AGENTS.md updated with the Context Engineering section
 ```
 
 ---
 
-## Knowledge Base проекты (не-код)
+## Knowledge Base projects (non-code)
 
-Repomix работает только с **текстовыми** форматами. Для проектов, содержащих бинарные документы (docx, pdf, pptx, изображения, видео), используй стратегию **"Markdown-First Knowledge Base"**:
+Repomix only handles **text** formats. For projects with binary documents (docx, pdf, pptx, images, video) use the **"Markdown-First Knowledge Base"** strategy:
 
-### Структура:
+### Layout
 ```
 project/
-├── AGENTS.md                  # Главный контекст для AI
+├── AGENTS.md                  # Main AI context
 ├── repomix.config.json
-├── .repomix/output.xml        # Индекс
+├── .repomix/output.xml        # Index
 │
-├── strategy/                  # Стратегия и планы
+├── strategy/                  # Strategy and plans
 │   ├── vision.md
 │   ├── okrs-q2-2026.md
 │   └── competitive-analysis.md
 │
-├── marketing/                 # Маркетинг
+├── marketing/                 # Marketing
 │   ├── brand-guidelines.md
 │   ├── campaigns/
 │   │   ├── launch-campaign.md
@@ -387,45 +387,45 @@ project/
 │   └── metrics/
 │       └── kpi-dashboard.md
 │
-├── research/                  # Исследования
+├── research/                  # Research
 │   ├── user-interviews.md
 │   ├── market-sizing.md
 │   └── competitor-matrix.md
 │
-├── assets/                    # Бинарные оригиналы (исключены из индекса)
+├── assets/                    # Binary originals (excluded from index)
 │   ├── presentations/         # .pptx
 │   ├── documents/             # .docx, .pdf
-│   └── media/                 # Изображения, видео
+│   └── media/                 # Images, video
 │
-└── assets-index/              # Описания бинарных файлов (включены в индекс)
-    ├── presentations.md       # Краткое содержание каждой презентации
-    ├── documents.md           # Краткое содержание каждого документа
-    └── media.md               # Описания изображений и видео
+└── assets-index/              # Descriptions of binary files (included in index)
+    ├── presentations.md       # Brief content of each presentation
+    ├── documents.md           # Brief content of each document
+    └── media.md               # Descriptions of images and videos
 ```
 
-### Правила:
-1. Основной контент — всегда в `.md` файлах
-2. Бинарные оригиналы лежат в `assets/` и исключены из repomix
-3. Для каждого бинарного файла создай описание в `assets-index/*.md`
-4. AI конвертирует docx/pdf → md при первичной загрузке (ручной или автоматический этап)
+### Rules
+1. The main content always lives in `.md` files
+2. Binary originals live in `assets/` and are excluded from repomix
+3. For each binary file write a description in `assets-index/*.md`
+4. The AI converts docx/pdf → md at intake (manual or automatic)
 
-### Конвертация бинарных файлов в Markdown:
+### Converting binaries to Markdown
 ```bash
 # DOCX → Markdown (pandoc)
 pandoc document.docx -t markdown -o document.md
 
-# PDF → Markdown (marker — AI-based, высокое качество)
+# PDF → Markdown (marker — AI-based, high quality)
 pip install marker-pdf
 marker_single input.pdf output/
 
-# PDF → текст (простой fallback)
+# PDF → text (simple fallback)
 pdftotext input.pdf output.txt
 ```
 
-### Include для knowledge base:
+### Include for knowledge bases
 ```json
 "include": ["**/*.md", "**/*.txt", "**/*.csv", "**/*.json", "**/*.yml"]
 ```
 
-### Рекомендация по размеру:
-Knowledge base проекты обычно компактнее кода. Для них `compress: false` часто предпочтительнее — сохраняет полную структуру текста, что важнее для стратегических документов, чем для кода.
+### Size guidance
+KB projects are usually more compact than code. For them, `compress: false` is often preferable — it preserves full text structure, which matters more for strategy documents than for code.

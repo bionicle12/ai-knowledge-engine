@@ -1,0 +1,131 @@
+# AGENTS.md — {{KB_NAME}}
+
+> Instructions for AI agents working with this knowledge base.
+> Generated from `templates/AGENTS.md.template` (instructions_version {{KB_INSTRUCTIONS_VERSION}}).
+
+## Purpose
+
+Local non-code knowledge base for role: **{{PRIMARY_ROLE}}**.
+Helps AI agents understand the author's context, thinking style, decisions, expertise, and preferences.
+
+## Context
+
+- Repomix index: `.repomix/output.xml`
+- Config: `kb.config.yml`
+- Structure: `KNOWLEDGE_STRUCTURE.md`
+- Placement examples: `DATA_PLACEMENT_EXAMPLES.md`
+
+## Reading priority
+
+1. `AGENTS.md` (this file)
+2. `kb.config.yml` — role, entities, rules, **mode**
+3. `knowledge/profile/` — who the author is, what they do
+4. `knowledge/principles/` — how they think and decide
+5. `knowledge/voice/` — how they write and speak
+6. Other `knowledge/*` — by topic relevance
+
+## How to use
+
+- Read `.repomix/output.xml` for broad context before strategy, analysis, or planning
+- Read specific `knowledge/` files before targeted updates
+- Process `review/needs-ai-decision/` — the queue of materials awaiting semantic analysis
+- Useful conclusions from review → clean Markdown in `knowledge/`
+- Update `assets-index/` when describing a binary asset
+
+## Forbidden
+
+- Do not index `raw/`, `assets/`, `review/` directly
+- Do not create new folders in `knowledge/` without confirming with the user
+- Do not store secrets, tokens, passwords, private keys, banking data
+- Do not copy third-party private data into `knowledge/`
+- For sensitive material → `review/needs-redaction/` only
+
+## Feedback loop
+
+While working with the user the agent captures conclusions:
+- Auto-detects when meaningful material has accumulated
+- Writes a session summary into `interactions/sessions/`
+- On `!save` — saves immediately
+
+### Commands
+
+| Command | What it does | Cost |
+|---------|--------------|------|
+| `!save` | Save session summary + enrichment now | ~2K tokens |
+| `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
+| `!audit` | Run AI lint level 2 (review the entire base) | ~50–100K tokens |
+| `!super` | Toggle mode: default ↔ super | 0 tokens |
+| `!super on/off` | Explicitly enable/disable super mode | 0 tokens |
+| `!super status` | Show current mode | 0 tokens |
+
+## Knowledge lifecycle
+
+- `knowledge/decisions/` — immutable (log style, do not edit historical entries)
+- `knowledge/domain/` — update when the underlying data changes
+- `knowledge/playbooks/` — update when processes change
+- `knowledge/insights/` — synthesis from facts; update when new data arrives
+- `knowledge/profile/` — update on professional/career changes
+- Outdated knowledge → `knowledge/_archive/` with a note
+- Frontmatter `last_verified` — refresh on confirmed accuracy
+
+## Operating mode
+
+At the start of each session, **read `mode` in `kb.config.yml`** and apply the corresponding profile from `mode_profiles`.
+
+| Mode | Paradigm | Tokens/day | Use when |
+|------|----------|-----------:|----------|
+| `default` | Python-first, throttled | ~3-4K | Daily work, limited budget |
+| `super` | AI-first, on-demand | ~50-200K+ | Unlimited plans, intensive learning |
+
+### default mode
+- Surprise filter: Python NLP overlap (0 tok)
+- Annotations: Python templates (0 tok)
+- Entity resolution: Python fuzzy match (0 tok)
+- Reflection: by threshold (≥25) OR weekly + changes
+- Lint L2: only on `!audit`
+- Review queue: waits for manual processing
+
+### super mode
+- Surprise filter: AI semantic per-ingest (~2-5K tok)
+- Annotations: AI substantive + suggested edits (~1-3K tok)
+- Entity resolution: AI semantic + cross-language (~500-1K tok)
+- Reflection: after every significant ingest (importance ≥5)
+- Lint L2: auto on every consolidation (24h)
+- Review queue: AI auto-processes `review/needs-ai-decision/`
+
+> ⚠️ **Super mode** can drain a daily token budget in one active session. Use only with unlimited or high-cap AI plans.
+
+## Context budget
+
+1. Reading priority: insights → opinions → domain → playbooks → raw facts
+2. Routing first: always start with the routing table; don't load every domain file
+3. Loading limit: at most 7 `knowledge/` files in context simultaneously
+4. If you've loaded > 5, stop and reassess
+5. Summarize what you've read before loading more
+6. Ranking: prefer files with high `importance` and recent `last_accessed`
+7. Temporal filter: filter by `valid_from`/`valid_until` if the question is period-specific
+8. Access tracking: when reading a `knowledge/` file, update `last_accessed` and `access_count += 1`
+
+## Token budget
+
+Depends on `mode` in `kb.config.yml`:
+
+### default mode — at most ~10% of session tokens
+- Ingest: importance scoring (~500 tok) + review if complex (~5–15K)
+- Query writeback: 1 call (~3K tok)
+- Surprise filter: Python-only (0 tok); AI only for >3000 words (max 2/day)
+- Self-editing annotations: Python-only (0 tok)
+- Reflection / lint L2: only on `!reflect` / `!audit` or weekly schedule
+
+### super mode — unlimited
+- Ingest: AI surprise (~2-5K) + AI annotations (~1-3K) + AI entity resolution (~1K) + importance with reasoning (~1-2K)
+- Query writeback: 1 call + auto-update related pages (~5-8K)
+- Surprise filter: AI for every material, no size/frequency limits
+- Self-editing annotations: AI substantive + suggested edits
+- Reflection: after every significant ingest (importance ≥5)
+- Lint L2: auto on every consolidation
+- Review queue: auto-processed without waiting for `!audit`
+
+## Language
+
+Primary language: **{{PRIMARY_LANGUAGE}}**. Technical terms, brand names, and product names — keep in original.

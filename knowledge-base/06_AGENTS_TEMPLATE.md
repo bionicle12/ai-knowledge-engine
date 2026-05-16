@@ -1,155 +1,157 @@
-# 06 — Шаблон AGENTS.md для базы знаний
+# 06 — AGENTS.md template for the knowledge base
 
-> AI-агент должен создать `AGENTS.md` в корне базы на основе этого шаблона, адаптировав под роль и сущности пользователя.
+> The AI agent must create `AGENTS.md` at the base root from this template, adapted to the user's role and entities.
+>
+> **Reference template:** `knowledge-base/templates/AGENTS.md.template` — already contains the full structure with placeholders `{{KB_NAME}}`, `{{PRIMARY_ROLE}}`, `{{PRIMARY_LANGUAGE}}`, `{{KB_INSTRUCTIONS_VERSION}}`. The agent copies and parameterizes it rather than writing from scratch.
 
 ---
 
-## Шаблон
+## Template
 
 ```markdown
-# AGENTS.md — [Название базы знаний]
+# AGENTS.md — [Knowledge base name]
 
-## Назначение
+## Purpose
 
-Локальная non-code knowledge base для роли: **[роль пользователя]**.
-Помогает AI-агенту понимать контекст, стиль мышления, решения, экспертизу и предпочтения автора.
+Local non-code knowledge base for role: **[user role]**.
+Helps the AI agent understand context, thinking style, decisions, expertise, and preferences of the author.
 
-## Контекст
+## Context
 
-- Repomix-индекс: `.repomix/output.xml`
-- Конфиг: `kb.config.yml`
-- Структура: `KNOWLEDGE_STRUCTURE.md`
-- Примеры размещения: `DATA_PLACEMENT_EXAMPLES.md`
+- Repomix index: `.repomix/output.xml`
+- Config: `kb.config.yml`
+- Structure: `KNOWLEDGE_STRUCTURE.md`
+- Placement examples: `DATA_PLACEMENT_EXAMPLES.md`
 
-## Приоритет чтения
+## Reading priority
 
-1. `AGENTS.md` (этот файл)
-2. `kb.config.yml` — роль, сущности, правила
-3. `knowledge/profile/` — кто автор, что умеет
-4. `knowledge/principles/` — как думает и решает
-5. `knowledge/voice/` — как пишет и говорит
-6. Остальные `knowledge/*` — по теме запроса
+1. `AGENTS.md` (this file)
+2. `kb.config.yml` — role, entities, rules
+3. `knowledge/profile/` — who the author is, what they do
+4. `knowledge/principles/` — how they think and decide
+5. `knowledge/voice/` — how they write and speak
+6. Other `knowledge/*` — by relevance to the request
 
-## Как использовать
+## How to use
 
-- Читай `.repomix/output.xml` для широкого контекста перед стратегией, анализом или планированием
-- Читай конкретные файлы `knowledge/` перед точечными обновлениями
-- Обрабатывай `review/needs-ai-decision/` — это очередь материалов для смыслового анализа
-- Полезные выводы из review → чистый markdown в `knowledge/`
-- Обновляй `assets-index/` когда описываешь бинарный ассет
+- Read `.repomix/output.xml` for broad context before strategy, analysis, or planning
+- Read specific `knowledge/` files before targeted edits
+- Process `review/needs-ai-decision/` — the queue of materials needing semantic analysis
+- Useful conclusions from review → clean Markdown in `knowledge/`
+- Update `assets-index/` when describing a binary asset
 
-## Запрещено
+## Forbidden
 
-- Индексировать `raw/`, `assets/`, `review/` напрямую
-- Создавать новые папки в `knowledge/` без уточнения у пользователя
-- Сохранять секреты, токены, пароли, приватные ключи, банковские данные
-- Копировать чужие приватные данные в `knowledge/`
-- Если материал чувствительный — только в `review/needs-redaction/`
+- Do not index `raw/`, `assets/`, `review/` directly
+- Do not create new folders in `knowledge/` without confirming with the user
+- Do not store secrets, tokens, passwords, private keys, banking data
+- Do not copy third-party private data into `knowledge/`
+- For sensitive material → only `review/needs-redaction/`
 
-## Feedback Loop
+## Feedback loop
 
-Во время работы с пользователем AI-агент захватывает выводы из диалогов:
-- Автоматически определяет, когда накопился содержательный материал
-- Пишет session summary в `interactions/sessions/` (с секцией «Обработанные материалы»)
-- По команде `!save` — немедленно сохраняет текущие выводы
+While working with the user the agent captures conclusions:
+- Auto-detects when meaningful material has accumulated
+- Writes a session summary into `interactions/sessions/` (with a "Processed materials" section)
+- On `!save` — saves immediately
 
-### Команды
+### Commands
 
-| Команда | Что делает | Стоимость |
-|---------|-----------|-----------|
-| `!save` | Сохранить session summary + enrichment сейчас | ~2K токенов |
-| `!reflect` | Запустить рефлексию: синтез insights из накопленного | ~15K токенов |
-| `!audit` | Запустить AI-ревью базы (lint уровня 2) | ~50-100K токенов |
-| `!super` | Переключить режим: default ↔ super | 0 токенов |
-| `!super on` | Включить super mode | 0 токенов |
-| `!super off` | Вернуть default mode | 0 токенов |
-| `!super status` | Показать текущий режим | 0 токенов |
+| Command | What it does | Cost |
+|---------|--------------|------|
+| `!save` | Save session summary + enrichment now | ~2K tokens |
+| `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
+| `!audit` | Run AI base review (lint level 2) | ~50–100K tokens |
+| `!super` | Toggle mode: default ↔ super | 0 tokens |
+| `!super on` | Enable super mode | 0 tokens |
+| `!super off` | Return to default mode | 0 tokens |
+| `!super status` | Show current mode | 0 tokens |
 
-## Жизненный цикл знаний
+## Knowledge lifecycle
 
-- `knowledge/decisions/` — иммутабельные (лог-стиль, не редактировать старые)
-- `knowledge/domain/` — обновлять при изменении данных
-- `knowledge/playbooks/` — обновлять при изменении процессов
-- `knowledge/insights/` — синтез из фактов, обновлять при новых данных
-- `knowledge/profile/` — обновлять при карьерных/профессиональных изменениях
-- Устаревшие знания → `knowledge/_archive/` с пометкой
-- Frontmatter `last_verified` — обновлять при подтверждении актуальности
+- `knowledge/decisions/` — immutable (log style, do not edit historical entries)
+- `knowledge/domain/` — update when underlying data changes
+- `knowledge/playbooks/` — update when processes change
+- `knowledge/insights/` — synthesis from facts; update on new data
+- `knowledge/profile/` — update on professional/career changes
+- Outdated knowledge → `knowledge/_archive/` with a note
+- Frontmatter `last_verified` — refresh on confirmed accuracy
 
-## Operating Mode
+## Operating mode
 
-При старте сессии **прочитай `mode` в `kb.config.yml`** и примени соответствующий профиль из `mode_profiles`.
+At the start of a session **read `mode` in `kb.config.yml`** and apply the corresponding profile from `mode_profiles`.
 
-| Mode | Парадигма | Токены/день | Когда использовать |
-|------|-----------|------------|-------------------|
-| `default` | Python-first, throttled | ~3-4K | Обычная работа, ограниченный бюджет |
-| `super` | AI-first, on-demand | ~50-200K+ | Безлимитный план, интенсивное наполнение базы |
+| Mode | Paradigm | Tokens/day | Use when |
+|------|----------|-----------:|----------|
+| `default` | Python-first, throttled | ~3-4K | Daily work, limited budget |
+| `super` | AI-first, on-demand | ~50-200K+ | Unlimited plan, intensive base build-up |
 
 ### default mode
 - Surprise filter: Python NLP overlap (0 tok)
-- Annotations: Python шаблонные (0 tok)
+- Annotations: Python templates (0 tok)
 - Entity resolution: Python fuzzy match (0 tok)
-- Рефлексия: по threshold (≥25) ИЛИ ≥7 дней + changes
-- Lint L2: только по `!audit`
-- Review queue: ждёт ручного запуска
+- Reflection: by threshold (≥25) OR weekly + changes
+- Lint L2: only on `!audit`
+- Review queue: waits for manual processing
 
 ### super mode
-- Surprise filter: AI семантический анализ каждого ingest (~2-5K tok)
-- Annotations: AI содержательные связи с предложениями правок (~1-3K tok)
-- Entity resolution: AI семантический + cross-language (~500-1K tok)
-- Рефлексия: после каждого значимого ingest (importance ≥5)
-- Lint L2: автоматически при каждой консолидации (24h)
-- Review queue: AI автоматически обрабатывает `review/needs-ai-decision/`
+- Surprise filter: AI semantic per-ingest (~2-5K tok)
+- Annotations: AI substantive + suggested edits (~1-3K tok)
+- Entity resolution: AI semantic + cross-language (~500-1K tok)
+- Reflection: after every significant ingest (importance ≥5)
+- Lint L2: auto on every consolidation (24h)
+- Review queue: AI auto-processes `review/needs-ai-decision/`
 
-> ⚠️ **Super mode** потребляет максимально возможное количество токенов и может выжрать все лимиты. Взамен — максимальная скорость и качество обучения системы.
+> ⚠️ **Super mode** consumes the maximum possible tokens and can blow through limits. In return — peak speed and learning quality.
 
-## Context Budget
+## Context budget
 
-Правила управления контекстом при чтении knowledge/:
+Rules for managing context when reading `knowledge/`:
 
-1. **Приоритет чтения:** insights/ → opinions/ → domain/ → playbooks/ → raw facts
-   (синтезированное → сырое; как в Hindsight — сначала «что я думаю», потом «что я знаю»)
-2. **Routing first:** всегда начинай с routing table, не загружай все файлы домена
-3. **Лимит загрузки:** не больше 7 knowledge/ файлов в контексте одновременно
-4. Если загрузил > 5 файлов — остановись и оцени: все ли нужны?
-5. Суммаризуй прочитанное, прежде чем загружать следующую порцию
-6. **Ранжирование:** при прочих равных предпочитай файлы с высоким `importance` и свежим `last_accessed`
-7. **Temporal filter:** если вопрос про конкретный период — фильтруй по `valid_from`/`valid_until`
-8. **Access tracking:** при чтении knowledge/ файла обнови `last_accessed` и `access_count += 1`
+1. **Reading priority:** insights/ → opinions/ → domain/ → playbooks/ → raw facts
+   (synthesized → raw; like Hindsight — first "what I think", then "what I know")
+2. **Routing first:** always start with the routing table; do not load every domain file
+3. **Loading limit:** at most 7 `knowledge/` files in context simultaneously
+4. If you have loaded > 5 — stop and reassess: are they all needed?
+5. Summarize what you have read before loading the next batch
+6. **Ranking:** all else equal, prefer files with high `importance` and recent `last_accessed`
+7. **Temporal filter:** when the question is about a specific period — filter by `valid_from`/`valid_until`
+8. **Access tracking:** when reading a `knowledge/` file, update `last_accessed` and `access_count += 1`
 
-## Token Budget
+## Token budget
 
-Зависит от `mode` в `kb.config.yml`:
+Depends on `mode` in `kb.config.yml`:
 
-### default mode — не более 10% токенов сессии
+### default mode — at most ~10% of session tokens
 
-- **При ingest:** importance scoring (~500 tok) + review если сложный (~5-15K)
-- **При query-writeback:** 1 вызов (~3K tok)
-- **Surprise filter:** Python-only (0 tok), AI только для >3000 слов (max 2/день)
-- **Self-editing annotations:** Python-only (0 tok), без LLM
-- **Рефлексия и lint L2:** ТОЛЬКО по команде `!reflect` / `!audit` или еженедельно
+- **On ingest:** importance scoring (~500 tok) + review if complex (~5–15K)
+- **On query writeback:** 1 call (~3K tok)
+- **Surprise filter:** Python-only (0 tok); AI only for >3000 words (max 2/day)
+- **Self-editing annotations:** Python-only (0 tok)
+- **Reflection / lint L2:** ONLY on `!reflect` / `!audit` or weekly schedule
 
-### super mode — без ограничений
+### super mode — unlimited
 
-- **При ingest:** AI surprise (~2-5K) + AI annotations (~1-3K) + AI entity resolution (~1K) + importance с reasoning (~1-2K)
-- **При query-writeback:** 1 вызов + автоматическое обновление связанных страниц (~5-8K)
-- **Surprise filter:** AI для **каждого** материала, без ограничений по размеру/частоте
-- **Self-editing annotations:** AI содержательные + предложения правок
-- **Рефлексия:** после каждого значимого ingest (importance ≥5)
-- **Lint L2:** автоматически при каждой консолидации
-- **Review queue:** автоматическая обработка без ожидания `!audit`
+- **On ingest:** AI surprise (~2-5K) + AI annotations (~1-3K) + AI entity resolution (~1K) + importance with reasoning (~1-2K)
+- **On query writeback:** 1 call + auto-update of related pages (~5-8K)
+- **Surprise filter:** AI for every material, no size/frequency limits
+- **Self-editing annotations:** AI substantive + suggested edits
+- **Reflection:** after every significant ingest (importance ≥5)
+- **Lint L2:** auto on every consolidation
+- **Review queue:** auto-processed without waiting for `!audit`
 
-## Язык
+## Language
 
-Основной язык: русский. Технические термины, названия и бренды — на языке оригинала.
+Primary language: [primary language]. Technical terms, brand names, and product names — keep in original.
 ```
 
 ---
 
-## Адаптация под роль
+## Adapting to the role
 
-AI-агент должен:
+The AI agent must:
 
-1. Заменить `[роль пользователя]` и `[Название базы знаний]`
-2. Добавить специфичные для роли секции (если нужны)
-3. Не добавлять очевидные инструкции ("пиши чистый код", "будь полезным")
-4. Не дублировать правила, которые уже есть в `kb.config.yml`
+1. Replace `[user role]` and `[Knowledge base name]`
+2. Add role-specific sections if needed
+3. Avoid restating the obvious ("write clean code", "be helpful")
+4. Avoid duplicating rules already present in `kb.config.yml`

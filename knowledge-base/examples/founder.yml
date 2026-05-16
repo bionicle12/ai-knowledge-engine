@@ -1,0 +1,187 @@
+# Example: Startup founder
+
+role: "Startup founder"
+
+description: |
+  Founder of an early-stage company (pre-seed to Series A). Wears every hat:
+  product, sales, hiring, fundraising, ops. The AI assistant becomes a thinking
+  partner that actually remembers prior conversations with investors, the
+  reasons behind every pivot, hiring decisions, and the long arc of the
+  company — context no advisor or mentor can match.
+
+entities:
+  thesis:
+    enabled: true
+    why: "Why this company, why now, why us — and how that thesis evolves"
+    knowledge_paths:
+      - "knowledge/domain/thesis.md"
+      - "knowledge/decisions/pivots.md"
+
+  product:
+    enabled: true
+    why: "What we're building, current state, near-term and long-term roadmap"
+    knowledge_paths:
+      - "knowledge/domain/product.md"
+      - "knowledge/projects/product-evolution.md"
+
+  customers:
+    enabled: true
+    why: "Who buys, why, ICP refinement, customer interviews"
+    knowledge_paths:
+      - "knowledge/domain/customers.md"
+      - "knowledge/playbooks/customer-discovery.md"
+
+  team:
+    enabled: true
+    why: "Hiring philosophy, current team, gaps, comp decisions, culture"
+    knowledge_paths:
+      - "knowledge/domain/team.md"
+      - "knowledge/playbooks/hiring.md"
+      - "knowledge/principles/culture.md"
+
+  fundraising:
+    enabled: true
+    why: "Investor conversations, pitch evolution, term-sheet history, runway math"
+    knowledge_paths:
+      - "knowledge/domain/fundraising.md"
+      - "knowledge/projects/fundraise-rounds/"
+
+  metrics:
+    enabled: true
+    why: "Revenue, MRR, churn, CAC, LTV, growth — the numbers that matter"
+    knowledge_paths:
+      - "knowledge/domain/metrics.md"
+
+  competitors:
+    enabled: true
+    why: "Direct, indirect, and emerging competition"
+    knowledge_paths:
+      - "knowledge/domain/competitors.md"
+
+  decisions:
+    enabled: true
+    why: "Major decisions and the reasoning — including ones we got wrong"
+    knowledge_paths:
+      - "knowledge/decisions/"
+
+  voice:
+    enabled: true
+    why: "How the founder writes investor updates, hiring messages, customer emails"
+    knowledge_paths:
+      - "knowledge/voice/founder-voice.md"
+
+  network:
+    enabled: true
+    why: "Advisors, mentors, helpful peers — who to ask for what"
+    knowledge_paths:
+      - "knowledge/domain/network.md"
+
+raw_data_examples:
+  - "Pitch decks (every version)"
+  - "Investor update emails"
+  - "Customer interview transcripts"
+  - "Cap table snapshots"
+  - "Board meeting decks and notes"
+  - "Notion/Linear/Asana exports for product roadmap"
+  - "Hiring scorecards and reference checks"
+  - "Financial models (anonymized if shared)"
+  - "Co-founder meeting notes"
+
+ai_assistant_tasks:
+  - "Drafting investor updates in your voice"
+  - "Pitch deck review with founder-style critique"
+  - "Hiring message templates that don't sound generic"
+  - "Strategic memos: 'should we do X?' with recall of past discussions"
+  - "Customer email drafts that match your tone"
+  - "Pre-meeting briefs based on prior conversations with the same person"
+  - "Decision logs — capturing the *reason* behind major choices"
+  - "Pattern matching: 'we've seen this kind of customer before, here's what worked'"
+
+placement_examples:
+  intro: |
+    Founders fly blind on memory: the conversation with that investor 6 months
+    ago, the reasons behind the failed hire, the customer who told you the
+    real pain. A knowledge base for you means *the company has institutional
+    memory before there's an institution*. The AI becomes the chief of staff
+    you can't yet afford.
+
+  by_artifact:
+    - artifact: "Pitch decks (every iteration)"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "Pitch-v3-pre-seed.pptx"
+        - "Pitch-v8-series-a-final.pptx"
+      knowledge_target: "knowledge/domain/fundraising.md"
+      tip: "Keep every version — they show the evolution of your thesis."
+
+    - artifact: "Investor update emails (sent)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Update-2026-04-monthly.md"
+        - "Update-2026-q1-quarterly.md"
+      knowledge_target: "knowledge/voice/founder-voice.md"
+      tip: "Your own investor updates are the best training corpus for your voice."
+
+    - artifact: "Customer interview transcripts"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Interview-2026-05-15-saas-buyer.md"
+        - "Demo-call-followup-customer-X.md"
+      knowledge_target: "knowledge/domain/customers.md"
+
+    - artifact: "Investor conversation notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Call notes — VC firm Y partner Z.md"
+        - "Coffee chat — angel investor W.md"
+      knowledge_target: "knowledge/domain/fundraising.md"
+      tip: "Note follow-ups and what they cared about — the AI will remind you."
+
+    - artifact: "Strategic memos and pivot docs"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Why we're pivoting from B2C to B2B.md"
+        - "Decision: kill mobile, double down on web.md"
+      knowledge_target: "knowledge/decisions/pivots.md"
+
+    - artifact: "Hiring docs and scorecards"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Engineering-hire-scorecard-2026-05.md"
+        - "Reference-check-candidate-X.md"
+      knowledge_target: "knowledge/playbooks/hiring.md"
+
+    - artifact: "Board meeting decks and notes"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "Board-deck-2026-q1.pptx"
+        - "Board-meeting-notes.md"
+
+    - artifact: "Co-founder/team meeting notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Co-founder-1on1-notes.md"
+        - "Weekly leadership sync.md"
+
+    - artifact: "Lessons from failures"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "What I learned from killing feature X.md"
+        - "Why the first hire didn't work.md"
+      knowledge_target: "knowledge/insights/founder-lessons.md"
+      tip: "Failure post-mortems compound — the AI surfaces them when you're about to repeat them."
+
+  quickstart:
+    - "Drop your latest pitch deck → raw/documents/unsorted/"
+    - "Last 3 investor update emails → raw/work/unsorted/"
+    - "1-paragraph current company thesis → raw/personal-context/unsorted/"
+    - "Run ./reindex.sh — your AI now knows your company arc"
+    - "Ask: 'Draft a monthly investor update covering wins, asks, and metrics for May.'"
+
+  do_not_drop:
+    - "Cap-table data of co-founders/employees without consent"
+    - "Salary or comp data of others"
+    - "Confidential investor terms still under NDA"
+    - "Personal information of customers / leads"
+    - "Internal HR conversations or sensitive feedback about specific people"
+    - "Board materials marked confidential without redaction"

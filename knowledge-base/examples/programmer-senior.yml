@@ -73,3 +73,80 @@ ai_assistant_tasks:
   - "Рефакторинг с учётом моих принципов"
   - "Подготовка к техническим интервью"
   - "Обсуждение системного дизайна"
+
+# ============================================================
+# Initial population helper (read by 14_INITIAL_POPULATION.md)
+# ============================================================
+placement_examples:
+  intro: |
+    Если ты программист уровня middle+/senior, то у тебя точно есть:
+    архитектурные решения, постмортемы, конфиги, заметки с код-ревью,
+    закладки на интересные статьи и записи технических созвонов.
+    Всё это — топливо для базы знаний. Чем регулярнее кладёшь, тем умнее
+    AI-агент в твоих проектах.
+
+  by_artifact:
+    - artifact: "ADR (Architecture Decision Records)"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "ADR-0042 переход с REST на GraphQL.md"
+        - "Решение использовать Docker Swarm вместо K8s.txt"
+      knowledge_target: "knowledge/decisions/"
+      tip: "После обработки ADR попадает в knowledge/decisions/ — иммутабельный лог решений с обоснованиями."
+
+    - artifact: "Постмортемы и расследования инцидентов"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "2026-05-15-postmortem-redis-spike.md"
+        - "Расследование N+1 в users API.md"
+      knowledge_target: "knowledge/playbooks/debugging.md"
+      tip: "Из постмортемов рождаются playbooks — повторяемые схемы дебага."
+
+    - artifact: "Заметки с код-ревью (свои или к тебе)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Экспорт PR-комментариев из GitHub.md"
+        - "Что я понял после ревью с тимлидом.md"
+      knowledge_target: "knowledge/voice/code-style.md"
+
+    - artifact: "Записи технических митингов и design review"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "2026-05-15-design-review.mp3"
+        - "Sync с тимлидом 14:00.mp4"
+      tip: "Аудио будет автотранскрибировано (если установлены ffmpeg + STT)."
+
+    - artifact: "Закладки и интересные статьи"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "HN: Why we moved off Postgres to ScyllaDB.md"
+        - "research-paper-distributed-locks.pdf"
+      knowledge_target: "knowledge/domain/tech-stack.md"
+
+    - artifact: "Конфиги и snippets, которые показались элегантными"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Красивый GitHub Actions workflow.yml"
+        - "Хитрый rust trait pattern.md"
+      knowledge_target: "knowledge/principles/code-quality.md"
+
+    - artifact: "README и документация своих проектов"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "highway-clicker README.md"
+        - "internal-api docs.md"
+      knowledge_target: "knowledge/projects/"
+
+  quickstart:
+    - "Положи README.md любого своего рабочего проекта → raw/reference/unsorted/"
+    - "Любая заметка про принятое арх. решение (даже одна строка) → raw/reference/unsorted/"
+    - "Скриншот архитектурной диаграммы из Excalidraw/Miro → raw/media/unsorted/"
+    - "Запусти ./reindex.sh — через минуту знания будут в knowledge/"
+    - "Открой .repomix/output.xml — теперь твой AI знает твой стек"
+
+  do_not_drop:
+    - "Чужой код без явной лицензии"
+    - "API-ключи, токены, .env файлы (даже зачёркнутые)"
+    - "Содержимое баз данных с продакшена"
+    - "Приватные переписки команды без согласия участников"
+    - "PII клиентов или коллег"

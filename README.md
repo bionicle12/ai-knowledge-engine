@@ -11,9 +11,12 @@ local-first NLP and automatic context indexing.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#requirements)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
+[![Tests](https://img.shields.io/badge/tests-133_passing-brightgreen.svg)](#)
+[![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.8.0-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
-[Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](README.ru.md)
+[Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](i18n/ru/README.md)
 
 </div>
 
@@ -239,10 +242,11 @@ Changes?                  -  -  -  -  -  -  -  -  ✓
 
 ## Instruction Modules
 
-The knowledge base system is built from 13 modular instruction files that the AI agent reads sequentially:
+The knowledge base system is built from modular instruction files that the AI agent reads sequentially:
 
 | # | Module | Purpose |
 |---|--------|---------|
+| 00 | Overview | Deployment map: what to read, what to copy, in what order (read first) |
 | 01 | Prerequisites | Environment check: Node.js, Python, Git, indexer |
 | 02 | Init | Role clarification, entity selection, folder creation |
 | 03 | Pipeline | Python ingest script: conversion + NLP + source hashing |
@@ -251,11 +255,12 @@ The knowledge base system is built from 13 modular instruction files that the AI
 | 06 | Agents Template | `AGENTS.md` template with token budget |
 | 07 | Interaction Loop | Self-learning + session capture + query writeback |
 | 08 | Portable | Portability + Dynamic Context Enrichment |
-| 09 | Lint | Health checks: Level 1 (Python) + Level 2 (AI) |
+| 09 | Lint | Health checks: Level 1 (Python) + Level 2 (AI) + `--metrics` |
 | 10 | Log | Append-only operation chronology |
 | 11 | Provenance | Source hash, span citations, regression tests |
 | 12 | NLP Preprocess | NER + keyword extraction + entity resolution |
 | 13 | Autorun | File watcher, git hooks, smart scheduling |
+| 14 | Initial Population | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` |
 
 ---
 
@@ -268,6 +273,10 @@ Pre-configured examples in `knowledge-base/examples/`:
 | `programmer-senior.yml` | Senior Software Engineer | Architecture, debugging, tech stack, code principles |
 | `marketing-director.yml` | Marketing Director | Strategy, brand, campaigns, audience analysis |
 | `creative-hybrid.yml` | Creative Hybrid | Code + music production + indie gamedev |
+| `product-manager.yml` | Product Manager | Prioritization, metrics, user research, PRDs |
+| `researcher.yml` | Researcher / Analyst | Literature graph, hypotheses, methodology |
+| `founder.yml` | Startup founder | Investors, hiring, product, decision logs |
+| `content-creator.yml` | Content creator | Voice fingerprinting, audience, monetization |
 
 Don't see your role? Tell the AI agent your profession — it will generate a custom configuration with relevant entities, knowledge paths, and example workflows.
 
