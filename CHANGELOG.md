@@ -403,3 +403,48 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   python3 scripts/sync_translations.py --to-head --lang ru
   python3 scripts/check_translations.py --update-status
   ```
+
+## [0.9.1] - 2026-05-17
+
+> Hotfix: deployment flow direction reversed. The 0.9.0 `install.sh` was
+> pre-deploy (flatten before agent works), which mixed source instructions
+> with build artifacts and left the project messy. Replaced with `finalize.sh`
+> which runs at the very end.
+
+### Changed
+- `knowledge-base/shell/install.sh` → `knowledge-base/shell/finalize.sh`
+  - **Old behavior** (pre-deploy): flatten `setup/` into project root, agent
+    builds the base on top → mixed instructions and artifacts at the root,
+    `setup/` deleted before deployment finished.
+  - **New behavior** (post-deploy): agent builds the base inside
+    `<project>/knowledge-base/` while `setup/` stays put as the source. After
+    `kb_doctor.py` passes and `START_HERE.md` is generated, the agent runs
+    `bash setup/shell/finalize.sh` which:
+    - Validates required files (`AGENTS.md`, `kb.config.yml`,
+      `scripts/kb_ingest.py`)
+    - Refuses if anything in `knowledge-base/` would overwrite a file at the
+      project root (without `--force`)
+    - Promotes every entry to the project root
+    - Removes the empty `knowledge-base/`
+    - Removes `setup/` (use `--keep-setup` to retain)
+  - Flags: `--dry-run`, `--keep-setup`, `--force`, `--kb-dir <path>`
+- `02_INIT.md`, `00_OVERVIEW.md`, `14_INITIAL_POPULATION.md` updated to reflect
+  the corrected flow:
+  - Agent works inside `knowledge-base/` during deployment
+  - `--kb-root knowledge-base` for `kb_populate.py` invocations during build
+  - `finalize.sh` is the final step in Phase 3
+
+### Added
+- `knowledge-base/scripts/tests/test_finalize_sh.py` — 8 tests covering happy
+  path, refusal scenarios (missing kb, missing required files, conflicts),
+  `--keep-setup`, `--dry-run`, `--force`, idempotency
+
+### Test stats
+- 150 tests passing (was 142)
+
+### Translation impact
+- After committing, the 18 RU files become stale (HEAD moved). Run:
+  ```
+  python3 scripts/sync_translations.py --to-head --lang ru
+  python3 scripts/check_translations.py --update-status
+  ```

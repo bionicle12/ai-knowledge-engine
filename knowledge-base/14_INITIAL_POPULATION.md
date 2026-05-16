@@ -6,6 +6,8 @@
 > **Reference role template (for custom roles):** `knowledge-base/templates/role.yml.template`.
 > **Reference generator (preferred):** `scripts/kb_populate.py` — yaml → markdown without LLM tokens.
 > **Source of examples:** the `placement_examples:` section inside `examples/<role>.yml`.
+>
+> ⚠️ **Path note:** during deployment the base lives at `<project-root>/knowledge-base/`, so `--kb-root knowledge-base` is the correct argument while building. After `setup/shell/finalize.sh` the base is flat at the project root and re-runs use `--kb-root .` (or omit the flag, since cwd is the root). The examples below assume the deployment-time path.
 
 ---
 
@@ -25,8 +27,12 @@ Both end with **the same optional review step** where the agent reads the genera
 ## Path A: built-in role
 
 1. User picks (or agent suggests) a role from `examples/`:
-   `programmer-senior`, `marketing-director`, `creative-hybrid`, `product-manager`, `researcher`, `founder`, `content-creator`.
-2. Agent runs:
+   `programmer-senior`, `marketing-director`, `creative-hybrid`, `product-manager`, `researcher`, `founder`, `content-creator`, `fiction-writer`.
+2. Agent runs (during deployment, before `finalize.sh`):
+   ```bash
+   python3 knowledge-base/scripts/kb_populate.py --role <role> --kb-root knowledge-base
+   ```
+   Or, if the agent's cwd is already inside `knowledge-base/`:
    ```bash
    python3 scripts/kb_populate.py --role <role> --kb-root .
    ```
@@ -43,7 +49,7 @@ When the user describes a role that isn't in `examples/`, the agent **must creat
 
 ### B.1. Create the role YAML
 
-1. Copy `templates/role.yml.template` to `knowledge-base/examples/<slug>.yml` (in the deployed KB).
+1. Copy `templates/role.yml.template` to `knowledge-base/examples/<slug>.yml` (in the deployed base, while it still lives at `<project>/knowledge-base/`).
 2. The agent fills placeholders by **interviewing the user**:
    - `{{ROLE_TITLE}}` — short title
    - `{{ROLE_DESCRIPTION}}` — 2-3 sentences
@@ -66,7 +72,7 @@ When the user describes a role that isn't in `examples/`, the agent **must creat
 Once the YAML is on disk, the workflow is identical to Path A:
 
 ```bash
-python3 scripts/kb_populate.py --role <slug> --kb-root .
+python3 knowledge-base/scripts/kb_populate.py --role <slug> --kb-root knowledge-base
 ```
 
 > **Why save the YAML first instead of generating directly?** Two reasons:
@@ -97,7 +103,7 @@ This pass typically costs ~1-2K tokens and is genuinely valuable. If the user is
 If the user wants format examples (or `--create-samples` was passed):
 
 ```bash
-python3 scripts/kb_populate.py --role <role> --create-samples --kb-root .
+python3 knowledge-base/scripts/kb_populate.py --role <role> --create-samples --kb-root knowledge-base
 ```
 
 This writes `raw/_samples/<artifact-slug>.example.md` for each artifact in `placement_examples.by_artifact`. The folder is excluded from ingest (name starts with `_`).
@@ -133,12 +139,13 @@ When deployment completes:
 
 - [ ] Determined whether built-in role applies (Path A) or custom role is needed (Path B)
 - [ ] (Path B only) Created `examples/<slug>.yml` from `templates/role.yml.template`, validated YAML parses
-- [ ] Ran `python3 scripts/kb_populate.py --role <role> --kb-root .`
+- [ ] Ran `python3 knowledge-base/scripts/kb_populate.py --role <role> --kb-root knowledge-base`
 - [ ] Verified `DATA_PLACEMENT_EXAMPLES.md` was written
 - [ ] (Recommended) Read the generated file and appended a `## Project notes` section with user-specific tips
 - [ ] (Optional) Re-ran with `--create-samples` if the user wants format examples
 - [ ] **Generated `START_HERE.md`** from `templates/START_HERE.md.template` (parameterize `{{KB_NAME}}` and `{{PRIMARY_ROLE}}`)
-- [ ] Ran `python3 scripts/kb_doctor.py` to confirm the install
+- [ ] Ran `python3 knowledge-base/scripts/kb_doctor.py --root knowledge-base` to confirm the install
+- [ ] Ran `bash setup/shell/finalize.sh` — promotes the base to the project root, removes `setup/` and the empty `knowledge-base/`
 - [ ] Showed the user a 3-5 line summary in chat. **Must include**:
   - "Read `START_HERE.md` first."
   - "Every new chat session: start with the line *'Read AGENTS.md and use it as the primary instruction for everything that follows.'*"

@@ -1,7 +1,7 @@
 ---
 translation_of: README.md
-source_commit: 069af84d1cdad91b3ff8b3d5290c6f5391ac9b7f
-source_version: 0.9.0
+source_commit: aaccaf31fb920a2191b427fb629ad6ac3ac70330
+source_version: 0.9.1
 translated_at: 2026-05-17
 translator: human
 ---
@@ -17,9 +17,9 @@ translator: human
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#требования)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#требования)
-[![Tests](https://img.shields.io/badge/tests-142_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-150_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](../../VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.1-blue.svg)](../../VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [English](../../README.md) · [Быстрый старт](#быстрый-старт) · [Возможности](#возможности) · [Архитектура](#архитектура) · [Примеры](#примеры-ролей)
@@ -77,17 +77,19 @@ cd /path/to/your-project
 # 3. В чате отправить РОВНО эту фразу:
 #
 #    "Прочитай setup/README.md и setup/00_OVERVIEW.md, затем разверни
-#     базу знаний для [моя роль] прямо в корне этого проекта.
-#     Запусти setup/shell/install.sh когда будешь готов её материализовать."
+#     базу знаний для [моя роль] внутри ./knowledge-base/.
+#     Когда kb_doctor пройдёт — запусти setup/shell/finalize.sh
+#     чтобы перенести базу в корень проекта."
 ```
 
 Агент:
 1. Задаст уточняющие вопросы про роль (или придумает кастомную если ни одна встроенная не подходит)
-2. Запустит `bash setup/shell/install.sh` — распакует setup/ в корень проекта и создаст структуру папок
+2. Построит базу **внутри `./knowledge-base/`**, исходный `setup/` остаётся на месте
 3. Параметризует `kb.config.yml`, `AGENTS.md`, `KNOWLEDGE_STRUCTURE.md`
 4. Сгенерирует `DATA_PLACEMENT_EXAMPLES.md` (детерминированно, 0 токенов) через `kb_populate.py`
 5. Сгенерирует `START_HERE.md` — первое что прочитаешь после развёртывания
 6. Прогонит `kb_doctor.py` для smoke-проверки
+7. **Запустит `bash setup/shell/finalize.sh`** — поднимет содержимое `knowledge-base/` в корень проекта и удалит `setup/` и пустую `knowledge-base/`
 
 После развёртывания корень проекта выглядит так:
 

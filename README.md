@@ -11,9 +11,9 @@ local-first NLP and automatic context indexing.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#requirements)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-142_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-150_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.9.1-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](i18n/ru/README.md)
@@ -73,17 +73,19 @@ cd /path/to/your-project
 # 3. In the chat, send EXACTLY this:
 #
 #    "Read setup/README.md and setup/00_OVERVIEW.md, then deploy a
-#     knowledge base for [your role] right here in this project root.
-#     Run setup/shell/install.sh when you're ready to materialize it."
+#     knowledge base for [your role] inside ./knowledge-base/.
+#     When kb_doctor passes, run setup/shell/finalize.sh to flatten
+#     the base into the project root."
 ```
 
 The agent will:
 1. Ask clarifying questions about your role (or invent a custom one if no built-in fits)
-2. Run `bash setup/shell/install.sh` — flattens setup/ into the project root and creates the directory layout
+2. Build the base **inside `./knowledge-base/`** while the original `setup/` stays put
 3. Parameterize `kb.config.yml`, `AGENTS.md`, `KNOWLEDGE_STRUCTURE.md`
 4. Generate `DATA_PLACEMENT_EXAMPLES.md` (deterministic, no tokens) via `kb_populate.py`
 5. Generate `START_HERE.md` — your first read after deployment
 6. Run `kb_doctor.py` to confirm everything is wired
+7. **Run `bash setup/shell/finalize.sh`** — promotes `knowledge-base/` contents to the project root, removes both `setup/` and `knowledge-base/`
 
 After deployment your project root looks like this:
 
