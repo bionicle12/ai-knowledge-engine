@@ -325,3 +325,46 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ### Test stats
 - 134 tests passing (one new parametrized integration entry for fiction-writer)
+
+## [0.8.2] - 2026-05-16
+
+### Changed
+- **CI workflows disabled.** The repo is currently local-only with no public
+  GitHub Actions instance, so the workflow file was renamed to prevent
+  unintended runs:
+  - `.github/workflows/ci.yml` → `.github/workflows/ci.yml.disabled`
+  - GitHub Actions only picks up `*.yml`/`*.yaml` files in this directory,
+    so the `.disabled` suffix turns the workflow into a no-op.
+  - Re-enabling is a single `git mv` away (see `.github/workflows/README.md`).
+- Added `.github/workflows/README.md` with explicit "do not enable without
+  the project owner's request" note + re-enable instructions.
+
+### Added
+- `.github/workflows/README.md` — disabled-state documentation
+- `examples/fiction-writer.yml` (released earlier this day, expanded with the
+  long-form-book artifact entry)
+- `kb_ingest.py` heuristic `_looks_like_long_book` — detects PDF/EPUB/DOCX
+  with ≥25 000 words and adds a "long-form reference book" warning block to
+  the generated review package, advising the agent to keep prose in
+  `assets/` and write a takeaways note instead. Metadata now records
+  `long_book_hint: true/false`.
+- `03_PIPELINE.md` — new section "Handling long reference materials" with
+  the asset-as-reference + notes-as-knowledge pattern and an explicit
+  decision tree.
+- 8 new tests in `test_kb_ingest.py` for the long-book detection and review-
+  package wording.
+
+### Removed
+- `i18n/ru/knowledge-base/templates/` — empty leftover folder. Templates,
+  scripts, and shell wrappers are language-agnostic and live only in the
+  canonical `knowledge-base/`.
+
+### Test stats
+- 142 tests passing (was 134)
+
+### Translation impact
+- After committing, all 18 RU files become stale (HEAD moved). Run:
+  ```
+  python3 scripts/sync_translations.py --to-head --lang ru
+  python3 scripts/check_translations.py --update-status
+  ```

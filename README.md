@@ -13,7 +13,7 @@ local-first NLP and automatic context indexing.
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-134_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.8.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](i18n/ru/README.md)
