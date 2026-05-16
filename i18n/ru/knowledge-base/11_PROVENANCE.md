@@ -1,7 +1,7 @@
 ---
 translation_of: knowledge-base/11_PROVENANCE.md
-source_commit: 6aa3cf8185ced124e010747a4238fd8f6097a76f
-source_version: 0.7.0
+source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
+source_version: 0.8.1
 translated_at: 2026-05-16
 translator: human
 ---

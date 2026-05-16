@@ -1,0 +1,282 @@
+# Example: Fiction writer
+
+role: "Fiction writer"
+
+description: |
+  Writes genre fiction (single genre or multiple — thriller, mystery, fantasy,
+  sci-fi, romance, literary). The AI assistant is a craft-aware analytical
+  critic: it knows story structure, dialogue mechanics, POV theory, pacing,
+  genre conventions, and the patterns of authors the writer admires. It does
+  not write *for* the user; it reads the user's drafts and answers the
+  question the writer cares about most: *"is this any good, and what would
+  make it better?"*
+
+  Two pillars make this work:
+  1. **Craft theory** — durable rules from Save the Cat, Story (McKee),
+     On Writing (King), The Anatomy of Story (Truby), Wired for Story
+     (Cron), Self-Editing for Fiction Writers (Browne & King), genre-specific
+     manuals (Writing the Thriller, Romancing the Beat, Wonderbook, etc.).
+  2. **Influences** — passages from books the writer loves, dissected for
+     what makes them work. Over time the AI can name *why* a draft scene
+     does or doesn't work in terms the writer recognizes from their own
+     library.
+
+entities:
+  voice:
+    enabled: true
+    why: "The writer's developing prose voice — sentence rhythm, vocabulary, signature moves"
+    knowledge_paths:
+      - "knowledge/voice/prose-voice.md"
+      - "knowledge/voice/forbidden-phrases.md"
+      - "knowledge/voice/influences-distilled.md"
+
+  craft_principles:
+    enabled: true
+    why: "Durable craft theory — story structure, POV, pacing, dialogue, scene mechanics"
+    knowledge_paths:
+      - "knowledge/principles/story-structure.md"
+      - "knowledge/principles/dialogue.md"
+      - "knowledge/principles/pov-and-tense.md"
+      - "knowledge/principles/scene-mechanics.md"
+      - "knowledge/principles/show-dont-tell.md"
+
+  genre_conventions:
+    enabled: true
+    why: "Reader expectations and genre tropes the writer either honors or subverts"
+    knowledge_paths:
+      - "knowledge/domain/genre-conventions.md"
+      - "knowledge/domain/genre-tropes.md"
+      - "knowledge/domain/comp-titles.md"
+
+  influences:
+    enabled: true
+    why: "Books, scenes, authors the writer admires — and *why* they work"
+    knowledge_paths:
+      - "knowledge/domain/influences.md"
+      - "knowledge/insights/why-this-works.md"
+
+  works_in_progress:
+    enabled: true
+    why: "Current novel/novella/short story — drafts, scenes, revisions"
+    knowledge_paths:
+      - "knowledge/projects/current-wip/"
+      - "knowledge/projects/short-stories/"
+
+  story_blueprint:
+    enabled: true
+    why: "Outline, beat sheets, three-act structure for the active project"
+    knowledge_paths:
+      - "knowledge/projects/current-wip/outline.md"
+      - "knowledge/projects/current-wip/beat-sheet.md"
+
+  characters:
+    enabled: true
+    why: "Character bibles, backstories, voice notes per character"
+    knowledge_paths:
+      - "knowledge/projects/current-wip/characters/"
+      - "knowledge/principles/character-design.md"
+
+  worldbuilding:
+    enabled: true
+    why: "(Genre-dependent) magic system, technology, geography, history, culture"
+    knowledge_paths:
+      - "knowledge/projects/current-wip/world/"
+
+  craft_decisions:
+    enabled: true
+    why: "Decisions made on this project — POV, tense, structure — and why"
+    knowledge_paths:
+      - "knowledge/decisions/craft-decisions.md"
+
+  feedback:
+    enabled: true
+    why: "Beta-reader notes, critiques received, recurring patterns to fix"
+    knowledge_paths:
+      - "knowledge/playbooks/self-editing.md"
+      - "knowledge/insights/recurring-feedback.md"
+
+  publishing_plan:
+    enabled: true
+    why: "Submission strategy, agents, query letters, market research"
+    knowledge_paths:
+      - "knowledge/playbooks/querying.md"
+      - "knowledge/domain/agents-and-imprints.md"
+
+raw_data_examples:
+  - "Drafts of chapters, scenes, full manuscripts (.md, .docx)"
+  - "Outlines, beat sheets, scene cards"
+  - "Character bibles and backstories"
+  - "Worldbuilding documents"
+  - "Excerpts from favorite books (for voice training, copyright-aware)"
+  - "Notes from craft books you've read"
+  - "Beta-reader feedback (anonymized)"
+  - "Critique-group notes"
+  - "Editor's track-changes documents"
+  - "Genre research (mystery procedure, period research, science notes)"
+  - "Query letters and synopses (drafts and final)"
+  - "Voice memos with story ideas"
+
+ai_assistant_tasks:
+  # Analytical critique (the core ask)
+  - "Read this scene and tell me what's working, what isn't, and why — in craft terms I'd recognize"
+  - "Pacing audit: where does this chapter drag and where does it rush?"
+  - "Voice check: does this scene sound like *me* (vs. flattening into generic prose)?"
+  - "POV audit: am I head-hopping? Where does the POV slip?"
+  - "Show-don't-tell pass: flag spots where I summarized when scene work would land harder"
+  - "Genre-fit audit: am I honoring/breaking conventions on purpose, or by accident?"
+  - "Dialogue critique: which lines sound real, which sound staged?"
+  - "Stakes audit: is the reader given a reason to care by page X?"
+
+  # Structural
+  - "Map this draft against Save the Cat / three-act / Truby — where are the gaps?"
+  - "Compare my opening to the openings of [influence list] — what could I steal in spirit?"
+  - "Flag chapters where the protagonist is passive (things happen TO them, not BY them)"
+  - "Sub-plot tracking: are all sub-plots resolved? where do they intersect the main plot?"
+
+  # Voice & influences
+  - "When I describe X, my favorite authors do Y — am I doing the cheap version of Y here?"
+  - "Compile a 'forbidden phrases' list from drafts where I caught myself sounding generic"
+  - "Voice fingerprint: based on my last 5 chapters, what are my 3 signature moves?"
+
+  # Mechanical / self-edit
+  - "Run the self-edit checklist (Browne & King): adverbs, dialogue tags, filter words, POV slips"
+  - "Find every instance of 'began to', 'started to', 'felt' — flag for tightening"
+  - "Sentence-rhythm pass: too many clauses of the same length?"
+
+  # Pre-submission
+  - "Critique my query letter against [agent's] preferences — what would they zero in on?"
+  - "Synopsis dry-run: does it convey the spine of the story without losing voice?"
+
+placement_examples:
+  intro: |
+    Fiction is about voice and structure, and both compound only if you
+    capture them. The single highest-leverage move when you start: drop in
+    excerpts from 3–5 books you love, with a paragraph each on *why* you
+    love them. After that, every scene you write gets read by an AI that
+    knows what "good" sounds like *to you*, not in some abstract sense.
+
+    Treat this base as a working library, not a museum: it should evolve
+    as your taste evolves and as you learn from each draft.
+
+  by_artifact:
+    - artifact: "Excerpts from books you love (voice training)"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "King — IT — opening 2 pages.md"
+        - "Le Guin — Earthsea — magic-naming scene.md"
+        - "Tartt — Secret History — opening paragraph annotated.md"
+      knowledge_target: "knowledge/domain/influences.md"
+      tip: "Add 1-2 sentences per excerpt about *what works* — that's the gold the AI needs. Stay within fair-use length (a paragraph, not a chapter)."
+
+    - artifact: "Notes on craft books you've read"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Save the Cat — beat sheet I actually use.md"
+        - "On Writing (King) — top 10 takeaways for me.md"
+        - "Story (McKee) — confused parts + my interpretation.md"
+      knowledge_target: "knowledge/principles/"
+      tip: "Don't copy whole books; capture the rules *as you understand them*. Your interpretation matters more than the original wording."
+
+    - artifact: "Full craft books (PDF / EPUB / DOCX)"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "Save the Cat — Blake Snyder.pdf"
+        - "Story — Robert McKee.pdf"
+        - "On Writing — Stephen King.epub"
+      knowledge_target: "assets/documents/ (PDF stays as a reference) + knowledge/principles/craft-bookshelf.md (your notes)"
+      tip: |
+        The pipeline will text-extract the full book and route it to review/ because of its size — that costs ~50-100K tokens of agent time and risks copyright/voice issues if the prose lands in voice/.
+        **Recommended:** drop the PDF (it lives in `assets/` as a non-indexed reference), then write a SEPARATE companion note ("My takeaways from <book>") into `raw/reference/unsorted/`. The note is what the AI uses day-to-day; the book is consulted on demand when you need exact wording.
+        See knowledge/principles/craft-bookshelf.md for the index of books you've processed this way.
+
+    - artifact: "Drafts (scene, chapter, full)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Chapter 7 draft 3.md"
+        - "Opening scene — three different versions.md"
+        - "Full novel manuscript v2.docx"
+      knowledge_target: "knowledge/projects/current-wip/"
+
+    - artifact: "Outlines and beat sheets"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Three-act outline — current novel.md"
+        - "Save the Cat beat sheet — Project X.md"
+        - "Scene cards (one per scene).md"
+      knowledge_target: "knowledge/projects/current-wip/outline.md"
+      tip: "Even a rough one-page outline is gold for pacing audits later."
+
+    - artifact: "Character bibles and backstories"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Protagonist — full bible (motive, wound, lie).md"
+        - "Antagonist — what they want and why.md"
+        - "Side cast — one paragraph each.md"
+      knowledge_target: "knowledge/projects/current-wip/characters/"
+
+    - artifact: "Worldbuilding documents (genre-dependent)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Magic system — rules and costs.md"
+        - "Period research — 1920s London.md"
+        - "Geography sketch with named places.md"
+      knowledge_target: "knowledge/projects/current-wip/world/"
+      tip: "Worldbuilding only counts if it shows up on the page — note which details are *visible* to the reader."
+
+    - artifact: "Beta-reader and critique feedback"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Beta reader 1 — chapter-by-chapter notes.md"
+        - "Critique group — Jan 2026 session notes.md"
+        - "Tracked changes from editor pass 1.docx"
+      knowledge_target: "knowledge/insights/recurring-feedback.md"
+      tip: "Anonymize names. The pattern (\"three readers found chapter 5 slow\") is the signal."
+
+    - artifact: "Voice memos and story ideas"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "voice-memo-2026-05-14-shower-idea.mp3"
+        - "Walking thoughts — what if the killer is the narrator.md"
+      tip: "Audio is auto-transcribed if ffmpeg + STT are installed."
+
+    - artifact: "Genre research"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "Police procedure — how a homicide investigation actually opens.md"
+        - "Forensic accounting basics for the heist subplot.md"
+        - "Naval terminology — corrected by reader who served.md"
+      knowledge_target: "knowledge/domain/genre-conventions.md"
+
+    - artifact: "Query letters, synopses, market research"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "Query letter v7 — final.md"
+        - "One-page synopsis.md"
+        - "Comp titles I'd pitch against.md"
+      knowledge_target: "knowledge/playbooks/querying.md"
+
+    - artifact: "Forbidden phrases and tics (your anti-patterns)"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "Words I overuse — running list.md"
+        - "Sentence patterns to break.md"
+        - "Cliches I default to under deadline.md"
+      knowledge_target: "knowledge/voice/forbidden-phrases.md"
+      tip: "This is a permanent file (lifecycle: evolving). Update whenever an editor or reader catches a tic you didn't notice."
+
+  quickstart:
+    - "Drop excerpts from 3-5 books you love into raw/reference/unsorted/, each with 1-2 sentences on *why* it works"
+    - "Drop your current opening (chapter 1 or first scene) into raw/work/unsorted/"
+    - "Drop your one-line premise + 3-paragraph outline (or just the premise if you don't have an outline yet) into raw/work/unsorted/"
+    - "If you have a craft book you swear by: (a) drop the PDF into raw/documents/unsorted/ (it stays as a reference), AND (b) write a 'top 5 lessons for me personally' note → raw/reference/unsorted/. The note is what the AI reads daily."
+    - "Run ./reindex.sh — your AI now has the seeds of taste, structure, and project context"
+    - "Ask: 'Read my opening and tell me where the hook lands, where it slips, and what one sentence I should rewrite first.'"
+
+  do_not_drop:
+    - "Full text of copyrighted books (excerpts within fair use are fine — a paragraph, not a chapter)"
+    - "Other writers' unpublished drafts shared in confidence (critique-group submissions)"
+    - "Beta readers' personal data (real names, contact info) — anonymize first"
+    - "Ghostwriting clients' material if your contract forbids derivative use"
+    - "Material under NDA from collaborators (game studios, screenwriting partners, etc.)"
+    - "Personal correspondence about the work that the other party didn't agree to share"
+    - "Real-life people's identifiable details that you fictionalized — keep those in a separate, sensitive folder if at all"
