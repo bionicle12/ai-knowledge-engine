@@ -97,6 +97,18 @@ GENERIC_TABLE = """\
 """
 
 
+CHAT_UPLOAD_RULES = """\
+## Adding files through chat
+
+If you attach a file directly in chat, the AI agent must ask before adding it to the main knowledge base:
+
+1. Summarize the attached file(s) and propose the best `raw/<category>/unsorted/` destination
+2. Ask: "Add this to the main knowledge base?"
+3. Only after confirmation, stage the file into `raw/` and run `./reindex.sh` or confirm the watcher processed it
+4. If the file looks low-value or unrelated, ask whether to keep it as an asset, archive it, or ignore it
+"""
+
+
 def _safe(s: Any) -> str:
     if s is None:
         return ""
@@ -137,6 +149,8 @@ def render_markdown(role_data: dict[str, Any], *, source_path: Path) -> str:
     lines.append("## You have → put it in (generic)")
     lines.append("")
     lines.append(GENERIC_TABLE)
+    lines.append("")
+    lines.append(CHAT_UPLOAD_RULES)
     lines.append("")
 
     # Role-specific summary table

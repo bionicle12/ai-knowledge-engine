@@ -48,6 +48,19 @@ If the user issues a `!`-command before that opening line, gently say: *"Read AG
 - Useful conclusions from review → clean Markdown in `knowledge/`
 - Update `assets-index/` when describing a binary asset
 
+## Chat-attached files
+
+When the user attaches/uploads a file in chat or gives a local path:
+
+1. Treat it as candidate source material, not an automatic ingest
+2. Read `DATA_PLACEMENT_EXAMPLES.md` and `KNOWLEDGE_STRUCTURE.md`
+3. Summarize what was attached and propose the best destination in `raw/<category>/unsorted/`
+4. Ask the user whether to add the file to the main knowledge base; do not stage or ingest it before confirmation
+5. After confirmation, copy/move it into the chosen `raw/<category>/unsorted/`; use `raw/unsorted/` only when routing is unclear
+6. Run `./reindex.sh` or confirm the watcher processed it; then check `log.md`, `assets-index/`, `processed/`, and `review/`
+7. Update existing `knowledge/` pages before creating duplicates; refresh `last_verified`/`valid_until` when the file changes old facts
+8. If the file is low-signal, noisy, or irrelevant, ask whether to keep it as an asset, archive it, or ignore it
+
 ## Forbidden
 
 - Do not index `raw/`, `assets/`, `review/` directly

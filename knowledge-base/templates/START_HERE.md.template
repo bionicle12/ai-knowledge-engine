@@ -67,6 +67,7 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 |---------|-----|
 | Agent ignores my voice / rules | You forgot the "Read AGENTS.md..." opening line. Say it now. |
 | Files keep landing in `review/needs-ai-decision/` | Say `!review` in chat. The agent will go through the queue. |
+| Chat-uploaded files should enter the base | Tell the agent: "Ask me before adding attached files to the main knowledge base." |
 | Generated `DATA_PLACEMENT_EXAMPLES.md` doesn't fit me | Edit `examples/<role>.yml`, then say `!populate`. |
 | Watcher won't pick up files | Check `./shell/watcher.sh --status`. Make sure files are in `raw/<sub>/unsorted/`, not just `raw/`. |
 | Need a smoke test of the install | Run `./shell/doctor.sh` (or `python3 scripts/kb_doctor.py`). |

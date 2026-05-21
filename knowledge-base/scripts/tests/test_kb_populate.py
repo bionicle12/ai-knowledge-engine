@@ -93,6 +93,7 @@ def test_render_markdown_has_all_sections(minimal_role: Path):
     md = kp.render_markdown(data, source_path=minimal_role)
     assert "Why this file" in md
     assert "You have → put it in (generic)" in md
+    assert "Adding files through chat" in md
     assert "Role-specific quick map" in md
     assert "Role-specific examples" in md
     assert "5-minute quickstart" in md

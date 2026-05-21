@@ -25,10 +25,15 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 - `docs/MAINTENANCE.md` — contributor rules for keeping instructions/scripts/translations in sync
 
 ### Changed
-- (none yet)
+- Agent instructions now route chat-uploaded files into `raw/*/unsorted/`
+  only after user confirmation and require a user question before low-signal
+  files are extracted into `knowledge/`.
 
 ### Translation impact
-- New files in EN need to be translated into `i18n/ru/` once Phase 2 starts.
+- `i18n/ru/knowledge-base/06_AGENTS_TEMPLATE.md` updated for the new
+  chat-attached file rule.
+- `i18n/ru/knowledge-base/03_PIPELINE.md` updated for the chat attachment
+  staging rule.
 
 ## [0.1.0] - 2026-05-16
 

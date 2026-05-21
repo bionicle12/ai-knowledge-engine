@@ -16,6 +16,8 @@
 
 Scans every directory under `raw/**/unsorted/`.
 
+Files attached/uploaded in chat are not pipeline input until the user confirms they should be added to the main knowledge base and the AI agent stages them into the best matching `raw/<category>/unsorted/` folder.
+
 ## Per-file processing
 
 1. Detect file type (extension + magic bytes)

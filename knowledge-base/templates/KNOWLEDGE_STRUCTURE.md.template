@@ -122,6 +122,7 @@ See `11_PROVENANCE.md` for full frontmatter spec, `09_LINT.md` for validation ru
 
 Subfolders are hints, not requirements. If unsure → `raw/unsorted/`.
 The pipeline (`scripts/kb_ingest.py`) handles classification.
+Files attached in chat must be confirmed by the user before being staged into `raw/<category>/unsorted/` for ingest.
 
 ### `review/` — agent's todo list
 
