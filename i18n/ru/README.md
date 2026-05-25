@@ -17,7 +17,7 @@ translator: human
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../../LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#требования)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#требования)
-[![Tests](https://img.shields.io/badge/tests-162_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-166_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
 [![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](../../VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
@@ -293,6 +293,9 @@ Watcher следит за `raw/<sub>/unsorted/` и запускает ingest pip
 | `founder.yml` | Основатель стартапа | Инвесторы, найм, продукт, лог решений |
 | `content-creator.yml` | Контент-мейкер | Voice fingerprinting, аудитория, монетизация |
 | `fiction-writer.yml` | Писатель художественной литературы | Craft theory, voice training через influences, критика драфтов |
+| `psychologist-gestalt.yml` | Психолог с гештальт-ориентацией | Этика, анонимизированные кейсы, супервизия, гештальт-интервенции |
+| `music-video-director.yml` | Сценарист-режиссёр музыкальных клипов | Хип-хоп и short-form концепции, treatment, продакшен, монтажный ритм |
+| `russian-software-engineering-student.yml` | Студент РФ: инженер-программист | Учебный план, лабы, экзамены, вузовские документы, стажировки |
 
 Не нашли свою роль? Скажите AI-агенту свою профессию — он сгенерирует конфигурацию с релевантными сущностями.
 

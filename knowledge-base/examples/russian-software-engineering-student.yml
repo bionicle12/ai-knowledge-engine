@@ -1,0 +1,192 @@
+# Example: Software engineering student in Russia
+
+role: "Software engineering student in Russia"
+
+description: |
+  University student in the Russian Federation studying to become a software
+  engineer / programmer. The knowledge base tracks courses, labs, algorithms,
+  programming practice, software engineering habits, exam preparation,
+  internships, and portfolio growth.
+
+  The AI assistant should behave like a strict but helpful tutor: explain,
+  debug, ask leading questions, plan study sessions, and help the student
+  understand material. It should not silently complete assignments, fabricate
+  lab results, bypass academic rules, or turn the knowledge base into a stash
+  of other people's solutions.
+
+entities:
+  curriculum:
+    enabled: true
+    why: "Semester plan, disciplines, deadlines, teacher requirements, assessment rules"
+    knowledge_paths:
+      - "knowledge/domain/curriculum.md"
+      - "knowledge/timelines/semester-plan.md"
+
+  programming_fundamentals:
+    enabled: true
+    why: "Core programming concepts, data structures, algorithms, complexity, language basics"
+    knowledge_paths:
+      - "knowledge/principles/programming-fundamentals.md"
+      - "knowledge/domain/algorithms-and-data-structures.md"
+
+  labs_and_coursework:
+    enabled: true
+    why: "Lab assignments, coursework, own attempts, reviews, fixes, and final submissions"
+    knowledge_paths:
+      - "knowledge/projects/labs/"
+      - "knowledge/projects/coursework/"
+
+  math_and_cs_theory:
+    enabled: true
+    why: "Discrete math, linear algebra, probability, automata, operating systems, networks"
+    knowledge_paths:
+      - "knowledge/domain/math-and-cs-theory.md"
+      - "knowledge/open-questions/theory-gaps.md"
+
+  software_engineering:
+    enabled: true
+    why: "Git, testing, OOP, design patterns, databases, APIs, documentation, teamwork"
+    knowledge_paths:
+      - "knowledge/principles/software-engineering.md"
+      - "knowledge/playbooks/development-workflow.md"
+
+  russian_university_context:
+    enabled: true
+    why: "Russian university formats: зачёт, экзамен, курсовая, практика, отчёты, ГОСТ-like documentation"
+    knowledge_paths:
+      - "knowledge/domain/russian-university-context.md"
+      - "knowledge/playbooks/university-documents.md"
+
+  exam_prep:
+    enabled: true
+    why: "Tickets, question banks, weak topics, spaced repetition, oral-exam practice"
+    knowledge_paths:
+      - "knowledge/playbooks/exam-prep.md"
+      - "knowledge/timelines/exam-calendar.md"
+
+  internships_and_career:
+    enabled: true
+    why: "Internships, resumes, interviews, portfolio, GitHub, career direction"
+    knowledge_paths:
+      - "knowledge/projects/internships/"
+      - "knowledge/playbooks/junior-career.md"
+
+  learning_reflection:
+    enabled: true
+    why: "What is hard, what finally clicked, recurring mistakes, study habits"
+    knowledge_paths:
+      - "knowledge/insights/learning-feedback.md"
+      - "knowledge/profile/study-style.md"
+
+raw_data_examples:
+  - "Course syllabi, semester schedules, deadlines"
+  - "Lecture notes and seminar notes"
+  - "Lab assignments plus the student's own attempts"
+  - "Coursework and practice-report drafts"
+  - "Exam tickets, question lists, teacher comments"
+  - "Code snippets, small projects, GitHub README drafts"
+  - "Internship tasks and feedback"
+  - "ГОСТ-style templates and university documentation rules"
+
+ai_assistant_tasks:
+  - "Explain a topic at the student's current level, then ask check questions"
+  - "Help debug a lab by reading the student's own attempt and pointing to the concept gap"
+  - "Build a semester study plan around deadlines and weak topics"
+  - "Turn lecture notes into exam cards and practice questions"
+  - "Review coursework structure, documentation, and code quality"
+  - "Prepare for internship interviews with tasks matched to the student's curriculum"
+  - "Create a portfolio roadmap from existing labs and side projects"
+  - "Detect academic-integrity risks and suggest a learning-safe workflow"
+
+placement_examples:
+  intro: |
+    A student's knowledge base should make learning cumulative. Each lab,
+    failed attempt, teacher comment, and exam question becomes part of a
+    personal tutor that remembers what you already understood and where you
+    keep getting stuck.
+
+    For a Russian software-engineering student, keep both the technical side
+    and the university side: algorithms, code, reports, ГОСТ-like templates,
+    зачёт/exam tickets, practice documents, and internship preparation.
+
+  by_artifact:
+    - artifact: "Course syllabi and semester requirements"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "semester-4-disciplines-and-deadlines.md"
+        - "programming-course-syllabus.pdf"
+      knowledge_target: "knowledge/domain/curriculum.md"
+      tip: "Deadlines plus grading rules let the AI plan realistically."
+
+    - artifact: "Lecture and seminar notes"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "algorithms-lecture-dijkstra.md"
+        - "os-seminar-processes-and-threads.md"
+      knowledge_target: "knowledge/domain/math-and-cs-theory.md"
+
+    - artifact: "Lab assignment plus your own attempt"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "lab-05-binary-search-tree-task.md"
+        - "lab-05-my-code-and-errors.md"
+      knowledge_target: "knowledge/projects/labs/"
+      tip: "Include your attempt first. The AI should tutor and debug, not replace your work."
+
+    - artifact: "Coursework and report drafts"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "coursework-database-app-draft.docx"
+        - "practice-report-v1.md"
+      knowledge_target: "knowledge/projects/coursework/"
+
+    - artifact: "Exam tickets and question banks"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "oop-exam-tickets-2026.md"
+        - "databases-credit-questions.md"
+      knowledge_target: "knowledge/playbooks/exam-prep.md"
+      tip: "Mark which questions are weak; the AI can build spaced repetition from that."
+
+    - artifact: "Code snippets and small projects"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "console-library-project-readme.md"
+        - "sorting-visualizer-notes.md"
+      knowledge_target: "knowledge/projects/portfolio/"
+
+    - artifact: "Teacher feedback and review comments"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "teacher-feedback-lab-03.md"
+        - "what-the-teacher-keeps-correcting.md"
+      knowledge_target: "knowledge/insights/learning-feedback.md"
+
+    - artifact: "University document templates"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "coursework-title-page-template.docx"
+        - "methodical-guidelines-practice-report.pdf"
+      knowledge_target: "knowledge/playbooks/university-documents.md"
+
+    - artifact: "Internship and junior-career materials"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "internship-test-task-my-solution.md"
+        - "junior-backend-resume-draft.md"
+      knowledge_target: "knowledge/projects/internships/"
+
+  quickstart:
+    - "Drop the current semester syllabus -> raw/reference/unsorted/"
+    - "Drop one lab task plus your own unfinished attempt -> raw/work/unsorted/"
+    - "List 5 weak topics before the next зачёт/exam -> raw/personal-context/unsorted/"
+    - "Run ./reindex.sh - the AI now has your study context"
+    - "Ask: 'Help me understand this lab without solving it for me: ask questions and point to the missing concepts.'"
+
+  do_not_drop:
+    - "Classmates' solutions, private chats, grades, or personal data"
+    - "Unofficial exam answers, leaked tests, or materials that violate university rules"
+    - "Login/passwords for LMS, GitHub, university portals, or email"
+    - "Paid course materials or books you do not have rights to redistribute"
+    - "Production or internship data covered by NDA"
+    - "Code copied from the internet without license notes or attribution"

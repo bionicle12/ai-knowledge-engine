@@ -13,6 +13,12 @@ import kb_populate as kp
 # REPO_ROOT (source-repo root) is three levels up.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
+REQUESTED_ROLE_TEMPLATES = {
+    "psychologist-gestalt.yml": "Gestalt-oriented psychologist",
+    "music-video-director.yml": "Music video writer-director",
+    "russian-software-engineering-student.yml": "Software engineering student in Russia",
+}
+
 
 @pytest.fixture()
 def minimal_role(tmp_path: Path) -> Path:
@@ -234,6 +240,29 @@ def test_main_json_output(minimal_role: Path, tmp_path: Path, capsys):
 
 
 # Integration: every real role template should populate without errors
+
+def test_requested_role_templates_ship_with_population_data():
+    """Requested built-in roles should be complete role YAMLs, not stubs."""
+    examples_dir = REPO_ROOT / "knowledge-base" / "examples"
+    for filename, role_title in REQUESTED_ROLE_TEMPLATES.items():
+        role_path = examples_dir / filename
+        assert role_path.is_file()
+
+        data = kp.load_role_yaml(role_path)
+        assert data["role"] == role_title
+        assert len(data.get("entities") or {}) >= 5
+        assert len(data.get("raw_data_examples") or []) >= 5
+        assert len(data.get("ai_assistant_tasks") or []) >= 5
+
+        placement = data.get("placement_examples") or {}
+        assert len(placement.get("by_artifact") or []) >= 5
+        assert len(placement.get("quickstart") or []) >= 4
+        assert len(placement.get("do_not_drop") or []) >= 4
+
+        md = kp.render_markdown(data, source_path=role_path)
+        assert role_title in md
+        assert "Role-specific examples" in md
+        assert "Run ./reindex.sh" in md
 
 def _real_role_files() -> list[Path]:
     return sorted((REPO_ROOT / "knowledge-base" / "examples").glob("*.yml"))

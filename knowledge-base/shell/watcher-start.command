@@ -42,7 +42,9 @@ elif [ -f "venv/bin/activate" ]; then
   source "venv/bin/activate"
 fi
 
-clear
+if [ -n "${TERM:-}" ]; then
+  clear || true
+fi
 echo "👁  Knowledge-base watcher"
 echo "    project: $PROJECT_ROOT"
 echo "    Ctrl+C  to stop"

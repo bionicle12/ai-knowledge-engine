@@ -23,6 +23,10 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 - `VERSION` file (semver of instructions)
 - `CHANGELOG.md`
 - `docs/MAINTENANCE.md` — contributor rules for keeping instructions/scripts/translations in sync
+- Role templates:
+  - `knowledge-base/examples/psychologist-gestalt.yml`
+  - `knowledge-base/examples/music-video-director.yml`
+  - `knowledge-base/examples/russian-software-engineering-student.yml`
 
 ### Changed
 - Agent instructions now route chat-uploaded files into `raw/*/unsorted/`
@@ -30,6 +34,8 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   files are extracted into `knowledge/`.
 
 ### Translation impact
+- `README.md` role-template table updated; `i18n/ru/README.md` updated
+  alongside with the same new templates.
 - `i18n/ru/knowledge-base/06_AGENTS_TEMPLATE.md` updated for the new
   chat-attached file rule.
 - `i18n/ru/knowledge-base/03_PIPELINE.md` updated for the chat attachment

@@ -11,7 +11,7 @@ local-first NLP and automatic context indexing.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#requirements)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-162_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-166_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
 [![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
@@ -370,6 +370,9 @@ Pre-configured examples in `knowledge-base/examples/`:
 | `founder.yml` | Startup founder | Investors, hiring, product, decision logs |
 | `content-creator.yml` | Content creator | Voice fingerprinting, audience, monetization |
 | `fiction-writer.yml` | Fiction writer | Craft theory, voice training from influences, draft critique |
+| `psychologist-gestalt.yml` | Gestalt-oriented psychologist | Ethics, anonymized case reflection, supervision, Gestalt interventions |
+| `music-video-director.yml` | Music video writer-director | Hip-hop and short-form concepts, treatments, production, edit rhythm |
+| `russian-software-engineering-student.yml` | Software engineering student in Russia | Curriculum, labs, exams, university docs, internships |
 
 Don't see your role? Tell the AI agent your profession — it will generate a custom configuration with relevant entities, knowledge paths, and example workflows.
 

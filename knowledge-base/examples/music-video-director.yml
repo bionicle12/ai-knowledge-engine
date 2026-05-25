@@ -1,0 +1,196 @@
+# Example: Music video writer-director
+
+role: "Music video writer-director"
+
+description: |
+  Writer-director for music videos, performance clips, vertical short-form
+  campaigns, and social-first visual concepts. Especially suited to hip-hop,
+  pop, TikTok/Reels/Shorts formats, artist branding, and production realities
+  where a strong concept must survive budget, location, crew, edit rhythm,
+  and platform constraints.
+
+  The AI assistant helps connect the track, lyrics, artist persona, references,
+  visual world, production plan, and release format. It should think like a
+  creative partner who understands treatments, shot grammar, hooks, loops,
+  transitions, performance energy, and how short clips travel online.
+
+entities:
+  artist_identity:
+    enabled: true
+    why: "Artist persona, visual codes, audience, taboos, recurring motifs, brand constraints"
+    knowledge_paths:
+      - "knowledge/domain/artist-identity.md"
+      - "knowledge/voice/artist-language.md"
+
+  track_and_lyrics:
+    enabled: true
+    why: "Song meaning, structure, hooks, ad-libs, tempo, emotional arc, lyrical images"
+    knowledge_paths:
+      - "knowledge/projects/current-video/track-and-lyrics.md"
+      - "knowledge/domain/lyrical-motifs.md"
+
+  concepts:
+    enabled: true
+    why: "Video ideas, loglines, story worlds, performance concepts, repeatable creative devices"
+    knowledge_paths:
+      - "knowledge/projects/video-concepts/"
+      - "knowledge/decisions/concept-decisions.md"
+
+  visual_references:
+    enabled: true
+    why: "Frames, directors, photographers, fashion, locations, color, camera language"
+    knowledge_paths:
+      - "knowledge/domain/visual-references.md"
+      - "knowledge/voice/visual-style.md"
+
+  short_form_grammar:
+    enabled: true
+    why: "TikTok/Reels/Shorts hooks, vertical framing, loops, captions, meme formats, trend mechanics"
+    knowledge_paths:
+      - "knowledge/playbooks/short-form-video.md"
+      - "knowledge/domain/platform-grammar.md"
+
+  treatments:
+    enabled: true
+    why: "Pitch documents, director's notes, scene-by-scene treatments, client-facing wording"
+    knowledge_paths:
+      - "knowledge/projects/treatments/"
+      - "knowledge/voice/treatment-style.md"
+
+  production:
+    enabled: true
+    why: "Budgets, locations, casting, crew, permits, call sheets, props, wardrobe, risk constraints"
+    knowledge_paths:
+      - "knowledge/playbooks/production-planning.md"
+      - "knowledge/projects/production-docs/"
+
+  edit_rhythm:
+    enabled: true
+    why: "Cut structure, transitions, beat mapping, performance coverage, feedback, deliverables"
+    knowledge_paths:
+      - "knowledge/playbooks/edit-rhythm.md"
+      - "knowledge/projects/current-video/edit-notes.md"
+
+  release_learning:
+    enabled: true
+    why: "What performed after release: retention, saves, comments, repeatable patterns"
+    knowledge_paths:
+      - "knowledge/insights/release-learnings.md"
+      - "knowledge/domain/audience-response.md"
+
+raw_data_examples:
+  - "Track briefs, lyrics, artist notes, unreleased demo context"
+  - "Director treatments, loglines, scripts, shot lists"
+  - "Moodboards, reference frames, screenshots, lookbooks"
+  - "TikTok/Reels trend notes and short-form format observations"
+  - "Production docs: budgets, call sheets, location notes, prop lists"
+  - "Storyboards, floor plans, camera tests, BTS stills"
+  - "Edit feedback, timecoded notes, delivery specs"
+  - "Post-release analytics and audience comments"
+
+ai_assistant_tasks:
+  - "Generate three music-video concepts from a track brief, each with a distinct visual device"
+  - "Write a director treatment in the user's pitch style"
+  - "Map lyrics and song sections to scenes, performance beats, and transitions"
+  - "Create a budget-aware shot list and production checklist"
+  - "Turn a horizontal concept into TikTok/Reels/Shorts deliverables"
+  - "Analyze reference videos and extract reusable visual rules without copying them"
+  - "Convert edit feedback into a prioritized revision plan"
+  - "Flag practical risks: permits, unsafe stunts, schedule pressure, rights, brand conflicts"
+
+placement_examples:
+  intro: |
+    A music-video role needs a memory for taste and constraints. The same
+    idea changes completely depending on the artist, budget, lens language,
+    platform, and whether the first second has a hook. Capture references,
+    treatments, track notes, and edit feedback so the AI can help you build
+    videos that feel specific rather than generic.
+
+    For hip-hop and social-first formats, store both polished references and
+    scrappy observations: what made a TikTok loop work, why a performance
+    clip felt expensive, how a location did half the storytelling.
+
+  by_artifact:
+    - artifact: "Track brief and lyrics"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "artist-x-single-brief.md"
+        - "lyrics-hook-verse-bridge-with-notes.md"
+      knowledge_target: "knowledge/projects/current-video/track-and-lyrics.md"
+      tip: "Add what the artist refuses to do, not only what they want."
+
+    - artifact: "Reference frames and moodboards"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "night-market-neon-frame-references.zip"
+        - "wardrobe-and-color-board.png"
+      knowledge_target: "knowledge/domain/visual-references.md"
+      tip: "One sentence per reference about why it works is more useful than a folder of images."
+
+    - artifact: "Director treatments and pitches"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "treatment-artist-x-v2.pdf"
+        - "director-note-performance-first-concept.md"
+      knowledge_target: "knowledge/projects/treatments/"
+      tip: "Past treatments teach the AI your pitch voice and what clients approve."
+
+    - artifact: "Scripts, shot lists, and storyboards"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "shotlist-warehouse-performance.md"
+        - "storyboard-phone-transition-sequence.pdf"
+      knowledge_target: "knowledge/projects/current-video/"
+
+    - artifact: "TikTok/Reels/Shorts format notes"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "3-second-hooks-that-worked-this-month.md"
+        - "vertical-loop-ideas-for-chorus.md"
+      knowledge_target: "knowledge/playbooks/short-form-video.md"
+      tip: "Capture the mechanic, not just the trend name; trend names expire fast."
+
+    - artifact: "Production planning docs"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "microbudget-call-sheet.md"
+        - "location-scout-notes-rooftop.md"
+        - "props-wardrobe-vehicles-list.md"
+      knowledge_target: "knowledge/playbooks/production-planning.md"
+
+    - artifact: "Edit feedback and timecoded notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "edit-v3-timecoded-feedback.md"
+        - "client-notes-performance-energy.md"
+      knowledge_target: "knowledge/projects/current-video/edit-notes.md"
+      tip: "Keep rejected notes too; they reveal taste and recurring client concerns."
+
+    - artifact: "Post-release analytics"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "tiktok-retention-screenshot.png"
+        - "youtube-shorts-comments-themes.md"
+      knowledge_target: "knowledge/insights/release-learnings.md"
+
+    - artifact: "Artist interviews and brand notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "artist-x-visual-boundaries.md"
+        - "manager-brief-brand-dos-donts.md"
+      knowledge_target: "knowledge/domain/artist-identity.md"
+
+  quickstart:
+    - "Drop one track brief or lyrics sheet -> raw/work/unsorted/"
+    - "Add 10 reference frames with one-line notes -> raw/media/unsorted/"
+    - "Add one past treatment you like -> raw/documents/unsorted/"
+    - "Run ./reindex.sh - the AI now has your visual and production context"
+    - "Ask: 'Pitch three hip-hop video concepts for this track: one performance-led, one narrative, one TikTok-native.'"
+
+  do_not_drop:
+    - "Unreleased tracks, stems, or lyrics unless you have permission to store them here"
+    - "Full copyrighted video rips as references; use notes, stills, or links instead"
+    - "Crew, talent, artist, or location personal contacts without consent"
+    - "Permit-sensitive location details that should stay private"
+    - "Unsafe stunt, weapon, vehicle, or pyrotechnic plans without professional safety review"
+    - "Private artist information, disputes, contracts, or rates not needed for creative work"

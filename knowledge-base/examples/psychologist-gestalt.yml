@@ -1,0 +1,191 @@
+# Example: Gestalt-oriented psychologist
+
+role: "Gestalt-oriented psychologist"
+
+description: |
+  Practicing psychologist or therapist whose primary lens is Gestalt therapy,
+  with room to add adjacent modalities later. The AI assistant helps maintain
+  a private professional knowledge base: anonymized case reflections,
+  therapeutic stance, intervention repertoire, supervision questions,
+  psychoeducation materials, and practice-development notes.
+
+  The assistant is not a clinical authority and does not replace supervision,
+  licensure requirements, emergency protocols, or local law. Its highest-value
+  use is reflective support: naming patterns, preparing hypotheses, surfacing
+  ethical risks, and helping the psychologist stay precise about boundaries,
+  consent, and the here-and-now process.
+
+entities:
+  therapeutic_stance:
+    enabled: true
+    why: "Professional ethics, boundaries, consent, responsibility, and the therapist's way of being with clients"
+    knowledge_paths:
+      - "knowledge/principles/therapeutic-stance.md"
+      - "knowledge/principles/ethics-and-boundaries.md"
+      - "knowledge/voice/therapist-language.md"
+
+  gestalt_framework:
+    enabled: true
+    why: "Gestalt concepts: awareness, contact boundary, figure/ground, field theory, polarities, experiments"
+    knowledge_paths:
+      - "knowledge/principles/gestalt-therapy.md"
+      - "knowledge/principles/contact-cycle.md"
+      - "knowledge/domain/gestalt-concepts.md"
+
+  case_reflections:
+    enabled: true
+    why: "Anonymized session summaries, process observations, hypotheses, and open questions"
+    knowledge_paths:
+      - "knowledge/projects/client-cases/"
+      - "knowledge/open-questions/client-work.md"
+
+  interventions:
+    enabled: true
+    why: "Experiments, chair work, awareness prompts, body-oriented observations, and homework patterns"
+    knowledge_paths:
+      - "knowledge/playbooks/gestalt-interventions.md"
+      - "knowledge/playbooks/session-design.md"
+
+  supervision:
+    enabled: true
+    why: "What to bring to supervision: stuck points, countertransference, risk, rupture/repair, uncertainty"
+    knowledge_paths:
+      - "knowledge/playbooks/supervision.md"
+      - "knowledge/insights/countertransference.md"
+
+  psychoeducation:
+    enabled: true
+    why: "Client-friendly explanations, handouts, exercises, and language that stays non-pathologizing"
+    knowledge_paths:
+      - "knowledge/domain/psychoeducation.md"
+      - "knowledge/voice/client-facing-language.md"
+
+  training_library:
+    enabled: true
+    why: "Books, seminars, lectures, and personal notes from professional development"
+    knowledge_paths:
+      - "knowledge/domain/training-library.md"
+      - "knowledge/principles/integrated-modalities.md"
+
+  practice_development:
+    enabled: true
+    why: "Services, positioning, intake process, referral network, content ideas, and administrative routines"
+    knowledge_paths:
+      - "knowledge/projects/practice-development/"
+      - "knowledge/playbooks/intake-and-onboarding.md"
+
+raw_data_examples:
+  - "Anonymized session notes and process observations"
+  - "Supervision questions and post-supervision notes"
+  - "Notes from Gestalt books, seminars, and training groups"
+  - "Client-facing psychoeducation drafts"
+  - "Intake forms, consent templates, and boundary policies"
+  - "Therapist reflective journal entries"
+  - "Intervention and experiment ideas"
+  - "Practice-development notes: services, referrals, content"
+
+ai_assistant_tasks:
+  - "Formulate an anonymized case in Gestalt terms: figure/ground, contact, interruptions, field conditions"
+  - "Prepare supervision questions from a session note without inventing clinical certainty"
+  - "Suggest here-and-now experiments that match the client's stated request and the therapist's ethics"
+  - "Flag boundary, consent, confidentiality, or scope-of-practice risks in draft materials"
+  - "Rewrite psychoeducation in warm, non-pathologizing client-facing language"
+  - "Extract recurring therapist blind spots from reflective journal notes"
+  - "Organize training notes into durable principles and practical playbooks"
+  - "Draft intake or follow-up messages in the psychologist's professional voice"
+
+placement_examples:
+  intro: |
+    A psychologist's knowledge base is useful only when it is careful. The
+    goal is not to store identifiable client records; it is to preserve
+    anonymized professional learning: how you think, where you get stuck,
+    which interventions fit your stance, and what your supervision keeps
+    teaching you.
+
+    For Gestalt work, capture process rather than labels: what became figure,
+    how contact happened or broke, what you noticed in the room, and what
+    hypotheses stayed open.
+
+  by_artifact:
+    - artifact: "Anonymized session notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "client-a-session-07-anonymized.md"
+        - "couple-work-process-note-no-identifiers.md"
+      knowledge_target: "knowledge/projects/client-cases/"
+      tip: "Remove names, contacts, workplaces, rare biographical details, and anything that can re-identify the client."
+
+    - artifact: "Supervision notes and questions"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "supervision-questions-2026-05.md"
+        - "after-supervision-insights-boundaries.md"
+      knowledge_target: "knowledge/playbooks/supervision.md"
+      tip: "Mark what is fact, what is hypothesis, and what still needs supervision."
+
+    - artifact: "Gestalt theory notes"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "contact-cycle-my-summary.md"
+        - "field-theory-seminar-takeaways.md"
+      knowledge_target: "knowledge/principles/gestalt-therapy.md"
+
+    - artifact: "Training materials and seminar handouts"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "gestalt-intensive-handout.pdf"
+        - "trauma-informed-practice-notes.docx"
+      knowledge_target: "knowledge/domain/training-library.md"
+      tip: "Keep copyrighted full materials as references; write your own takeaways for daily indexed use."
+
+    - artifact: "Intervention and experiment cards"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "empty-chair-variations-that-fit-my-style.md"
+        - "body-awareness-prompts.md"
+      knowledge_target: "knowledge/playbooks/gestalt-interventions.md"
+
+    - artifact: "Psychoeducation drafts"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "client-handout-anxiety-and-awareness.md"
+        - "what-to-expect-from-therapy.md"
+      knowledge_target: "knowledge/domain/psychoeducation.md"
+      tip: "The AI can help keep these warm and precise, but final wording stays your professional responsibility."
+
+    - artifact: "Intake, consent, and boundary templates"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "intake-form-template.md"
+        - "cancellation-policy-and-consent.md"
+      knowledge_target: "knowledge/playbooks/intake-and-onboarding.md"
+
+    - artifact: "Therapist reflective journal"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "what-i-noticed-in-my-reactions-this-week.md"
+        - "recurring-stuck-points-with-avoidant-clients.md"
+      knowledge_target: "knowledge/insights/countertransference.md"
+      tip: "Separate personal material from client facts. This is for your professional growth, not client profiling."
+
+    - artifact: "Practice-development notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "new-group-therapy-offer-outline.md"
+        - "referral-network-notes.md"
+      knowledge_target: "knowledge/projects/practice-development/"
+
+  quickstart:
+    - "Drop one fully anonymized session note -> raw/work/unsorted/"
+    - "Write your therapeutic stance in 10 bullet points -> raw/personal-context/unsorted/"
+    - "Add one Gestalt theory note you actually use -> raw/reference/unsorted/"
+    - "Run ./reindex.sh - the AI now has your professional frame"
+    - "Ask: 'Formulate this anonymized session in Gestalt terms and list supervision questions, separating facts from hypotheses.'"
+
+  do_not_drop:
+    - "Client names, contacts, addresses, workplaces, dates of birth, or rare identifying details"
+    - "Raw recordings, photos, or screenshots of clients without explicit documented consent"
+    - "Active crisis materials that require professional emergency protocols instead of AI analysis"
+    - "Medical records, psychiatric diagnoses, or third-party documents without legal/ethical permission"
+    - "Information about minors or family members that could identify them"
+    - "Private supervision-group materials if participants did not consent to storage"
