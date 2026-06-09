@@ -17,6 +17,7 @@ REQUESTED_ROLE_TEMPLATES = {
     "psychologist-gestalt.yml": "Gestalt-oriented psychologist",
     "music-video-director.yml": "Music video writer-director",
     "russian-software-engineering-student.yml": "Software engineering student in Russia",
+    "startup-opportunity-explorer.yml": "Startup Opportunity Explorer",
 }
 
 

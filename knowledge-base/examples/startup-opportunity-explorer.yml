@@ -1,0 +1,230 @@
+# Example: Startup Opportunity Explorer
+
+role: "Startup Opportunity Explorer"
+
+description: |
+  A pre-founder or independent builder looking for a worthwhile internet
+  business to start. The AI assistant helps discover markets, identify painful
+  unmet needs, generate web-product ideas, compare opportunities, design
+  validation experiments, and turn the strongest direction into an MVP plan.
+  This role is for the stage before there is a company, product, team, or
+  recurring revenue.
+
+entities:
+  founder_fit:
+    enabled: true
+    why: "Skills, resources, interests, constraints, unfair advantages, and risk tolerance"
+    knowledge_paths:
+      - "knowledge/profile/founder-fit.md"
+      - "knowledge/principles/opportunity-criteria.md"
+
+  market_landscape:
+    enabled: true
+    why: "Markets, categories, platform shifts, trends, and timing signals"
+    knowledge_paths:
+      - "knowledge/domain/market-landscape.md"
+      - "knowledge/open-questions/markets.md"
+
+  pain_points:
+    enabled: true
+    why: "Expensive, frequent, urgent, or emotionally intense problems people already have"
+    knowledge_paths:
+      - "knowledge/domain/pain-points.md"
+      - "knowledge/insights/unmet-needs.md"
+
+  customer_segments:
+    enabled: true
+    why: "Potential users, buyers, ICPs, jobs-to-be-done, and segment-specific language"
+    knowledge_paths:
+      - "knowledge/domain/customer-segments.md"
+      - "knowledge/playbooks/customer-discovery.md"
+
+  idea_pipeline:
+    enabled: true
+    why: "Raw ideas, variants, scoring, stage, next action, and why an idea moved forward or died"
+    knowledge_paths:
+      - "knowledge/projects/idea-pipeline/"
+      - "knowledge/decisions/startup-ideas.md"
+
+  competitors_and_alternatives:
+    enabled: true
+    why: "Direct competitors, indirect alternatives, spreadsheets, agencies, manual work, and doing nothing"
+    knowledge_paths:
+      - "knowledge/domain/competitors.md"
+      - "knowledge/domain/alternatives.md"
+
+  validation:
+    enabled: true
+    why: "Interviews, smoke tests, waitlists, landing pages, concierge MVPs, and evidence quality"
+    knowledge_paths:
+      - "knowledge/projects/validation/"
+      - "knowledge/playbooks/validation-experiments.md"
+
+  business_models:
+    enabled: true
+    why: "Monetization, pricing, unit economics assumptions, acquisition channels, and willingness to pay"
+    knowledge_paths:
+      - "knowledge/domain/business-models.md"
+      - "knowledge/principles/monetization.md"
+
+  mvp_concepts:
+    enabled: true
+    why: "Web app scopes, prototype plans, technical feasibility, launch slices, and implementation trade-offs"
+    knowledge_paths:
+      - "knowledge/projects/mvp-concepts/"
+      - "knowledge/playbooks/mvp-planning.md"
+
+  web_product_patterns:
+    enabled: true
+    why: "Reusable patterns for SaaS, marketplaces, AI tools, workflow automation, communities, and data products"
+    knowledge_paths:
+      - "knowledge/domain/web-product-patterns.md"
+      - "knowledge/principles/product-patterns.md"
+
+raw_data_examples:
+  - "Personal founder-fit inventory"
+  - "Raw business idea lists and brainstorming notes"
+  - "Market reports, trend notes, and niche maps"
+  - "Competitor and alternative teardowns"
+  - "Forum threads, reviews, complaints, and support-ticket patterns"
+  - "Customer interview notes and survey responses"
+  - "Validation experiment plans and results"
+  - "Landing page copy, waitlist data, and ad test notes"
+  - "Pricing pages and monetization research"
+  - "MVP specs, prototypes, and technical feasibility notes"
+
+ai_assistant_tasks:
+  - "Generate web-business ideas from markets, user pains, and founder-fit constraints"
+  - "Find underserved niches and translate messy observations into opportunity hypotheses"
+  - "Synthesize complaints, reviews, and forum threads into concrete pain points"
+  - "Compare ideas using demand, urgency, competition, distribution, monetization, and MVP complexity"
+  - "Design validation experiments that can run before building a full product"
+  - "Draft customer interview scripts, landing page copy, and smoke-test messaging"
+  - "Create MVP scopes and phased implementation plans for web apps, SaaS, marketplaces, and AI tools"
+  - "Maintain a decision log of rejected, parked, and promoted startup ideas"
+  - "Help transition a selected opportunity into founder/product-manager execution mode"
+
+placement_examples:
+  intro: |
+    Before there is a startup, there is usually a messy pile of observations:
+    markets that look interesting, problems people complain about, products
+    that feel outdated, tools you could build, and half-formed ideas that may
+    or may not deserve months of your life. This role turns that pile into an
+    opportunity pipeline.
+
+    Use this knowledge base to preserve what you looked at, what evidence you
+    found, why an idea was rejected, and what would need to be true for an idea
+    to become a real web business. The AI assistant should help you move from
+    "I can build something" to "this specific problem is worth validating next."
+
+  by_artifact:
+    - artifact: "Personal founder-fit inventory"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "founder-fit-inventory.md"
+        - "skills-time-budget-risk-tolerance.md"
+      knowledge_target: "knowledge/profile/founder-fit.md"
+      tip: "Good startup ideas are filtered through your actual skills, time, money, network, and risk tolerance."
+
+    - artifact: "Raw business idea lists and brainstorming notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "50-web-app-ideas.md"
+        - "ai-tools-to-build.md"
+        - "marketplaces-that-might-work.md"
+      knowledge_target: "knowledge/projects/idea-pipeline/"
+      tip: "Keep rough ideas. The useful pattern may only appear after the tenth version."
+
+    - artifact: "Market maps and trend research"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "vertical-saas-market-map.md"
+        - "2026-ai-automation-trends.pdf"
+        - "creator-economy-tools-landscape.md"
+      knowledge_target: "knowledge/domain/market-landscape.md"
+
+    - artifact: "Competitor and alternative teardowns"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "competitor-x-pricing-and-positioning.md"
+        - "how-small-businesses-solve-this-with-spreadsheets.md"
+        - "legacy-tool-y-product-teardown.md"
+      knowledge_target: "knowledge/domain/competitors.md"
+      tip: "For early ideas, alternatives matter as much as direct competitors."
+
+    - artifact: "Complaint, review, and forum research"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "reddit-complaints-about-booking-software.md"
+        - "g2-negative-reviews-export.csv"
+        - "support-forum-pain-points.md"
+      knowledge_target: "knowledge/domain/pain-points.md"
+      tip: "Strong opportunities often start as repeated, specific complaints with money or urgency attached."
+
+    - artifact: "Customer interview notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "interview-freelance-designer-scheduling-pain.md"
+        - "call-notes-small-agency-owner.md"
+        - "jtbd-notes-ecommerce-ops-manager.md"
+      knowledge_target: "knowledge/domain/customer-segments.md"
+      tip: "Anonymize people unless they explicitly agreed to be stored by name."
+
+    - artifact: "Validation experiment plans and results"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "smoke-test-ai-invoice-copilot.md"
+        - "landing-page-waitlist-results.md"
+        - "concierge-mvp-results-week-1.md"
+      knowledge_target: "knowledge/projects/validation/"
+      tip: "Record the expected signal before the test starts, or every result will look ambiguous afterward."
+
+    - artifact: "Business model and pricing notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "pricing-hypotheses-for-b2b-saas.md"
+        - "marketplace-take-rate-benchmarks.md"
+        - "freemium-vs-sales-led-notes.md"
+      knowledge_target: "knowledge/domain/business-models.md"
+
+    - artifact: "MVP concepts and technical feasibility notes"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "mvp-spec-ai-contract-review-tool.md"
+        - "prototype-scope-vertical-crm.md"
+        - "technical-feasibility-marketplace-v1.md"
+      knowledge_target: "knowledge/projects/mvp-concepts/"
+      tip: "Capture the smallest useful web product, not the dream platform."
+
+    - artifact: "Decision memos and rejected ideas"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "decision-reject-consumer-habit-app.md"
+        - "why-not-enter-ai-logo-generator-market.md"
+        - "parked-idea-b2b-procurement-tool.md"
+      knowledge_target: "knowledge/decisions/startup-ideas.md"
+      tip: "Rejected ideas are valuable if the reason is preserved; otherwise they keep coming back with a new hat."
+
+    - artifact: "Web product pattern notes"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "useful-saas-onboarding-patterns.md"
+        - "marketplace-liquidity-patterns.md"
+        - "ai-workflow-automation-patterns.md"
+      knowledge_target: "knowledge/domain/web-product-patterns.md"
+
+  quickstart:
+    - "Write a 1-page founder-fit inventory -> raw/personal-context/unsorted/"
+    - "Drop a raw list of 20-50 web-business ideas -> raw/work/unsorted/"
+    - "Drop 3 competitor or alternative teardowns -> raw/reference/unsorted/"
+    - "Drop 5 complaint/review/forum research notes -> raw/reference/unsorted/"
+    - "Run ./reindex.sh - your AI now has an opportunity radar"
+    - "Ask: 'Based on my constraints and the evidence so far, rank 10 web-app business directions I should validate next.'"
+
+  do_not_drop:
+    - "API keys, .env files, credentials, seed phrases, or payment data"
+    - "Unredacted private chats, names, emails, phone numbers, or customer PII"
+    - "Confidential employer/client materials or NDA-protected market research"
+    - "Paid reports, books, or courses copied wholesale when your own notes would be enough"
+    - "Scraped datasets whose terms of service forbid this use"
+    - "Private information about potential customers gathered without permission"

@@ -27,6 +27,7 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   - `knowledge-base/examples/psychologist-gestalt.yml`
   - `knowledge-base/examples/music-video-director.yml`
   - `knowledge-base/examples/russian-software-engineering-student.yml`
+  - `knowledge-base/examples/startup-opportunity-explorer.yml`
 
 ### Changed
 - Agent instructions now route chat-uploaded files into `raw/*/unsorted/`

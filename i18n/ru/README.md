@@ -291,6 +291,7 @@ Watcher следит за `raw/<sub>/unsorted/` и запускает ingest pip
 | `product-manager.yml` | Product Manager | Приоритизация, метрики, user research, PRD |
 | `researcher.yml` | Исследователь / Аналитик | Литературный граф, гипотезы, методология |
 | `founder.yml` | Основатель стартапа | Инвесторы, найм, продукт, лог решений |
+| `startup-opportunity-explorer.yml` | Исследователь стартап-возможностей | Поиск ниш, боли рынка, идеи веб-продуктов, валидация |
 | `content-creator.yml` | Контент-мейкер | Voice fingerprinting, аудитория, монетизация |
 | `fiction-writer.yml` | Писатель художественной литературы | Craft theory, voice training через influences, критика драфтов |
 | `psychologist-gestalt.yml` | Психолог с гештальт-ориентацией | Этика, анонимизированные кейсы, супервизия, гештальт-интервенции |
