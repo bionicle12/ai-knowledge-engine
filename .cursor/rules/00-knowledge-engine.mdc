@@ -1,0 +1,62 @@
+---
+description: How to work on the AI Knowledge Engine repo (deployment model, layers, privacy, cross-platform)
+alwaysApply: true
+---
+
+# AI Knowledge Engine — working rules
+
+This repo is a **framework of instructions + reference scripts**, not a running
+app. AI agents deploy it into a user's project to build a local, private
+knowledge base. Keep these invariants in mind for every change.
+
+## Architecture (don't break the layers)
+
+- **Instruction modules** `knowledge-base/00_*.md … 15_*.md` — the contract AI
+  agents read. If you change behavior in a script, update the matching module so
+  docs and code never drift.
+- **Reference scripts** `knowledge-base/scripts/kb_*.py` — the mechanical layer
+  (convert, NLP, route). No LLM calls here; semantic decisions are the agent's
+  job via the `review/` queue.
+- **Templates** `knowledge-base/templates/` — copied into the deployed base and
+  parameterized with `{{PLACEHOLDERS}}`.
+- Shared helpers live in `kb_common.py`; import it, don't duplicate utilities.
+
+## Keep code and docs in sync
+
+When you touch ingest/conversion/routing logic, update **all** of:
+1. the script (`scripts/kb_*.py`),
+2. its contract module (`03_PIPELINE.md`, `15_MEDIA_PROCESSING.md`, …),
+3. the config template (`templates/kb.config.yml.template`) if you add settings,
+4. `scripts/kb_upgrade.py` `SCRIPT_FILES` if you add a new `kb_*.py`,
+5. tests under `knowledge-base/scripts/tests/`.
+
+## Cross-platform (Windows + macOS + Linux)
+
+- Orchestration must run everywhere. Prefer the Python entrypoint
+  `scripts/kb_reindex.py` over shelling out to `bash`. The watcher already calls
+  the Python orchestrator; don't reintroduce hard `bash` dependencies in code
+  paths that run on Windows.
+- Locate system tools with helpers like `kb_common.find_ffmpeg()` (which probes
+  beyond `PATH`, e.g. `/opt/homebrew/bin`), not bare `which`.
+- Use `pathlib.Path`, `subprocess` with arg lists (no shell string concat), and
+  `encoding="utf-8"` on all file I/O.
+
+## Privacy by default
+
+- Never index `raw/`, `assets/`, `review/`, `interactions/`. Only
+  `knowledge/**` and `assets-index/**` are indexed by Repomix.
+- Never put secrets/tokens/PII into `knowledge/`. Sensitive material →
+  `review/needs-redaction/`.
+- Cloud APIs are opt-in only (e.g. `media.stt.allow_cloud`), default off.
+
+## Graceful degradation
+
+Optional dependencies (spaCy, faster-whisper, rapidocr, watchdog) must be
+imported lazily and fail soft: log a debug message and route the file to review
+with an actionable, OS-specific install hint — never crash the run.
+
+## Tests
+
+Run `pytest` from the repo root. Add tests for new behavior; keep them
+hermetic (use `tmp_path`, don't require network or heavy models — guard
+model-dependent tests with availability checks).

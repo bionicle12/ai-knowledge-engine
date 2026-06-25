@@ -30,9 +30,13 @@ echo project: %PROJECT_ROOT%
 echo --------------------------------------
 echo.
 
-python scripts\kb_ingest.py
-python scripts\kb_lint.py --quick
-where repomix >nul 2>nul && repomix
+if exist "scripts\kb_reindex.py" (
+    python scripts\kb_reindex.py
+) else (
+    python scripts\kb_ingest.py
+    python scripts\kb_lint.py --quick
+    where repomix >nul 2>nul && repomix
+)
 
 pause
 endlocal

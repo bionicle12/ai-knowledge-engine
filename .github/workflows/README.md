@@ -1,50 +1,53 @@
-# CI workflows — currently DISABLED
+# CI workflows — PERMANENTLY DISABLED (by design)
 
-> 🚫 **Do not enable CI without an explicit request from the project owner.**
->
-> The repo is local-only at the moment — there is no public GitHub instance,
-> no deployment, and no contributor traffic that would benefit from CI runs.
-> Running workflows would consume Actions minutes for no gain.
+> ⛔ **There is no CI for this repository, and that is intentional. Do not
+> enable it.**
+
+## Why this repo has no CI
+
+This repository is a **download-only template**. It is:
+
+- **never deployed** anywhere (no server, no service, no package release),
+- **never built** into an artifact,
+- **not a contributor-traffic project** that benefits from PR validation.
+
+People simply **clone or download** it and then initialize a knowledge base in
+**their own project** by following the instruction modules in `knowledge-base/`.
+There is literally nothing to ship. Running GitHub Actions here only burns
+Actions minutes and produces **noisy failures "into the void"** for a repo that
+will never be deployed.
+
+So CI is **off on purpose** — not by oversight.
+
+## For AI agents and contributors (please read)
+
+Agents repeatedly try to "fix" the missing CI. **Don't.** Specifically:
+
+- ❌ Do **not** rename `ci.yml.disabled` to `ci.yml` (or `*.yaml`).
+- ❌ Do **not** create any new file under `.github/workflows/` with a `.yml` /
+  `.yaml` extension.
+- ❌ Do **not** add other CI providers (Actions, Travis, CircleCI, etc.).
+- ✅ Run checks **locally** instead: `pytest` from the repo root.
+
+This is a standing project decision. If you think CI is needed, that's almost
+certainly wrong for this repo — leave it disabled.
 
 ## Status
 
 | File | State |
 |------|-------|
-| `ci.yml.disabled` | Disabled. The `.disabled` suffix prevents GitHub Actions from picking it up. |
+| `ci.yml.disabled` | Disabled. The `.disabled` suffix keeps GitHub from detecting it. Kept only as a historical reference of what a test pipeline *would* look like. As an extra safety net it also has no `push`/`pull_request` triggers. |
 
-## What the workflow does (when enabled)
+## How GitHub decides whether to run a workflow
 
-When activated, `ci.yml` runs five jobs:
+GitHub Actions only runs files matching `.github/workflows/*.yml` or
+`*.yaml`. Because the only workflow here ends in `.disabled`, **nothing runs**.
+Keep it that way.
 
-- **test** — pytest on Python 3.11 / 3.12 (Ubuntu) and 3.12 (macOS), with coverage upload to Codecov
-- **doctor** — `kb_doctor.py --self-test --skip-nlp` smoke check
-- **lint-shell** — `bash -n` syntax check + shellcheck (warnings only) on all `*.sh` files
-- **validate-yaml** — verifies role examples and `kb.config.yml.template` parse cleanly
-- **check-translations** — runs `scripts/check_translations.py` (non-blocking)
-
-## How to enable
-
-When you're ready (e.g., made the repo public, want PR validation):
+## Running tests locally (the supported way)
 
 ```bash
-git mv .github/workflows/ci.yml.disabled .github/workflows/ci.yml
-git commit -m "ci: re-enable workflows"
-git push
+pip install -r knowledge-base/templates/requirements.txt
+pip install -r knowledge-base/templates/requirements-dev.txt
+pytest
 ```
-
-That's it. The file's contents are unchanged — only its filename was tweaked
-to fall outside GitHub's workflow detection (`*.yml` / `*.yaml`).
-
-## How to confirm CI is disabled
-
-```bash
-ls .github/workflows/
-# Should show only files ending in .disabled (and this README).
-# If you see *.yml or *.yaml — workflows are LIVE.
-```
-
-## Why use `.disabled` instead of deleting
-
-- **History preserved.** When CI is needed, one rename brings it back exactly as it was.
-- **Discoverable.** Future contributors see the disabled file and understand the workflow exists, just paused.
-- **Reversible.** Deleting and re-adding loses the file's git history; renaming keeps `git blame` and prior commits.

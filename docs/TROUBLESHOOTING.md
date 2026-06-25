@@ -45,9 +45,8 @@ This is fine for many features. Watchdog, OCR, STT, KeyBERT, RAKE are optional. 
 # Watchdog (file watcher)
 pip install 'watchdog>=4.0,<5.0'
 
-# OCR
-sudo apt install tesseract-ocr  # or: brew install tesseract
-pip install 'pytesseract>=0.3,<1.0' 'Pillow>=10.0,<12.0'
+# Transcription (STT) + OCR, out of the box, no system tools:
+pip install -r requirements-media.txt
 
 # Better keyword extraction
 pip install 'keybert>=0.8,<1.0'
@@ -57,7 +56,7 @@ pip install 'keybert>=0.8,<1.0'
 
 ### "conversion failed: <ext>"
 
-The pipeline can convert: `.md`, `.txt`, `.docx`, `.pdf`, `.pptx`, `.xlsx`, `.csv`. For other types it routes to `review/needs-ai-decision/` and the AI agent handles them in chat.
+The pipeline can convert: `.md`, `.txt`, `.docx`, `.pdf`, `.pptx`, `.xlsx`, `.csv` out of the box, plus audio/video (STT) and images (OCR) once `requirements-media.txt` is installed (see "Transcription & OCR" below). For anything else it routes to `review/needs-ai-decision/` and the AI agent handles it in chat.
 
 If a supported type fails:
 
@@ -83,6 +82,64 @@ The complexity threshold may be too low. In `kb.config.yml`:
 nlp:
   complexity_threshold: 0.7   # raise this if too many files end up in review
 ```
+
+## Transcription & OCR (media)
+
+### Audio/video files end up in review with "conversion unavailable"
+
+The media backends aren't installed. Install them (works on all platforms, no
+system tools needed):
+
+```bash
+pip install -r requirements-media.txt
+python3 scripts/kb_stt.py --check      # should list "faster-whisper"
+```
+
+Then re-run ingest: `./reindex.sh` (or `python3 scripts/kb_reindex.py`).
+
+### macOS: "ffmpeg not found" even though `brew install ffmpeg` succeeded
+
+This is the classic Homebrew PATH trap on Apple Silicon: `ffmpeg` lives in
+`/opt/homebrew/bin`, which is **not** on the PATH that your IDE hands to its
+child processes. Two fixes:
+
+1. **Preferred — don't use ffmpeg at all.** The default STT backend
+   (`faster-whisper`) decodes audio via bundled PyAV and never calls system
+   `ffmpeg`:
+   ```bash
+   pip install -r requirements-media.txt
+   ```
+2. If you specifically want the `openai-whisper` backend, ensure
+   `/opt/homebrew/bin` is on PATH for the IDE, or launch the IDE from a
+   terminal. `kb_common.find_ffmpeg()` also probes `/opt/homebrew/bin` directly,
+   so `kb_doctor.py` will report ffmpeg as found even when `which ffmpeg` fails
+   in the IDE's environment.
+
+### Transcription is slow or low quality
+
+Tune `media.stt` in `kb.config.yml`:
+
+- **Faster:** `model: "base"` or `"tiny"`, `compute_type: "int8"`.
+- **Higher quality:** `model: "medium"` or `"large-v3"` (slower; a GPU with
+  `device: "cuda"`, `compute_type: "float16"` helps a lot).
+- **Force a language** instead of auto-detect: `language: "ru"`.
+
+### OCR backend not found
+
+```bash
+pip install rapidocr-onnxruntime    # no system dependency
+python3 scripts/kb_ocr.py --check
+```
+
+The Tesseract backend additionally needs the system `tesseract` binary
+(`brew install tesseract` / `sudo apt install tesseract-ocr` /
+`winget install UB-Mannheim.TesseractOCR`).
+
+### `.rar` archive not unpacked
+
+The standard library can't read `.rar`. Extract it manually into
+`raw/<category>/unsorted/` and re-run ingest, or install a tool like `unar`.
+`.zip`, `.tar`, and `.tar.gz` are unpacked automatically.
 
 ## Lint (kb_lint.py)
 

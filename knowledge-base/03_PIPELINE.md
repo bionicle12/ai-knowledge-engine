@@ -55,12 +55,18 @@ Files attached/uploaded in chat are not pipeline input until the user confirms t
 | `.pdf` | `pypdf`, `pdftotext`, OCR fallback | `processed/markdown/` or `processed/ocr/` |
 | `.pptx` | `python-pptx` | `processed/markdown/` |
 | `.xlsx`, `.csv` | `pandas`, `openpyxl` | `processed/tables/` |
-| `.mp3`, `.wav`, `.mp4` | `ffmpeg` + STT (if available) | `processed/transcripts/` |
-| `.png`, `.jpg`, scans | OCR (if `tesseract` is available) | `processed/ocr/` |
+| audio: `.mp3` `.wav` `.m4a` `.flac` `.ogg` `.aac` `.opus` … | STT via `kb_stt.py` (faster-whisper, **no system ffmpeg**) | `processed/transcripts/` |
+| video: `.mp4` `.mov` `.webm` `.mkv` `.avi` `.m4v` … | STT via `kb_stt.py` (audio stream decoded by PyAV) | `processed/transcripts/` |
+| images/scans: `.png` `.jpg` `.webp` `.tiff` `.bmp` | OCR via `kb_ocr.py` (RapidOCR, no system deps) | `processed/ocr/` |
 | chat exports | custom parsers | `processed/markdown/` + possibly `review/needs-redaction/` |
-| `.zip`, `.tar.gz` | unpack | `review/needs-classification/` |
+| `.zip`, `.tar`, `.tar.gz` | unpack into `raw/unsorted/` for re-ingestion | `processed/markdown/` (listing) |
 
-If STT or OCR is unavailable — route to `review/needs-ai-decision/` with a note.
+STT/OCR run automatically **when `pip install -r requirements-media.txt` has been
+done** (see `01_PREREQUISITES.md` and `15_MEDIA_PROCESSING.md`). They degrade
+gracefully: if no backend is available, the file is routed to
+`review/needs-ai-decision/` with an OS-specific install hint inlined in the
+review package — the agent should surface that hint, **not** blindly invoke
+`ffmpeg`.
 
 ## Metadata format
 

@@ -51,7 +51,11 @@ SCRIPT_FILES = (
     "kb_ingest.py",
     "kb_lint.py",
     "kb_nlp_batch.py",
+    "kb_ocr.py",
+    "kb_populate.py",
     "kb_reflect.py",
+    "kb_reindex.py",
+    "kb_stt.py",
     "kb_watch.py",
 )
 

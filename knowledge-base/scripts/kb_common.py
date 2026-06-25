@@ -146,6 +146,22 @@ class KbConfig:
     autorun: dict[str, Any] = field(default_factory=dict)
     indexer_output_path: str = ".repomix/output.xml"
     instructions_version: str = "0.0.0"
+    media: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def stt(self) -> dict[str, Any]:
+        """Speech-to-text settings (media.stt in kb.config.yml)."""
+        return (self.media or {}).get("stt", {}) or {}
+
+    @property
+    def ocr(self) -> dict[str, Any]:
+        """OCR settings (media.ocr in kb.config.yml)."""
+        return (self.media or {}).get("ocr", {}) or {}
+
+    @property
+    def archives(self) -> dict[str, Any]:
+        """Archive-unpacking settings (media.archives in kb.config.yml)."""
+        return (self.media or {}).get("archives", {}) or {}
 
     def profile(self) -> ModeProfile:
         profiles = self.raw.get("mode_profiles", {})
@@ -201,6 +217,7 @@ def load_config(root: Path | None = None) -> KbConfig:
         autorun=raw.get("autorun", {}) or {},
         indexer_output_path=raw.get("indexer", {}).get("output_path", ".repomix/output.xml"),
         instructions_version=raw.get("instructions_version", "0.0.0"),
+        media=raw.get("media", {}) or {},
     )
     return cfg
 
@@ -404,6 +421,76 @@ def detect_python_executable() -> str:
     return sys.executable
 
 
+# ---------------------------------------------------------------------------
+# Cross-platform tool discovery
+# ---------------------------------------------------------------------------
+
+
+def find_ffmpeg() -> str | None:
+    """Locate an ffmpeg binary, cross-platform.
+
+    Tries ``shutil.which`` first, then a list of common install locations that
+    are frequently *missing* from the PATH that GUI apps (IDEs) hand to their
+    child processes. The classic case is Homebrew on Apple Silicon, where
+    ``/opt/homebrew/bin`` is not on a launchd-inherited PATH — so ``ffmpeg``
+    "is installed" yet the agent's subprocess can't find it.
+
+    Returns the resolved path, or ``None`` if no ffmpeg is found.
+
+    Note: the default STT backend (faster-whisper) does NOT need ffmpeg — it
+    decodes audio via the bundled PyAV libraries. ffmpeg is only relevant for
+    the optional openai-whisper backend.
+    """
+    import shutil
+
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+
+    candidates: list[str] = []
+    if os.name == "nt":
+        local = os.environ.get("LOCALAPPDATA", "")
+        candidates += [
+            r"C:\ffmpeg\bin\ffmpeg.exe",
+            os.path.join(local, "Microsoft", "WinGet", "Links", "ffmpeg.exe") if local else "",
+            r"C:\ProgramData\chocolatey\bin\ffmpeg.exe",
+        ]
+    else:
+        candidates += [
+            "/opt/homebrew/bin/ffmpeg",  # macOS Apple Silicon (Homebrew)
+            "/usr/local/bin/ffmpeg",     # macOS Intel (Homebrew) / Linux
+            "/usr/bin/ffmpeg",           # Linux
+            "/opt/local/bin/ffmpeg",     # MacPorts
+        ]
+    for c in candidates:
+        if c and Path(c).is_file():
+            return c
+    return None
+
+
+def os_install_hint(tool: str) -> str:
+    """Return a per-OS install command hint for an optional system tool."""
+    system = sys.platform
+    table = {
+        "ffmpeg": {
+            "darwin": "brew install ffmpeg",
+            "linux": "sudo apt install -y ffmpeg   # or your distro's package manager",
+            "win32": "winget install Gyan.FFmpeg",
+        },
+        "tesseract": {
+            "darwin": "brew install tesseract",
+            "linux": "sudo apt install -y tesseract-ocr",
+            "win32": "winget install UB-Mannheim.TesseractOCR   # then add to PATH",
+        },
+    }
+    per_tool = table.get(tool, {})
+    if system.startswith("win"):
+        return per_tool.get("win32", f"install {tool}")
+    if system == "darwin":
+        return per_tool.get("darwin", f"install {tool}")
+    return per_tool.get("linux", f"install {tool}")
+
+
 __all__ = [
     "DEFAULT_CONFIG_FILENAME",
     "DEFAULT_LOG_FILENAME",
@@ -437,4 +524,6 @@ __all__ = [
     "scan_knowledge_slugs",
     "print_err",
     "detect_python_executable",
+    "find_ffmpeg",
+    "os_install_hint",
 ]

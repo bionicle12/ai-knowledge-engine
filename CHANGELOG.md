@@ -19,6 +19,28 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 ## [Unreleased]
 
 ### Added
+- **Out-of-the-box media processing (transcription, OCR, archives).**
+  - `knowledge-base/scripts/kb_stt.py` — speech-to-text for audio/video.
+    Default backend is `faster-whisper`, which decodes audio via bundled PyAV,
+    so **no system `ffmpeg` is required** on macOS/Windows/Linux. Fixes the
+    common macOS Homebrew PATH failure ("ffmpeg not found"). Falls back to
+    `openai-whisper` when configured. Graceful degradation: missing backend →
+    review queue with an OS-specific install hint.
+  - `knowledge-base/scripts/kb_ocr.py` — OCR for images/scans. Default backend
+    `rapidocr-onnxruntime` (no system deps); Tesseract optional.
+  - Archive unpacking (`.zip`, `.tar`, `.tar.gz`) into `raw/unsorted/` for
+    re-ingestion, with a zip-bomb safety cap.
+  - `knowledge-base/templates/requirements-media.txt` — optional media deps.
+  - `media:` section in `kb.config.yml` (stt / ocr / archives).
+  - `knowledge-base/15_MEDIA_PROCESSING.md` — contract module.
+  - `kb_doctor.py` now reports STT/OCR/ffmpeg readiness.
+- `knowledge-base/scripts/kb_reindex.py` — cross-platform (pure-Python) reindex
+  orchestrator so the pipeline runs on Windows without Git Bash/WSL. The watcher
+  now uses it; `reindex.bat` delegates to it.
+- `kb_common.find_ffmpeg()` (cross-platform, probes `/opt/homebrew/bin` etc.)
+  and `os_install_hint()`.
+- `.cursor/rules/` — repo rules for AI agents (architecture/privacy/
+  cross-platform + media handling).
 - `docs/ROADMAP.md` — phased roadmap with task checklists
 - `VERSION` file (semver of instructions)
 - `CHANGELOG.md`
@@ -33,6 +55,18 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 - Agent instructions now route chat-uploaded files into `raw/*/unsorted/`
   only after user confirmation and require a user question before low-signal
   files are extracted into `knowledge/`.
+- `kb_ingest.py` now mechanically handles the `stt`, `ocr`, and `archive`
+  strategies (previously declared but unimplemented), and recognizes many more
+  audio/video/image/archive extensions. Silent `except: pass` blocks in NLP
+  enrichment replaced with debug logging (`--verbose`).
+- `03_PIPELINE.md` and `01_PREREQUISITES.md` updated: `ffmpeg`/`tesseract` are
+  now genuinely optional (only for alternative backends); the defaults need no
+  system tools.
+- CI remains intentionally disabled: this repo is a download-only template that
+  is never deployed, so `.github/workflows/ci.yml.disabled` stays off and is
+  documented as such (run `pytest` locally instead).
+- `scripts/kb_upgrade.py` syncs the new scripts (`kb_stt`, `kb_ocr`,
+  `kb_reindex`) and the previously-missing `kb_populate`.
 
 ### Translation impact
 - `README.md` role-template table updated; `i18n/ru/README.md` updated

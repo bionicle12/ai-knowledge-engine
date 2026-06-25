@@ -136,13 +136,18 @@ def check_structure(root: Path) -> list[CheckResult]:
     return results
 
 
-def check_config(root: Path) -> CheckResult:
+def check_config(root: Path, *, self_test: bool = False) -> CheckResult:
     cfg_path = kbc.kb_config_path(root)
     if not cfg_path.is_file():
+        # In --self-test (running against the source repo, not a deployed base)
+        # there is intentionally no kb.config.yml — that's a soft warning, not a
+        # deployment error.
+        severity = "warn" if self_test else "error"
         return CheckResult(
             "config",
-            "error",
-            f"{kbc.DEFAULT_CONFIG_FILENAME} not found in {root}",
+            severity,
+            f"{kbc.DEFAULT_CONFIG_FILENAME} not found in {root}"
+            + (" (expected in --self-test)" if self_test else ""),
         )
     try:
         cfg = kbc.load_config(root)
@@ -252,6 +257,76 @@ def check_log_writable(root: Path, *, ephemeral: bool = False) -> CheckResult:
         return CheckResult("log:writable", "error", f"cannot write to log.md: {e}")
 
 
+def check_media(root: Path) -> list[CheckResult]:
+    """Report transcription (STT) and OCR readiness. Soft checks only.
+
+    These are warnings, never errors: media support is optional. The goal is to
+    surface problems (notably the macOS ffmpeg-PATH trap) BEFORE the user drops
+    an audio file and the agent tries to transcribe it blindly.
+    """
+    results: list[CheckResult] = []
+    try:
+        cfg = kbc.load_config(root)
+    except Exception:  # noqa: BLE001
+        cfg = None
+
+    # ffmpeg (only needed by the openai-whisper fallback, not faster-whisper)
+    ffmpeg = kbc.find_ffmpeg()
+    if ffmpeg:
+        results.append(CheckResult("media:ffmpeg", "ok", f"found at {ffmpeg}"))
+    else:
+        results.append(
+            CheckResult(
+                "media:ffmpeg",
+                "ok",
+                "not found — fine, the default STT backend (faster-whisper) "
+                "does not need it",
+            )
+        )
+
+    # STT backends
+    try:
+        import kb_stt  # noqa: WPS433
+
+        stt_usable = kb_stt.available_backends(cfg)
+        if stt_usable:
+            results.append(
+                CheckResult("media:stt", "ok", f"available: {', '.join(stt_usable)}")
+            )
+        else:
+            results.append(
+                CheckResult(
+                    "media:stt",
+                    "warn",
+                    "no transcription backend. Install: pip install -r requirements-media.txt",
+                )
+            )
+    except Exception as e:  # noqa: BLE001
+        results.append(CheckResult("media:stt", "warn", f"could not probe STT: {e}"))
+
+    # OCR backends
+    try:
+        import kb_ocr  # noqa: WPS433
+
+        ocr_usable = kb_ocr.available_backends(cfg)
+        if ocr_usable:
+            results.append(
+                CheckResult("media:ocr", "ok", f"available: {', '.join(ocr_usable)}")
+            )
+        else:
+            results.append(
+                CheckResult(
+                    "media:ocr",
+                    "warn",
+                    "no OCR backend. Install: pip install rapidocr-onnxruntime",
+                )
+            )
+    except Exception as e:  # noqa: BLE001
+        results.append(CheckResult("media:ocr", "warn", f"could not probe OCR: {e}"))
+
+    return results
+
+
 def check_repomix_config(root: Path) -> CheckResult:
     p = root / "repomix.config.json"
     if not p.is_file():
@@ -272,14 +347,20 @@ def check_repomix_config(root: Path) -> CheckResult:
 # ---------------------------------------------------------------------------
 
 
-def run_all_checks(root: Path, *, skip_nlp: bool = False, ephemeral_log: bool = False) -> list[CheckResult]:
+def run_all_checks(
+    root: Path,
+    *,
+    skip_nlp: bool = False,
+    ephemeral_log: bool = False,
+    self_test: bool = False,
+) -> list[CheckResult]:
     results: list[CheckResult] = []
     results.append(check_python_version())
     results.extend(check_required_packages())
     results.extend(check_optional_packages())
     results.extend(check_structure(root))
 
-    cfg_res = check_config(root)
+    cfg_res = check_config(root, self_test=self_test)
     results.append(cfg_res)
 
     if not skip_nlp:
@@ -292,6 +373,7 @@ def run_all_checks(root: Path, *, skip_nlp: bool = False, ephemeral_log: bool = 
             )
 
     results.append(check_frontmatter_roundtrip())
+    results.extend(check_media(root))
     results.append(check_repomix_config(root))
     results.append(check_log_writable(root, ephemeral=ephemeral_log))
     return results
@@ -314,10 +396,10 @@ def render_text(results: list[CheckResult]) -> str:
     return "\n".join(lines)
 
 
-def exit_code(results: list[CheckResult]) -> int:
+def exit_code(results: list[CheckResult], *, warnings_ok: bool = False) -> int:
     if any(r.severity == "error" for r in results):
         return 2
-    if any(r.severity == "warn" for r in results):
+    if not warnings_ok and any(r.severity == "warn" for r in results):
         return 1
     return 0
 
@@ -338,7 +420,17 @@ def main(argv: list[str] | None = None) -> int:
         root = args.root or kbc.find_kb_root()
         ephemeral_log = False
 
-    results = run_all_checks(root, skip_nlp=args.skip_nlp, ephemeral_log=ephemeral_log)
+    results = run_all_checks(
+        root,
+        skip_nlp=args.skip_nlp,
+        ephemeral_log=ephemeral_log,
+        self_test=args.self_test,
+    )
+
+    # In --self-test we validate that the scripts are wired and importable;
+    # warnings about optional deps / missing deployed config are expected and
+    # must not fail the run (e.g. in CI with only core deps installed).
+    code = exit_code(results, warnings_ok=args.self_test)
 
     if args.json:
         print(
@@ -346,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "root": str(root),
                     "results": [asdict(r) for r in results],
-                    "exit_code": exit_code(results),
+                    "exit_code": code,
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -355,7 +447,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(render_text(results))
 
-    return exit_code(results)
+    return code
 
 
 if __name__ == "__main__":

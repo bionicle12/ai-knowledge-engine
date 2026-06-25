@@ -1,0 +1,29 @@
+---
+description: This repo intentionally has NO CI — do not enable GitHub Actions or any CI
+alwaysApply: true
+---
+
+# No CI — by design
+
+This repository is a **download-only template**. It is never deployed, built,
+or published — people clone it and initialize a knowledge base in their own
+project. There is nothing to ship, so **CI is intentionally disabled.**
+
+Do **not**:
+
+- rename `.github/workflows/ci.yml.disabled` to `ci.yml` / `*.yaml`,
+- create any new `.github/workflows/*.yml` or `*.yaml`,
+- add Travis/CircleCI/other CI config,
+- "fix" the absence of CI in any other way.
+
+GitHub only runs workflows matching `*.yml` / `*.yaml`; the only workflow file
+here ends in `.disabled`, so nothing runs. **Keep it that way.**
+
+Run checks locally instead:
+
+```bash
+pytest
+```
+
+If a task seems to require CI, it almost certainly does not for this repo —
+leave CI off and do the equivalent work locally.

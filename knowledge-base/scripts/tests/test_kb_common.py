@@ -237,3 +237,45 @@ def test_write_read_json(tmp_path: Path):
     data = {"a": 1, "b": [2, 3], "ru": "тест"}
     kbc.write_json(p, data)
     assert kbc.read_json(p) == data
+
+
+# ---------------------------------------------------------------------------
+# Cross-platform tool discovery & config media accessors
+# ---------------------------------------------------------------------------
+
+
+def test_find_ffmpeg_returns_path_or_none():
+    result = kbc.find_ffmpeg()
+    assert result is None or isinstance(result, str)
+
+
+def test_os_install_hint_nonempty():
+    assert kbc.os_install_hint("ffmpeg")
+    assert kbc.os_install_hint("tesseract")
+    # unknown tool still returns something usable
+    assert "frobnicate" in kbc.os_install_hint("frobnicate")
+
+
+def test_media_accessors_default_empty(tmp_path: Path):
+    (tmp_path / "kb.config.yml").write_text(
+        "knowledge_base:\n  name: t\n", encoding="utf-8"
+    )
+    cfg = kbc.load_config(tmp_path)
+    assert cfg.stt == {}
+    assert cfg.ocr == {}
+    assert cfg.archives == {}
+
+
+def test_media_accessors_parse(tmp_path: Path):
+    (tmp_path / "kb.config.yml").write_text(
+        "knowledge_base:\n  name: t\n"
+        "media:\n"
+        "  stt:\n    enabled: true\n    model: small\n"
+        "  ocr:\n    enabled: false\n"
+        "  archives:\n    max_files: 50\n",
+        encoding="utf-8",
+    )
+    cfg = kbc.load_config(tmp_path)
+    assert cfg.stt["model"] == "small"
+    assert cfg.ocr["enabled"] is False
+    assert cfg.archives["max_files"] == 50

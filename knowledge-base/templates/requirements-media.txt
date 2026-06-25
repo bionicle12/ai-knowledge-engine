@@ -1,0 +1,25 @@
+# AI Knowledge Engine — optional MEDIA dependencies (STT + OCR)
+# Install only if you need audio/video transcription or image OCR:
+#
+#   pip install -r requirements-media.txt
+#
+# Everything here is pip-only and works out of the box on macOS / Windows /
+# Linux. In particular, faster-whisper decodes audio via the bundled PyAV
+# libraries, so a system ffmpeg is NOT required. This deliberately avoids the
+# common macOS failure where Homebrew's ffmpeg is installed but invisible to
+# the IDE's PATH (/opt/homebrew/bin).
+
+# --- Speech-to-text (audio + video) ---
+# Default backend. No system ffmpeg needed.
+faster-whisper>=1.0,<2.0
+
+# Optional alternative STT backend (requires a system 'ffmpeg' on PATH):
+# openai-whisper>=20231117
+
+# --- OCR (images / scans / screenshots) ---
+# Default backend: ships its own ONNX models + runtime, no system deps.
+rapidocr-onnxruntime>=1.3,<2.0
+
+# Optional alternative OCR backend (requires a system 'tesseract' binary):
+# pytesseract>=0.3,<1.0
+# Pillow>=10.0,<12.0

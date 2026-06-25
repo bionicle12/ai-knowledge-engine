@@ -1,0 +1,44 @@
+---
+description: Rules for transcription (STT), OCR, and media handling — apply when working with audio/video/images or kb_stt/kb_ocr
+globs: knowledge-base/scripts/kb_stt.py,knowledge-base/scripts/kb_ocr.py,knowledge-base/15_MEDIA_PROCESSING.md
+alwaysApply: false
+---
+
+# Media processing rules (STT / OCR)
+
+## Environment before action
+
+Before transcribing or OCR-ing anything, **run `python3 scripts/kb_doctor.py`**
+(or `kb_stt.py --check` / `kb_ocr.py --check`) to learn what backends exist.
+Never blindly invoke `ffmpeg` or assume a system binary is present.
+
+## Default to dependency-free backends
+
+- **STT:** default to `faster-whisper`. It decodes audio via bundled PyAV, so
+  **no system ffmpeg is required** on any OS. This deliberately avoids the macOS
+  Homebrew PATH trap (`/opt/homebrew/bin` not visible to the IDE).
+- **OCR:** default to `rapidocr-onnxruntime` (ships its own models, no system
+  deps). Tesseract is only a fallback and needs a system binary.
+- Install both with: `pip install -r requirements-media.txt`.
+
+## When a backend is missing
+
+The pipeline already routes the file to `review/needs-ai-decision/` with an
+OS-specific install hint. The agent should **surface that hint to the user**
+(e.g. "run `pip install -r requirements-media.txt`"), not hand-transcribe in
+chat unless the user explicitly prefers that.
+
+## Configuration
+
+All media behavior is controlled by the `media:` section in `kb.config.yml`
+(`stt`, `ocr`, `archives`). Respect `enabled` flags and `allow_cloud: false`
+(never send audio/images to a cloud API unless explicitly enabled).
+
+## Output contract
+
+- Transcripts → `processed/transcripts/<slug>.md` with a provenance header and
+  `[mm:ss]` segment markers when `timestamps: true`.
+- OCR text → `processed/ocr/<slug>.md`.
+- Originals stay in `assets/media/` or `assets/images/` and are **not** indexed.
+- Treat machine transcripts/OCR as drafts — verify before extracting durable
+  knowledge into `knowledge/`.

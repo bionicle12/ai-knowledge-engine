@@ -64,12 +64,32 @@ def _run_quick_lint(root: Path, *, verbose: bool) -> None:
 
 
 def _run_reindex(root: Path, *, verbose: bool) -> None:
-    reindex = root / "reindex.sh"
-    if not reindex.is_file():
+    """Reindex cross-platform.
+
+    Prefer the Python orchestrator (kb_reindex.py) so this works identically on
+    Windows without Git Bash / WSL. Fall back to bash reindex.sh only if the
+    Python script is unavailable (older deployments).
+    """
+    reindex_py = SCRIPT_DIR / "kb_reindex.py"
+    if reindex_py.is_file():
+        cmd = [
+            kbc.detect_python_executable(),
+            str(reindex_py),
+            "--root",
+            str(root),
+            "--no-ingest",  # the watcher already ran ingest for the changed file
+        ]
+        if verbose:
+            print(f"[watch] {' '.join(cmd)}")
+        subprocess.run(cmd, check=False, cwd=str(root))
+        return
+
+    reindex_sh = root / "reindex.sh"
+    if not reindex_sh.is_file():
         return
     if verbose:
-        print(f"[watch] running {reindex}")
-    subprocess.run(["bash", str(reindex)], check=False, cwd=str(root))
+        print(f"[watch] running {reindex_sh}")
+    subprocess.run(["bash", str(reindex_sh)], check=False, cwd=str(root))
 
 
 def watch_with_watchdog(

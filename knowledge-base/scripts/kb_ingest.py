@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import logging
 import shutil
 import sys
 import traceback
@@ -37,6 +38,8 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import kb_common as kbc  # noqa: E402
+
+logger = logging.getLogger("kb_ingest")
 
 
 # ---------------------------------------------------------------------------
@@ -64,16 +67,30 @@ ASSET_TYPE_BY_EXT: dict[str, str] = {
     ".webp": "images",
     ".gif": "images",
     ".svg": "images",
+    ".tif": "images",
+    ".tiff": "images",
+    ".bmp": "images",
     ".mp3": "media",
     ".wav": "media",
     ".m4a": "media",
     ".flac": "media",
+    ".ogg": "media",
+    ".oga": "media",
+    ".aac": "media",
+    ".wma": "media",
+    ".opus": "media",
     ".mp4": "media",
     ".mov": "media",
     ".webm": "media",
+    ".mkv": "media",
+    ".avi": "media",
+    ".m4v": "media",
+    ".mpg": "media",
+    ".mpeg": "media",
     ".zip": "archives",
     ".tar": "archives",
     ".gz": "archives",
+    ".tgz": "archives",
     ".rar": "archives",
 }
 
@@ -85,15 +102,37 @@ PROCESSING_STRATEGY_BY_EXT: dict[str, str] = {
     ".pptx": "pptx",
     ".xlsx": "xlsx",
     ".csv": "csv",
+    # Images → OCR (rapidocr/tesseract; see kb_ocr.py)
     ".png": "ocr",
     ".jpg": "ocr",
     ".jpeg": "ocr",
+    ".webp": "ocr",
+    ".tif": "ocr",
+    ".tiff": "ocr",
+    ".bmp": "ocr",
+    # Audio/Video → STT (faster-whisper by default; see kb_stt.py)
     ".mp3": "stt",
     ".wav": "stt",
+    ".m4a": "stt",
+    ".flac": "stt",
+    ".ogg": "stt",
+    ".oga": "stt",
+    ".aac": "stt",
+    ".wma": "stt",
+    ".opus": "stt",
     ".mp4": "stt",
+    ".mov": "stt",
+    ".webm": "stt",
+    ".mkv": "stt",
+    ".avi": "stt",
+    ".m4v": "stt",
+    ".mpg": "stt",
+    ".mpeg": "stt",
+    # Archives → unpack into raw/unsorted for re-ingestion (see kb_ingest._run_archive)
     ".zip": "archive",
     ".tar": "archive",
     ".gz": "archive",
+    ".tgz": "archive",
     ".rar": "archive",
 }
 
@@ -304,8 +343,117 @@ def _convert(strategy: str, src: Path) -> tuple[str | None, str]:
     except Exception as e:  # noqa: BLE001
         raise RuntimeError(f"conversion failed: {e}") from e
 
-    # ocr / stt / archive / unknown — not handled mechanically
+    # archive / unknown — not handled here (stt/ocr go through dedicated helpers)
     return None, "markdown"
+
+
+# ---------------------------------------------------------------------------
+# Media converters (STT / OCR / archives) — optional, gracefully degrading
+# ---------------------------------------------------------------------------
+
+
+def _run_stt(src: Path, cfg: kbc.KbConfig) -> tuple[str, str, dict]:
+    """Transcribe audio/video. Returns (markdown, "transcripts", meta).
+
+    Raises RuntimeError (caught by caller → review) when STT is disabled or no
+    backend is available; the message carries an OS-aware install hint.
+    """
+    import kb_stt
+
+    if not kb_stt.stt_enabled(cfg):
+        raise RuntimeError(
+            "STT disabled in kb.config.yml (media.stt.enabled: false). "
+            "Transcribe manually or enable it."
+        )
+    try:
+        result = kb_stt.transcribe(src, cfg=cfg)
+    except kb_stt.SttUnavailable as e:
+        raise RuntimeError(str(e)) from e
+    return result.markdown, "transcripts", kb_stt.transcript_metadata(result)
+
+
+def _run_ocr(src: Path, cfg: kbc.KbConfig) -> tuple[str, str]:
+    """OCR an image. Returns (markdown, "ocr"). Raises RuntimeError → review."""
+    import kb_ocr
+
+    if not kb_ocr.ocr_enabled(cfg):
+        raise RuntimeError(
+            "OCR disabled in kb.config.yml (media.ocr.enabled: false). "
+            "Describe the image manually or enable it."
+        )
+    try:
+        result = kb_ocr.ocr_image(src, cfg=cfg)
+    except kb_ocr.OcrUnavailable as e:
+        raise RuntimeError(str(e)) from e
+    return result.markdown, "ocr"
+
+
+def _safe_member_name(stem: str, member_path: str) -> str:
+    """Flatten an archive member path into a safe, collision-resistant name."""
+    cleaned = member_path.replace("\\", "/").strip("/")
+    parts = [p for p in cleaned.split("/") if p not in ("", ".", "..")]
+    flat = "__".join(parts) if parts else "file"
+    return f"{stem}__{flat}"
+
+
+def _run_archive(src: Path, root: Path, cfg: kbc.KbConfig) -> tuple[str, str, int]:
+    """Unpack an archive into raw/unsorted/unsorted/ for re-ingestion.
+
+    Returns (listing_markdown, "markdown", member_count). Raises RuntimeError
+    (→ review) for unsupported formats (e.g. .rar without a helper).
+    """
+    import tarfile
+    import zipfile
+
+    if not cfg.archives.get("enabled", True):
+        raise RuntimeError("archive unpacking disabled (media.archives.enabled: false)")
+
+    max_files = int(cfg.archives.get("max_files", 200))
+    dest = root / "raw" / "unsorted" / "unsorted"
+    dest.mkdir(parents=True, exist_ok=True)
+    stem = src.stem
+    extracted: list[str] = []
+
+    suffix = src.suffix.lower()
+    if zipfile.is_zipfile(src):
+        with zipfile.ZipFile(src) as zf:
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                if len(extracted) >= max_files:
+                    break
+                target = dest / _safe_member_name(stem, info.filename)
+                with zf.open(info) as member, target.open("wb") as out:
+                    shutil.copyfileobj(member, out)
+                extracted.append(info.filename)
+    elif tarfile.is_tarfile(src):
+        with tarfile.open(src) as tf:
+            for member in tf.getmembers():
+                if not member.isfile():
+                    continue
+                if len(extracted) >= max_files:
+                    break
+                fobj = tf.extractfile(member)
+                if fobj is None:
+                    continue
+                target = dest / _safe_member_name(stem, member.name)
+                with fobj, target.open("wb") as out:
+                    shutil.copyfileobj(fobj, out)
+                extracted.append(member.name)
+    else:
+        raise RuntimeError(
+            f"unsupported archive format '{suffix}'. Extract it manually into "
+            "raw/<category>/unsorted/ and re-run ingest "
+            "(.rar needs an external tool such as 'unar')."
+        )
+
+    listing = [f"# Archive: {src.name}", "", f"Unpacked {len(extracted)} file(s) "
+               "into `raw/unsorted/unsorted/` for re-ingestion.", ""]
+    for name in extracted[:100]:
+        listing.append(f"- {name}")
+    if len(extracted) > 100:
+        listing.append(f"- … and {len(extracted) - 100} more")
+    return "\n".join(listing) + "\n", "markdown", len(extracted)
 
 
 # ---------------------------------------------------------------------------
@@ -377,8 +525,8 @@ def nlp_enrich(text: str, cfg: kbc.KbConfig, knowledge_dir: Path) -> dict:
                         "existing_page": None,
                     }
                 )
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.debug("spaCy NER skipped: %s", e)
 
     # ---------- entity resolution (fuzzy) ----------
     if entities:
@@ -403,8 +551,8 @@ def nlp_enrich(text: str, cfg: kbc.KbConfig, knowledge_dir: Path) -> dict:
                     ent["existing_page"] = str(
                         slugs[best[0]][0].relative_to(knowledge_dir.parent)
                     )
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.debug("entity resolution skipped: %s", e)
 
     # Deduplicate entities
     seen: set[str] = set()
@@ -447,10 +595,10 @@ def nlp_enrich(text: str, cfg: kbc.KbConfig, knowledge_dir: Path) -> dict:
                 {"phrase": phrase, "weight": float(score), "source": "rake"}
                 for score, phrase in top
             ]
-        except Exception:
-            pass
-    except Exception:
-        pass
+        except Exception as e:  # noqa: BLE001
+            logger.debug("RAKE keyword extraction skipped: %s", e)
+    except Exception as e:  # noqa: BLE001
+        logger.debug("KeyBERT keyword extraction skipped: %s", e)
 
     out["complexity"] = estimate_complexity(text, entity_count=len(deduped))
     return out
@@ -535,10 +683,21 @@ def process_one(
     # Convert
     md_text: str | None = None
     processed_subdir = "markdown"
+    transcript_meta: dict = {}
+    archive_count: int | None = None
     try:
-        md_text, processed_subdir = _convert(strategy, asset_target)
+        if strategy == "stt":
+            md_text, processed_subdir, transcript_meta = _run_stt(asset_target, cfg)
+        elif strategy == "ocr":
+            md_text, processed_subdir = _run_ocr(asset_target, cfg)
+        elif strategy == "archive":
+            md_text, processed_subdir, archive_count = _run_archive(
+                asset_target, root, cfg
+            )
+        else:
+            md_text, processed_subdir = _convert(strategy, asset_target)
     except RuntimeError as e:
-        # Optional dep missing or conversion failed
+        # Optional dep missing, backend unavailable, or conversion failed
         result.review_reason = f"conversion unavailable: {e}"
 
     processed_path: Path | None = None
@@ -566,8 +725,8 @@ def process_one(
                 encoding="utf-8",
             )
             result.nlp_meta_path = str(nlp_path.relative_to(root))
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.debug("NLP enrichment skipped for %s: %s", asset_target.name, e)
 
     complexity = nlp_meta.get("complexity") if nlp_meta else (
         estimate_complexity(md_text or "")
@@ -651,6 +810,10 @@ def process_one(
         "review_reason": result.review_reason,
         "nlp_meta_path": result.nlp_meta_path,
     }
+    if transcript_meta:
+        metadata.update(transcript_meta)
+    if archive_count is not None:
+        metadata["archive_extracted_files"] = archive_count
     import yaml  # type: ignore[import-untyped]
 
     metadata_path.write_text(
@@ -672,6 +835,16 @@ def process_one(
             f"Processed: {result.processed_path or '—'}",
             f"NLP meta: {result.nlp_meta_path or '—'}",
             f"Complexity: {result.complexity:.2f}",
+            *(
+                [f"Transcribed: {transcript_meta.get('stt_backend')} "
+                 f"({transcript_meta.get('stt_language')}, "
+                 f"{transcript_meta.get('stt_segments')} segments)"]
+                if transcript_meta else []
+            ),
+            *(
+                [f"Archive: unpacked {archive_count} file(s) into raw/unsorted/"]
+                if archive_count is not None else []
+            ),
             f"Routed: {result.routed_to}{(' (' + result.review_reason + ')') if result.review_reason else ''}",
         ],
         root=root,
@@ -814,11 +987,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-nlp", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
+        "--verbose", action="store_true", help="Show debug logs (skipped NLP, etc.)"
+    )
+    parser.add_argument(
         "--init-dirs",
         action="store_true",
         help="Just create directory structure and exit",
     )
     args = parser.parse_args(argv)
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.WARNING,
+        format="[%(name)s] %(levelname)s: %(message)s",
+    )
 
     root = args.root or kbc.find_kb_root()
     cfg = kbc.load_config(root)

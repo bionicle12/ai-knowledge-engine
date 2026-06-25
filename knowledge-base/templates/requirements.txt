@@ -21,9 +21,11 @@ keybert>=0.8,<1.0
 # File watcher (see 13_AUTORUN.md)
 watchdog>=4.0,<5.0
 
-# Optional: OCR & images. Uncomment if tesseract is installed system-wide.
-# pytesseract>=0.3,<1.0
-# Pillow>=10.0,<12.0
+# Media: transcription (STT) & OCR are OPTIONAL and live in a separate file so
+# the base install stays light. Install when you need audio/video/image input:
+#   pip install -r requirements-media.txt
+# (faster-whisper transcribes WITHOUT a system ffmpeg; rapidocr does OCR
+#  without a system tesseract — both work out of the box on all platforms.)
 
 # Testing (dev only — install with: pip install -r requirements-dev.txt)
 # pytest>=8.0,<9.0

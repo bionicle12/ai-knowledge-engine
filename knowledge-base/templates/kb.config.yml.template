@@ -44,6 +44,30 @@ nlp:
   complexity_threshold: 0.7                            # >= → review/needs-ai-decision/
   skip_extensions: [".csv", ".xlsx"]
 
+# Media processing — transcription (STT), OCR, archive unpacking
+# (see 15_MEDIA_PROCESSING.md). Requires: pip install -r requirements-media.txt
+media:
+  stt:                                                 # audio + video → processed/transcripts/
+    enabled: true
+    # Backend preference order. faster-whisper needs NO system ffmpeg — it
+    # decodes audio via bundled PyAV, so it works out of the box on
+    # macOS / Windows / Linux. openai-whisper is a fallback that DOES need a
+    # system ffmpeg on PATH.
+    backends: ["faster-whisper", "openai-whisper"]
+    model: "small"                                     # tiny | base | small | medium | large-v3
+    language: "auto"                                   # "auto", or ISO code like "ru" / "en"
+    device: "auto"                                     # auto | cpu | cuda
+    compute_type: "int8"                               # int8 (fast CPU) | float16 (GPU) | float32
+    timestamps: true                                   # add [mm:ss] markers per segment
+    allow_cloud: false                                 # never send audio to a cloud API unless true
+  ocr:                                                 # images/scans → processed/ocr/
+    enabled: true
+    backends: ["rapidocr", "tesseract"]                # rapidocr needs no system deps
+    language: "auto"
+  archives:                                            # .zip/.tar(.gz) → unpacked to raw/unsorted/
+    enabled: true
+    max_files: 200                                     # safety cap when unpacking
+
 # Auto-run behavior (see 13_AUTORUN.md)
 autorun:
   watch_enabled: true

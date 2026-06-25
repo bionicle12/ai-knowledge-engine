@@ -238,3 +238,63 @@ def test_review_package_no_long_book_hint_when_flag_false():
     )
     assert "Likely long-form reference book" not in pkg
     assert "## What to do" in pkg
+
+
+# ---------------------------------------------------------------------------
+# Media (STT / OCR) + archive strategies
+# ---------------------------------------------------------------------------
+
+
+def test_strategy_mapping_media_and_archive():
+    assert kb_ingest._detect_strategy(".m4a") == "stt"
+    assert kb_ingest._detect_strategy(".mov") == "stt"
+    assert kb_ingest._detect_strategy(".webm") == "stt"
+    assert kb_ingest._detect_strategy(".webp") == "ocr"
+    assert kb_ingest._detect_strategy(".tiff") == "ocr"
+    assert kb_ingest._detect_strategy(".tgz") == "archive"
+    assert kb_ingest._detect_asset_type(".flac") == "media"
+    assert kb_ingest._detect_asset_type(".tiff") == "images"
+    assert kb_ingest._detect_asset_type(".tgz") == "archives"
+
+
+def test_ingest_audio_without_backend_routes_to_review(kb_root: Path, monkeypatch):
+    import kb_stt
+
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    audio = kb_root / "raw" / "media" / "unsorted" / "note.mp3"
+    audio.write_bytes(b"ID3 fake mp3 data not decodable")
+
+    # Force "no STT backend" regardless of what's installed on the test machine
+    monkeypatch.setattr(kb_stt, "available_backends", lambda cfg=None: [])
+
+    code = kb_ingest.main(["--root", str(kb_root), "--no-nlp"])
+    assert code == 0
+    # Original safely stored as an asset
+    assert list((kb_root / "assets" / "media").glob("*.mp3"))
+    # Routed to review with an actionable, OS-specific install hint
+    review = list((kb_root / "review" / "needs-ai-decision").glob("*.md"))
+    assert len(review) == 1
+    text = review[0].read_text(encoding="utf-8")
+    assert "requirements-media.txt" in text
+
+
+def test_ingest_zip_archive_extracts_members(kb_root: Path):
+    import zipfile
+
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    archive = kb_root / "raw" / "documents" / "unsorted" / "bundle.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("a.txt", "hello")
+        zf.writestr("sub/b.txt", "world")
+
+    code = kb_ingest.main(["--root", str(kb_root), "--no-nlp"])
+    assert code == 0
+
+    # Archive original moved to assets/archives
+    assert list((kb_root / "assets" / "archives").glob("*.zip"))
+    # Members extracted (flattened) into raw/unsorted/unsorted for re-ingestion
+    extracted = [p.name for p in (kb_root / "raw" / "unsorted" / "unsorted").glob("*")]
+    assert any(n.endswith("a.txt") for n in extracted)
+    assert any(n.endswith("b.txt") for n in extracted)
+    # A listing was written to processed/markdown
+    assert list((kb_root / "processed" / "markdown").glob("*.md"))
