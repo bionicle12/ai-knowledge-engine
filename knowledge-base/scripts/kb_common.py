@@ -28,6 +28,32 @@ except ImportError:  # pragma: no cover
     raise
 
 
+def _enable_utf8_console() -> None:
+    """Make stdout/stderr UTF-8 safe so emoji output never crashes the run.
+
+    On Windows the default console encoding is often a legacy code page (e.g.
+    cp1251), which raises UnicodeEncodeError when scripts print status icons
+    like ✅/⚠️/❌. We switch to UTF-8 with errors="replace" so output is always
+    safe. Guarded for environments (e.g. pytest capture) where the stream can't
+    be reconfigured.
+    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        enc = (getattr(stream, "encoding", "") or "").lower()
+        if enc.startswith("utf"):
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except Exception:  # noqa: BLE001
+            pass
+
+
+_enable_utf8_console()
+
+
 # ---------------------------------------------------------------------------
 # Constants & paths
 # ---------------------------------------------------------------------------
