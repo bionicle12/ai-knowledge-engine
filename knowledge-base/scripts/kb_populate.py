@@ -104,7 +104,7 @@ If you attach a file directly in chat, the AI agent must ask before adding it to
 
 1. Summarize the attached file(s) and propose the best `raw/<category>/unsorted/` destination
 2. Ask: "Add this to the main knowledge base?"
-3. Only after confirmation, stage the file into `raw/` and run `./reindex.sh` or confirm the watcher processed it
+3. Only after confirmation, stage the file into `raw/` and run `./shell/reindex.sh` or confirm the watcher processed it
 4. If the file looks low-value or unrelated, ask whether to keep it as an asset, archive it, or ignore it
 """
 
@@ -219,7 +219,7 @@ def render_markdown(role_data: dict[str, Any], *, source_path: Path) -> str:
     lines.append("## Next steps")
     lines.append("")
     lines.append("1. Drop a few files into the matching `raw/*/unsorted/` folder")
-    lines.append("2. Run `./reindex.sh` (or start `./watcher.sh` for auto-processing)")
+    lines.append("2. Run `./shell/reindex.sh` (or start `./shell/watcher.sh` for auto-processing)")
     lines.append("3. Check `log.md` to see what happened")
     lines.append("4. Open `.repomix/output.xml` once the AI has indexed your knowledge")
     lines.append("")

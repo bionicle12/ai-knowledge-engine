@@ -179,7 +179,7 @@ placement_examples:
     - "Drop one fully anonymized session note -> raw/work/unsorted/"
     - "Write your therapeutic stance in 10 bullet points -> raw/personal-context/unsorted/"
     - "Add one Gestalt theory note you actually use -> raw/reference/unsorted/"
-    - "Run ./reindex.sh - the AI now has your professional frame"
+    - "Run ./shell/reindex.sh - the AI now has your professional frame"
     - "Ask: 'Formulate this anonymized session in Gestalt terms and list supervision questions, separating facts from hypotheses.'"
 
   do_not_drop:

@@ -141,7 +141,7 @@ placement_examples:
     - "Положи README.md любого своего рабочего проекта → raw/reference/unsorted/"
     - "Любая заметка про принятое арх. решение (даже одна строка) → raw/reference/unsorted/"
     - "Скриншот архитектурной диаграммы из Excalidraw/Miro → raw/media/unsorted/"
-    - "Запусти ./reindex.sh — через минуту знания будут в knowledge/"
+    - "Запусти ./shell/reindex.sh — через минуту знания будут в knowledge/"
     - "Открой .repomix/output.xml — теперь твой AI знает твой стек"
 
   do_not_drop:

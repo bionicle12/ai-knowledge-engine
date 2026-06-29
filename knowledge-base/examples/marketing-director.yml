@@ -150,7 +150,7 @@ placement_examples:
     - "Любой брендбук в PDF → raw/documents/unsorted/"
     - "Презентация последней успешной кампании → raw/documents/unsorted/"
     - "1-2 customer interview transcripts → raw/work/unsorted/"
-    - "Запусти ./reindex.sh — AI получит понимание твоего бренда"
+    - "Запусти ./shell/reindex.sh — AI получит понимание твоего бренда"
     - "Спроси AI: 'Напиши мне draft email на нашем tone of voice про X' — увидишь разницу"
 
   do_not_drop:

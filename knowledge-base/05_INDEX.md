@@ -3,7 +3,7 @@
 > Configure the Repomix index: what is indexed, what is excluded, how it auto-updates.
 >
 > **Reference template:** `knowledge-base/templates/repomix.config.json.template`. The agent copies it to the deployed base root as `repomix.config.json` and parameterizes if needed.
-> **Reference shell script:** `knowledge-base/shell/reindex.sh` is copied as `reindex.sh` to the base root.
+> **Reference shell script:** `knowledge-base/shell/reindex.sh` is copied into `shell/reindex.sh` in the deployed base.
 
 ---
 
@@ -80,7 +80,7 @@ The Repomix index contains **only**:
 
 ---
 
-## reindex.sh
+## shell/reindex.sh
 
 ```bash
 #!/bin/bash
@@ -110,7 +110,7 @@ echo "Done: .repomix/output.xml"
 ```
 
 ```bash
-chmod +x reindex.sh
+chmod +x shell/reindex.sh
 ```
 
 ---

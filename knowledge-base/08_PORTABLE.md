@@ -65,7 +65,7 @@ While working in this project — write session summaries into the KB:
 - Path: `../knowledge-base/interactions/sessions/`
 - Folder format: `YYYY-MM-DD__<project-name>__<topic>/`
 - Auto-capture follows the same rules (see 07_INTERACTION_LOOP.md)
-- Reindex manually: `cd ../knowledge-base && ./reindex.sh`
+- Reindex manually: `cd ../knowledge-base && ./shell/reindex.sh`
 ```
 
 ### Option 2: symlink to the index
@@ -116,7 +116,7 @@ quality: high
 - ...
 ```
 
-4. Reindex the KB **manually**: `cd ../knowledge-base && ./reindex.sh`
+4. Reindex the KB **manually**: `cd ../knowledge-base && ./shell/reindex.sh`
    - Not automatic, to avoid slowing down the working project
 
 ---
@@ -130,7 +130,7 @@ Working in highway-clicker
         ↓
 AI writes session summary → ../knowledge-base/interactions/sessions/
         ↓
-When convenient: cd ../knowledge-base && ./reindex.sh
+When convenient: cd ../knowledge-base && ./shell/reindex.sh
         ↓
 Meta-review → knowledge/ updates
         ↓
@@ -169,7 +169,7 @@ cd knowledge-base
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-./reindex.sh
+./shell/reindex.sh
 ```
 
 If you need assets — add `assets/` to the archive (increases size).
@@ -183,7 +183,7 @@ If you need assets — add `assets/` to the archive (increases size).
 | Where does the KB live? | Once, next to projects (`../knowledge-base/`) |
 | Where does the AI write session summaries? | Always in `../knowledge-base/interactions/sessions/` |
 | How do projects stay distinct? | By session-folder name: `2026-05-06__highway-clicker__topic/` |
-| When to reindex? | Automatically (see `13_AUTORUN.md`) or `./reindex.sh` |
+| When to reindex? | Automatically (see `13_AUTORUN.md`) or `./shell/reindex.sh` |
 | Need an `AGENTS.md` in every project? | Yes, with a "Personal Knowledge Base" section |
 | Different bases for different roles? | Possible, but usually one base per person |
 

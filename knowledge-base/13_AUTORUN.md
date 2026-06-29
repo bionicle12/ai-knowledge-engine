@@ -8,7 +8,7 @@
 
 ## Why
 
-Manual `./reindex.sh` after every change is friction — and friction means the base goes stale. Automation removes that barrier.
+Manual `./shell/reindex.sh` after every change is friction — and friction means the base goes stale. Automation removes that barrier.
 
 ---
 
@@ -47,10 +47,10 @@ When a knowledge/ file changes:
 4. Append to log.md
 
 Usage:
-    ./watcher.sh                               # Foreground
-    ./watcher.sh --daemon                      # Background
-    ./watcher.sh --stop                        # Stop
-    ./watcher.sh --verbose                     # Verbose logging
+    ./shell/watcher.sh                         # Foreground
+    ./shell/watcher.sh --daemon                # Background
+    ./shell/watcher.sh --stop                  # Stop
+    ./shell/watcher.sh --verbose               # Verbose logging
 
 Exit:
     Ctrl+C or SIGTERM for graceful shutdown
@@ -85,7 +85,7 @@ class RawFileHandler(FileSystemEventHandler):
         # 1. Ingest
         subprocess.run(["python3", "scripts/kb_ingest.py", filepath])
         # 2. Reindex
-        subprocess.run(["./reindex.sh"])
+        subprocess.run(["./shell/reindex.sh"])
         print(f"[watch] Processed and reindexed: {filepath}")
 
 
@@ -108,9 +108,9 @@ class KnowledgeChangeHandler(FileSystemEventHandler):
         return False
 ```
 
-### Running via `watcher.sh`
+### Running via `shell/watcher.sh`
 
-The base root contains `watcher.sh` — a wrapper around `kb_watch.py` with auto-venv activation:
+The deployed base includes `shell/watcher.sh` — a wrapper around `kb_watch.py` with auto-venv activation:
 
 ```bash
 #!/bin/bash
@@ -180,7 +180,7 @@ case "${1:-}" in
     python3 scripts/kb_watch.py
     ;;
   *)
-    echo "Usage: ./watcher.sh [--daemon|--stop|--status|--verbose]"
+    echo "Usage: ./shell/watcher.sh [--daemon|--stop|--status|--verbose]"
     echo ""
     echo "  (no flag)     Foreground mode (Ctrl+C to stop)"
     echo "  --daemon      Run in background"
@@ -192,23 +192,23 @@ esac
 ```
 
 ```bash
-chmod +x watcher.sh
+chmod +x shell/watcher.sh
 ```
 
 ### Commands
 
 ```bash
 # Foreground (for development)
-./watcher.sh
+./shell/watcher.sh
 
 # Background
-./watcher.sh --daemon
+./shell/watcher.sh --daemon
 
 # Status
-./watcher.sh --status
+./shell/watcher.sh --status
 
 # Stop
-./watcher.sh --stop
+./shell/watcher.sh --stop
 ```
 
 ### Systemd unit (Linux)
@@ -253,7 +253,7 @@ changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
 
 if echo "$changed_files" | grep -q "^knowledge/"; then
   echo "[hook] Knowledge files changed, reindexing..."
-  ./reindex.sh > /dev/null 2>&1 &
+  ./shell/reindex.sh > /dev/null 2>&1 &
 
   # Quick lint
   if [ -f "scripts/kb_lint.py" ]; then
@@ -290,7 +290,7 @@ fi
 # crontab -e
 
 # Every day at 03:00 — full lint + reindex
-0 3 * * * cd /path/to/knowledge-base && ./lint.sh >> log.md 2>&1 && ./reindex.sh >> log.md 2>&1
+0 3 * * * cd /path/to/knowledge-base && ./shell/lint.sh >> log.md 2>&1 && ./shell/reindex.sh >> log.md 2>&1
 
 # Every 6 hours — quick lint
 0 */6 * * * cd /path/to/knowledge-base && python3 scripts/kb_lint.py --quick >> /dev/null 2>&1
@@ -481,8 +481,8 @@ The last point matters: in active sessions reflection fires before 7 days, preve
 
 | Event | Action | Source |
 |-------|--------|--------|
-| New file in `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./watcher.sh` |
-| Edit in `knowledge/` | Reindex + quick lint | `./watcher.sh` or git hook |
+| New file in `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./shell/watcher.sh` |
+| Edit in `knowledge/` | Reindex + quick lint | `./shell/watcher.sh` or git hook |
 | `!save` in AI session | Session capture (with enrichment) → Reindex | AI agent |
 | `!reflect` | Reflection: insight generation (~15K tokens) | AI agent |
 | `!audit` | Lint level 2: AI review (~50–100K tokens) | AI agent |

@@ -152,7 +152,7 @@ placement_examples:
     - "Drop your latest OKR doc → raw/reference/unsorted/"
     - "Two recent user interview transcripts → raw/work/unsorted/"
     - "One competitor teardown you've written → raw/reference/unsorted/"
-    - "Run ./reindex.sh — your AI now thinks like *your* PM, not a generic one"
+    - "Run ./shell/reindex.sh — your AI now thinks like *your* PM, not a generic one"
     - "Ask: 'Draft a Q3 OKR for retention based on what we learned in Q2.'"
 
   do_not_drop:

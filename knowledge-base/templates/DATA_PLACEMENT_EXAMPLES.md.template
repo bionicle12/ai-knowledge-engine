@@ -19,7 +19,7 @@ If you attach a file directly in chat, the AI agent must ask before adding it to
 
 1. Summarize the attached file(s) and propose the best `raw/<category>/unsorted/` destination
 2. Ask: "Add this to the main knowledge base?"
-3. Only after confirmation, stage the file into `raw/` and run `./reindex.sh` or confirm the watcher processed it
+3. Only after confirmation, stage the file into `raw/` and run `./shell/reindex.sh` or confirm the watcher processed it
 4. If the file looks low-value or unrelated, ask whether to keep it as an asset, archive it, or ignore it
 
 ## Common cases
@@ -36,7 +36,7 @@ If you attach a file directly in chat, the AI agent must ask before adding it to
 ## After dropping
 
 1. (If watcher is running) — files are picked up automatically within ~5 seconds
-2. (Manual) — run `./reindex.sh` to trigger the pipeline
+2. (Manual) — run `./shell/reindex.sh` to trigger the pipeline
 3. Watch `log.md` to see what happened
 4. Check `review/needs-ai-decision/` if anything needs your AI agent's attention
 5. Check `knowledge/` to see freshly extracted knowledge

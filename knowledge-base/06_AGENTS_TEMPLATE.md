@@ -49,7 +49,7 @@ When the user attaches/uploads a file in chat or gives a local path:
 3. Summarize what was attached and propose the best destination in `raw/<category>/unsorted/`
 4. Ask the user whether to add the file to the main knowledge base; do not stage or ingest it before confirmation
 5. After confirmation, copy/move it into the chosen `raw/<category>/unsorted/`; use `raw/unsorted/` only when routing is unclear
-6. Run `./reindex.sh` or confirm the watcher processed it; then check `log.md`, `assets-index/`, `processed/`, and `review/`
+6. Run `./shell/reindex.sh` or confirm the watcher processed it; then check `log.md`, `assets-index/`, `processed/`, and `review/`
 7. Update existing `knowledge/` pages before creating duplicates; refresh `last_verified`/`valid_until` when the file changes old facts
 8. If the file is low-signal, noisy, or irrelevant, ask whether to keep it as an asset, archive it, or ignore it
 
@@ -75,9 +75,10 @@ While working with the user the agent captures conclusions:
 | `!save` | Save session summary + enrichment now | ~2K tokens |
 | `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
 | `!audit` | Run AI base review (lint level 2) | ~50–100K tokens |
+| `!review` | Walk through `review/needs-classification/`, `review/needs-ai-decision/`, and `review/needs-redaction/`, process each item, and report what was extracted, redacted, archived, or deferred | ~5–30K tokens |
+| `!populate` | Regenerate `DATA_PLACEMENT_EXAMPLES.md` (run `python3 scripts/kb_populate.py --role <role> --kb-root .`) | ~50 tokens |
 | `!super` | Toggle mode: default ↔ super | 0 tokens |
-| `!super on` | Enable super mode | 0 tokens |
-| `!super off` | Return to default mode | 0 tokens |
+| `!super on/off` | Explicitly enable/disable super mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |
 
 ## Knowledge lifecycle

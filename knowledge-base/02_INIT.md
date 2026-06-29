@@ -32,7 +32,8 @@ my-project/
     ├── AGENTS.md, kb.config.yml, ...
     ├── scripts/, shell/, templates/, examples/    ← copied verbatim from setup/
     ├── raw/, processed/, knowledge/, assets/, ...
-    ├── reindex.sh, watcher.sh, watcher-start.command, ...
+    ├── watcher-start.command, watcher-stop.command
+    ├── reindex.bat, watcher-start.bat
     └── DATA_PLACEMENT_EXAMPLES.md, START_HERE.md
 ```
 
@@ -159,7 +160,13 @@ knowledge-base/
 ├── kb.config.yml               # Role, entities, rules
 ├── repomix.config.json         # Indexer config
 ├── requirements.txt            # Python dependencies
-├── reindex.sh                  # Update script
+├── reindex.command, watcher-start.command, watcher-stop.command   # macOS launchers
+├── reindex.bat, watcher-start.bat                                 # Windows launchers
+├── shell/                      # Linux / CLI wrappers
+│   ├── reindex.sh
+│   ├── watcher.sh
+│   ├── lint.sh
+│   └── doctor.sh
 │
 ├── scripts/
 │   └── kb_ingest.py            # Pipeline (see 03_PIPELINE.md)

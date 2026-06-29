@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/01_PREREQUISITES.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 01 — Проверка окружения
@@ -75,21 +75,50 @@ pandas>=2.2
 openpyxl>=3.1
 ```
 
-Опционально (OCR, изображения):
+## Media: транскрибация (STT) и OCR — из коробки, на всех платформах
 
-```txt
-pytesseract>=0.3
-pillow>=10.0
+Транскрибация аудио/видео и OCR по изображениям **опциональны** и вынесены в отдельный
+requirements-файл, чтобы базовая установка оставалась лёгкой. Значения по умолчанию
+подобраны так, чтобы работать на macOS, Windows и Linux **без системных утилит** —
+в частности, **системный `ffmpeg` не нужен**:
+
+```bash
+pip install -r requirements-media.txt
 ```
 
-## Системные утилиты (опционально)
+Это установит:
 
-| Утилита | Зачем |
+| Возможность | Библиотека | Системная зависимость? |
+|-------------|------------|------------------------|
+| Speech-to-text (audio + video) | `faster-whisper` | **Нет** — декодирует аудио через встроенный PyAV |
+| OCR (images / scans) | `rapidocr-onnxruntime` | **Нет** — поставляется со своими ONNX-моделями |
+
+> **Почему это важно (ловушка с macOS ffmpeg):** раньше подход опирался на системный
+> `ffmpeg`. На Apple Silicon Homebrew ставит его в `/opt/homebrew/bin`, а этот путь
+> часто **не попадает** в PATH, который IDE передаёт дочерним процессам. В итоге
+> `ffmpeg` "как бы установлен", но транскрибация падает с ошибкой *"ffmpeg not found"*.
+> `faster-whisper` полностью обходит эту проблему.
+
+После установки проверьте, что backends видны:
+
+```bash
+python3 scripts/kb_stt.py --check
+python3 scripts/kb_ocr.py --check
+python3 scripts/kb_doctor.py        # также покажет статус STT/OCR/ffmpeg
+```
+
+Полный контракт — в `15_MEDIA_PROCESSING.md`.
+
+## Системные утилиты (действительно опциональны)
+
+Они нужны только для альтернативных backends — настройки по умолчанию выше в них не нуждаются.
+
+| Утилита | Когда реально нужна |
 |---|---|
-| `pandoc` | DOCX/HTML/MD конвертации |
-| `poppler-utils` / `pdftotext` | Текст из PDF |
-| `tesseract` | OCR для сканов |
-| `ffmpeg` | Аудио из видео для STT |
+| `pandoc` | Более качественные DOCX/HTML/MD конвертации |
+| `poppler-utils` / `pdftotext` | Альтернативное извлечение текста из PDF |
+| `tesseract` | Только если вы выбрали Tesseract OCR вместо RapidOCR |
+| `ffmpeg` | Только если вы выбрали `openai-whisper` вместо faster-whisper |
 
 ### Ubuntu
 
@@ -108,7 +137,7 @@ brew install pandoc poppler tesseract ffmpeg
 
 ```powershell
 winget install Gyan.FFmpeg
-# Tesseract и Poppler — через Chocolatey/Scoop, добавить в PATH
+# Tesseract и Poppler — через Chocolatey/Scoop, затем добавить в PATH
 ```
 
 Если Node.js из пакетного менеджера старее 20.0.0 — установить через `nvm`, `fnm` или NodeSource.

@@ -104,7 +104,7 @@ for the user's OS. The agent should:
 2. **Surface the install hint** to the user (e.g. "run
    `pip install -r requirements-media.txt`"). Do **not** blindly call `ffmpeg`
    or assume system tools exist.
-3. Only after the backend is installed, re-run ingest (`./reindex.sh` or
+3. Only after the backend is installed, re-run ingest (`./shell/reindex.sh` or
    `python3 scripts/kb_reindex.py`) — do not hand-transcribe in chat unless the
    user explicitly prefers that.
 

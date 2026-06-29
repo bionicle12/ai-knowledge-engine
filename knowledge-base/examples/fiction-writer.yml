@@ -269,7 +269,7 @@ placement_examples:
     - "Drop your current opening (chapter 1 or first scene) into raw/work/unsorted/"
     - "Drop your one-line premise + 3-paragraph outline (or just the premise if you don't have an outline yet) into raw/work/unsorted/"
     - "If you have a craft book you swear by: (a) drop the PDF into raw/documents/unsorted/ (it stays as a reference), AND (b) write a 'top 5 lessons for me personally' note → raw/reference/unsorted/. The note is what the AI reads daily."
-    - "Run ./reindex.sh — your AI now has the seeds of taste, structure, and project context"
+    - "Run ./shell/reindex.sh — your AI now has the seeds of taste, structure, and project context"
     - "Ask: 'Read my opening and tell me where the hook lands, where it slips, and what one sentence I should rewrite first.'"
 
   do_not_drop:

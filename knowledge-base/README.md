@@ -64,8 +64,8 @@ Reference Python and shell scripts: `scripts/` and `shell/`.
 4. Tell the agent: "Read knowledge-base/README.md and deploy a knowledge base for [my role]"
 5. The agent verifies the environment, asks questions, creates the structure
 6. Start working: drop files into raw/
-7. Run watch mode: ./watcher.sh
-   (or manually: ./reindex.sh)
+7. Run watch mode: ./shell/watcher.sh
+   (or manually: ./shell/reindex.sh)
 ```
 
 ## User commands
@@ -77,6 +77,8 @@ Things you can say to the AI agent in the IDE:
 | `!save` | Save a session summary with conclusions and processed materials | ~2K tokens | At the end of a productive session, or when useful conclusions accumulate |
 | `!reflect` | Reflect: synthesize higher-level insights from accumulated facts | ~15K tokens | When a lot of new material has been added |
 | `!audit` | AI review of the base: contradictions, gaps, merge candidates | ~50–100K tokens | Every 2–4 weeks |
+| `!review` | Process `review/` queues, extract durable knowledge, redact sensitive materials, and ask focused questions when input is needed | ~5–30K tokens | When `review/needs-ai-decision/` starts to accumulate |
+| `!populate` | Re-generate `DATA_PLACEMENT_EXAMPLES.md` from the role YAML | ~50 tokens | After editing `examples/<role>.yml` |
 | `!super` | Toggle mode: default ↔ super | 0 tokens | When you need maximum learning speed |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens | See below |
 | `!super status` | Show the current mode | 0 tokens | Quick check |

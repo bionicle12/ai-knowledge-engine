@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/04_REVIEW.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 04 — AI Review Queue
@@ -102,5 +102,5 @@ Python-скрипт создаёт пакет для каждого матери
 3. Прочитать связанный файл из processed/
 4. Извлечь знания → обновить knowledge/
 5. Удалить обработанный пакет из review/
-6. Запустить ./reindex.sh
+6. Запустить ./shell/reindex.sh
 ```

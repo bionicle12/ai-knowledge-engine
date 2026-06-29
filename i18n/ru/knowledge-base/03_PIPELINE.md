@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/03_PIPELINE.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 03 — Контракт Python-пайплайна
@@ -63,12 +63,17 @@ translator: human
 | `.pdf` | `pypdf`, `pdftotext`, OCR fallback | `processed/markdown/` или `processed/ocr/` |
 | `.pptx` | `python-pptx` | `processed/markdown/` |
 | `.xlsx`, `.csv` | `pandas`, `openpyxl` | `processed/tables/` |
-| `.mp3`, `.wav`, `.mp4` | `ffmpeg` + STT (если есть) | `processed/transcripts/` |
-| `.png`, `.jpg`, сканы | OCR (если `tesseract` доступен) | `processed/ocr/` |
+| audio: `.mp3` `.wav` `.m4a` `.flac` `.ogg` `.aac` `.opus` … | STT через `kb_stt.py` (faster-whisper, **без системного ffmpeg**) | `processed/transcripts/` |
+| video: `.mp4` `.mov` `.webm` `.mkv` `.avi` `.m4v` … | STT через `kb_stt.py` (audio stream декодируется PyAV) | `processed/transcripts/` |
+| изображения/сканы: `.png` `.jpg` `.webp` `.tiff` `.bmp` | OCR через `kb_ocr.py` (RapidOCR, без системных зависимостей) | `processed/ocr/` |
 | экспорты чатов | custom parsers | `processed/markdown/` + возможно `review/needs-redaction/` |
-| `.zip`, `.tar.gz` | распаковка | `review/needs-classification/` |
+| `.zip`, `.tar`, `.tar.gz` | распаковка в `raw/unsorted/` для повторного ingest | `processed/markdown/` (листинг) |
 
-Если STT или OCR недоступны — отправить в `review/needs-ai-decision/` с пометкой.
+STT/OCR запускаются автоматически **после `pip install -r requirements-media.txt`**
+(см. `01_PREREQUISITES.md` и `15_MEDIA_PROCESSING.md`). Если backend недоступен,
+файл мягко уходит в `review/needs-ai-decision/`, а в review package встраивается
+подсказка по установке под конкретную ОС — агент должен показать именно её, а не
+вслепую советовать `ffmpeg`.
 
 ## Формат metadata
 

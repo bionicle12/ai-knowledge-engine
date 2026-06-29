@@ -180,7 +180,7 @@ placement_examples:
     - "Drop the current semester syllabus -> raw/reference/unsorted/"
     - "Drop one lab task plus your own unfinished attempt -> raw/work/unsorted/"
     - "List 5 weak topics before the next зачёт/exam -> raw/personal-context/unsorted/"
-    - "Run ./reindex.sh - the AI now has your study context"
+    - "Run ./shell/reindex.sh - the AI now has your study context"
     - "Ask: 'Help me understand this lab without solving it for me: ask questions and point to the missing concepts.'"
 
   do_not_drop:

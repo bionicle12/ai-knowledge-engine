@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/10_LOG.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 10 — Хронологический лог операций
@@ -127,7 +127,7 @@ grep "^## \[" log.md | sed 's/.*\] //' | sed 's/ |.*//' | sort | uniq -c | sort 
 | `kb_lint.py` | Автоматически после каждого запуска |
 | `reindex.sh` | Автоматически после перегенерации индекса |
 | AI-агент | При query-writeback и session-capture |
-| `kb_watch.py` (через `./watcher.sh`) | При автоматической обработке нового файла |
+| `kb_watch.py` (через `./shell/watcher.sh`) | При автоматической обработке нового файла |
 
 ---
 

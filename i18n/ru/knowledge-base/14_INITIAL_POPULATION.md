@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/14_INITIAL_POPULATION.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 14 — Initial Population Helper
@@ -104,7 +104,7 @@ placement_examples:
 
    1. Положи README любого своего проекта в raw/reference/unsorted/
    2. Если есть PDF/DOCX со стратегией — в raw/documents/unsorted/
-   3. Запусти ./reindex.sh
+   3. Запусти ./shell/reindex.sh
 
    Подробности — в DATA_PLACEMENT_EXAMPLES.md
    ```

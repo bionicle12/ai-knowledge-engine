@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/00_OVERVIEW.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 00 — Карта развёртывания
@@ -74,15 +74,20 @@ translator: human
 │   ├── kb_nlp_batch.py
 │   └── kb_doctor.py
 │
-├── reindex.sh                         ← из shell/reindex.sh
-├── watcher.sh                         ← из shell/watcher.sh
-├── lint.sh                            ← из shell/lint.sh
-├── doctor.sh                          ← из shell/doctor.sh
+├── reindex.command, watcher-start.command, watcher-stop.command   ← macOS launcher-ы
+├── reindex.bat, watcher-start.bat                                  ← Windows launcher-ы
+├── shell/
+│   ├── reindex.sh                     ← из shell/reindex.sh
+│   ├── watcher.sh                     ← из shell/watcher.sh
+│   ├── lint.sh                        ← из shell/lint.sh
+│   └── doctor.sh                      ← из shell/doctor.sh
 │
 └── (структура папок создаётся через kb_ingest.py --init-dirs)
 ```
 
 Скрипты в KB пользователя — **идентичны** скриптам в этом репо. При обновлении `kb_upgrade.py` сравнит версии и обновит их.
+
+> Примечание: `finalize.sh` автоматически поднимает `*.command` и `*.bat` из `shell/` в корень проекта, чтобы их можно было запускать двойным кликом. `*.sh` остаются только внутри `shell/`, чтобы не захламлять корень.
 
 ---
 

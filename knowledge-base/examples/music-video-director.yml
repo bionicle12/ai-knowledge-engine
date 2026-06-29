@@ -184,7 +184,7 @@ placement_examples:
     - "Drop one track brief or lyrics sheet -> raw/work/unsorted/"
     - "Add 10 reference frames with one-line notes -> raw/media/unsorted/"
     - "Add one past treatment you like -> raw/documents/unsorted/"
-    - "Run ./reindex.sh - the AI now has your visual and production context"
+    - "Run ./shell/reindex.sh - the AI now has your visual and production context"
     - "Ask: 'Pitch three hip-hop video concepts for this track: one performance-led, one narrative, one TikTok-native.'"
 
   do_not_drop:

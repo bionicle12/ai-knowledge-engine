@@ -153,7 +153,7 @@ placement_examples:
     - "Drop your 3 best published pieces → raw/reference/unsorted/"
     - "Write a 1-paragraph 'this is how I write' note → raw/personal-context/unsorted/"
     - "List 10 phrases or words you'd never use → raw/personal-context/unsorted/"
-    - "Run ./reindex.sh — the AI now has voice fingerprints"
+    - "Run ./shell/reindex.sh — the AI now has voice fingerprints"
     - "Ask: 'Draft a 200-word intro for my newsletter on topic X in my voice.'"
 
   do_not_drop:

@@ -94,7 +94,7 @@ Forbidden:
 3. Read the linked file from processed/
 4. Extract knowledge → update knowledge/
 5. Delete the processed package from review/
-6. Run ./reindex.sh
+6. Run ./shell/reindex.sh
 ```
 
 ---

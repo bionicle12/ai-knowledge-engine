@@ -149,7 +149,7 @@ When deployment completes:
 - [ ] Showed the user a 3-5 line summary in chat. **Must include**:
   - "Read `START_HERE.md` first."
   - "Every new chat session: start with the line *'Read AGENTS.md and use it as the primary instruction for everything that follows.'*"
-  - The OS-specific watcher launcher (`watcher-start.command` for macOS, `./watcher.sh` for Linux, `watcher-start.bat` for Windows)
+  - The OS-specific watcher launcher (`watcher-start.command` for macOS, `./shell/watcher.sh` for Linux, `watcher-start.bat` for Windows)
 - [ ] Logged the operation in `log.md` (auto-handled if integrated)
 
 ---

@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/05_INDEX.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 05 — Индексация и Repomix
@@ -11,7 +11,7 @@ translator: human
 > Настройка Repomix-индекса: что индексируется, что исключается, автообновление.
 >
 > **Reference template:** `knowledge-base/templates/repomix.config.json.template`. Агент копирует его в корень развёрнутой базы как `repomix.config.json` и при необходимости параметризует.
-> **Reference shell-скрипт:** `knowledge-base/shell/reindex.sh` копируется как `reindex.sh` в корень базы.
+> **Reference shell-скрипт:** `knowledge-base/shell/reindex.sh` копируется в `shell/reindex.sh` в развернутой базе.
 
 ---
 
@@ -88,7 +88,7 @@ translator: human
 
 ---
 
-## reindex.sh
+## shell/reindex.sh
 
 ```bash
 #!/bin/bash
@@ -118,7 +118,7 @@ echo "Готово: .repomix/output.xml"
 ```
 
 ```bash
-chmod +x reindex.sh
+chmod +x shell/reindex.sh
 ```
 
 ---

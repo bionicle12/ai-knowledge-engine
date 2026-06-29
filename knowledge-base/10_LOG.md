@@ -122,7 +122,7 @@ grep "^## \[" log.md | sed 's/.*\] //' | sed 's/ |.*//' | sort | uniq -c | sort 
 | `kb_lint.py` | Automatically after each run |
 | `reindex.sh` | Automatically after regenerating the index |
 | AI agent | On query-writeback and session-capture |
-| `kb_watch.py` (via `./watcher.sh`) | On automatic processing of a new file |
+| `kb_watch.py` (via `./shell/watcher.sh`) | On automatic processing of a new file |
 | `kb_reflect.py --generate` | On reflection trigger |
 
 ---

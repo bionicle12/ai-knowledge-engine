@@ -175,7 +175,7 @@ placement_examples:
     - "Drop your latest pitch deck → raw/documents/unsorted/"
     - "Last 3 investor update emails → raw/work/unsorted/"
     - "1-paragraph current company thesis → raw/personal-context/unsorted/"
-    - "Run ./reindex.sh — your AI now knows your company arc"
+    - "Run ./shell/reindex.sh — your AI now knows your company arc"
     - "Ask: 'Draft a monthly investor update covering wins, asks, and metrics for May.'"
 
   do_not_drop:

@@ -147,7 +147,7 @@ placement_examples:
     - "Drop the most-cited paper in your subfield → raw/documents/unsorted/"
     - "Your most recent draft (any state) → raw/work/unsorted/"
     - "One file describing your main dataset → raw/reference/unsorted/"
-    - "Run ./reindex.sh — your AI now has your reference frame"
+    - "Run ./shell/reindex.sh — your AI now has your reference frame"
     - "Ask: 'What papers have I read that disagree with claim X in my draft?'"
 
   do_not_drop:

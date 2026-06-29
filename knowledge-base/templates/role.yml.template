@@ -81,7 +81,7 @@ placement_examples:
     - "{{First file to drop, with the exact destination}}"
     - "{{Second file to drop}}"
     - "{{Third file to drop}}"
-    - "Run ./reindex.sh — your AI now has role context"
+    - "Run ./shell/reindex.sh — your AI now has role context"
     - "Ask: '{{One concrete prompt that demonstrates value}}'"
 
   # 3-5 concrete things the user must NOT drop.

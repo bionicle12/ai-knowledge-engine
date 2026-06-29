@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/06_AGENTS_TEMPLATE.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 06 — Шаблон AGENTS.md для базы знаний
@@ -57,7 +57,7 @@ translator: human
 3. Кратко опиши, что приложено, и предложи лучший маршрут в `raw/<category>/unsorted/`
 4. Спроси пользователя, добавлять ли файл в основную базу знаний; не размещай и не запускай ingest до подтверждения
 5. После подтверждения скопируй/перемести файл в выбранный `raw/<category>/unsorted/`; используй `raw/unsorted/` только если маршрут неясен
-6. Запусти `./reindex.sh` или проверь, что watcher обработал файл; затем проверь `log.md`, `assets-index/`, `processed/` и `review/`
+6. Запусти `./shell/reindex.sh` или проверь, что watcher обработал файл; затем проверь `log.md`, `assets-index/`, `processed/` и `review/`
 7. Обновляй существующие страницы `knowledge/` до создания дублей; обновляй `last_verified`/`valid_until`, если файл меняет старые факты
 8. Если файл низкосигнальный, шумный или нерелевантный, спроси: оставить его как asset, архивировать или игнорировать
 
@@ -83,9 +83,10 @@ translator: human
 | `!save` | Сохранить session summary + enrichment сейчас | ~2K токенов |
 | `!reflect` | Запустить рефлексию: синтез insights из накопленного | ~15K токенов |
 | `!audit` | Запустить AI-ревью базы (lint уровня 2) | ~50-100K токенов |
+| `!review` | Пройтись по `review/needs-classification/`, `review/needs-ai-decision/` и `review/needs-redaction/`, обработать каждый элемент и отчитаться, что было извлечено, отредактировано, архивировано или отложено | ~5–30K токенов |
+| `!populate` | Перегенерировать `DATA_PLACEMENT_EXAMPLES.md` (запустить `python3 scripts/kb_populate.py --role <role> --kb-root .`) | ~50 токенов |
 | `!super` | Переключить режим: default ↔ super | 0 токенов |
-| `!super on` | Включить super mode | 0 токенов |
-| `!super off` | Вернуть default mode | 0 токенов |
+| `!super on/off` | Явно включить или выключить super mode | 0 токенов |
 | `!super status` | Показать текущий режим | 0 токенов |
 
 ## Жизненный цикл знаний

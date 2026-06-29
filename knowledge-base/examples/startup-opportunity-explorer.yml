@@ -218,7 +218,7 @@ placement_examples:
     - "Drop a raw list of 20-50 web-business ideas -> raw/work/unsorted/"
     - "Drop 3 competitor or alternative teardowns -> raw/reference/unsorted/"
     - "Drop 5 complaint/review/forum research notes -> raw/reference/unsorted/"
-    - "Run ./reindex.sh - your AI now has an opportunity radar"
+    - "Run ./shell/reindex.sh - your AI now has an opportunity radar"
     - "Ask: 'Based on my constraints and the evidence so far, rank 10 web-app business directions I should validate next.'"
 
   do_not_drop:

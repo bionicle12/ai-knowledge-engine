@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/13_AUTORUN.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 13 — Auto-run: автоматический запуск при изменениях
@@ -16,7 +16,7 @@ translator: human
 
 ## Зачем
 
-Ручной запуск `./reindex.sh` после каждого изменения — friction, которая приводит к тому, что база устаревает. Автоматизация убирает этот барьер.
+Ручной запуск `./shell/reindex.sh` после каждого изменения — friction, которая приводит к тому, что база устаревает. Автоматизация убирает этот барьер.
 
 ---
 
@@ -55,10 +55,10 @@ kb_watch.py — File system watcher для knowledge base.
 4. Пишет в log.md
 
 Usage:
-    ./watcher.sh                               # Foreground
-    ./watcher.sh --daemon                      # Background
-    ./watcher.sh --stop                        # Остановить
-    ./watcher.sh --verbose                     # С подробным логированием
+    ./shell/watcher.sh                         # Foreground
+    ./shell/watcher.sh --daemon                # Background
+    ./shell/watcher.sh --stop                  # Остановить
+    ./shell/watcher.sh --verbose               # С подробным логированием
 
 Exit:
     Ctrl+C или SIGTERM для graceful shutdown
@@ -93,7 +93,7 @@ class RawFileHandler(FileSystemEventHandler):
         # 1. Ingest
         subprocess.run(["python3", "scripts/kb_ingest.py", filepath])
         # 2. Reindex
-        subprocess.run(["./reindex.sh"])
+        subprocess.run(["./shell/reindex.sh"])
         print(f"[watch] Processed and reindexed: {filepath}")
 
 
@@ -116,9 +116,9 @@ class KnowledgeChangeHandler(FileSystemEventHandler):
         return False
 ```
 
-### Запуск через `watcher.sh`
+### Запуск через `shell/watcher.sh`
 
-В корне базы создаётся `watcher.sh` — обёртка над `kb_watch.py` с автоматической активацией venv:
+В развернутой базе используется `shell/watcher.sh` — обёртка над `kb_watch.py` с автоматической активацией venv:
 
 ```bash
 #!/bin/bash
@@ -188,7 +188,7 @@ case "${1:-}" in
     python3 scripts/kb_watch.py
     ;;
   *)
-    echo "Usage: ./watcher.sh [--daemon|--stop|--status|--verbose]"
+    echo "Usage: ./shell/watcher.sh [--daemon|--stop|--status|--verbose]"
     echo ""
     echo "  (без флагов)  Foreground mode (Ctrl+C для остановки)"
     echo "  --daemon      Запуск в фоне"
@@ -200,23 +200,23 @@ esac
 ```
 
 ```bash
-chmod +x watcher.sh
+chmod +x shell/watcher.sh
 ```
 
 ### Команды
 
 ```bash
 # Foreground (для разработки)
-./watcher.sh
+./shell/watcher.sh
 
 # Background
-./watcher.sh --daemon
+./shell/watcher.sh --daemon
 
 # Проверить статус
-./watcher.sh --status
+./shell/watcher.sh --status
 
 # Остановить
-./watcher.sh --stop
+./shell/watcher.sh --stop
 ```
 
 ### Systemd unit (Linux)
@@ -261,7 +261,7 @@ changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
 
 if echo "$changed_files" | grep -q "^knowledge/"; then
   echo "[hook] Knowledge files changed, reindexing..."
-  ./reindex.sh > /dev/null 2>&1 &
+  ./shell/reindex.sh > /dev/null 2>&1 &
 
   # Quick lint
   if [ -f "scripts/kb_lint.py" ]; then
@@ -298,7 +298,7 @@ fi
 # crontab -e
 
 # Каждый день в 3:00 — полный lint + reindex
-0 3 * * * cd /path/to/knowledge-base && ./lint.sh >> log.md 2>&1 && ./reindex.sh >> log.md 2>&1
+0 3 * * * cd /path/to/knowledge-base && ./shell/lint.sh >> log.md 2>&1 && ./shell/reindex.sh >> log.md 2>&1
 
 # Каждые 6 часов — quick lint
 0 */6 * * * cd /path/to/knowledge-base && python3 scripts/kb_lint.py --quick >> /dev/null 2>&1
@@ -490,8 +490,8 @@ fi
 
 | Событие | Действие | Кто запускает |
 |---------|---------|--------------|
-| Новый файл в `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./watcher.sh` |
-| Файл изменён в `knowledge/` | Reindex + Quick lint | `./watcher.sh` или git hook |
+| Новый файл в `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./shell/watcher.sh` |
+| Файл изменён в `knowledge/` | Reindex + Quick lint | `./shell/watcher.sh` или git hook |
 | `!save` в AI-сессии | Session capture (с enrichment) → Reindex | AI-агент |
 | `!reflect` | Рефлексия: генерация insights (~15K токенов) | AI-агент |
 | `!audit` | Lint уровня 2: AI-ревью (~50-100K токенов) | AI-агент |

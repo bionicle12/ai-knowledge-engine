@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/08_PORTABLE.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 08 — Портабельность: использование базы в других проектах
@@ -73,7 +73,7 @@ translator: human
 - Путь: `../knowledge-base/interactions/sessions/`
 - Формат папки: `YYYY-MM-DD__<project-name>__<topic>/`
 - Автоматический capture работает по тем же правилам (см. 07_INTERACTION_LOOP.md)
-- Реиндекс вручную: `cd ../knowledge-base && ./reindex.sh`
+- Реиндекс вручную: `cd ../knowledge-base && ./shell/reindex.sh`
 ```
 
 ### Вариант 2: Симлинк на индекс
@@ -124,7 +124,7 @@ quality: high
 - ...
 ```
 
-4. Реиндекс базы — **вручную**: `cd ../knowledge-base && ./reindex.sh`
+4. Реиндекс базы — **вручную**: `cd ../knowledge-base && ./shell/reindex.sh`
    - Не автоматически, чтобы не замедлять работу в рабочем проекте
 
 ---
@@ -138,7 +138,7 @@ quality: high
         ↓
 AI пишет session summary → ../knowledge-base/interactions/sessions/
         ↓
-Когда удобно: cd ../knowledge-base && ./reindex.sh
+Когда удобно: cd ../knowledge-base && ./shell/reindex.sh
         ↓
 Meta-review → knowledge/ обновляется
         ↓
@@ -177,7 +177,7 @@ cd knowledge-base
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-./reindex.sh
+./shell/reindex.sh
 ```
 
 Если нужны ассеты — добавить `assets/` в архив (увеличит размер).
@@ -191,7 +191,7 @@ pip install -r requirements.txt
 | Где живёт база? | Один раз, рядом с проектами (`../knowledge-base/`) |
 | Где AI пишет session summary? | Всегда в `../knowledge-base/interactions/sessions/` |
 | Как различать проекты? | По имени папки сессии: `2026-05-06__highway-clicker__topic/` |
-| Когда реиндексить? | Автоматически (см. `13_AUTORUN.md`) или `./reindex.sh` |
+| Когда реиндексить? | Автоматически (см. `13_AUTORUN.md`) или `./shell/reindex.sh` |
 | Нужен ли AGENTS.md в каждом проекте? | Да, с секцией «Personal Knowledge Base» |
 | Можно ли разные базы для разных ролей? | Да, но обычно одна база на человека |
 
@@ -248,4 +248,3 @@ decisions/2026-03__swarm-deployment.md
 - Обогащается при query-writeback (см. `07_INTERACTION_LOOP.md`)
 - Подгружается по запросу через routing + wikilinks
 - Проверяется lint'ом (см. `09_LINT.md`)
-

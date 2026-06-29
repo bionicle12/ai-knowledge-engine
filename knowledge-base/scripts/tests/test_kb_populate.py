@@ -263,7 +263,7 @@ def test_requested_role_templates_ship_with_population_data():
         md = kp.render_markdown(data, source_path=role_path)
         assert role_title in md
         assert "Role-specific examples" in md
-        assert "Run ./reindex.sh" in md
+        assert "Run ./shell/reindex.sh" in md
 
 def _real_role_files() -> list[Path]:
     return sorted((REPO_ROOT / "knowledge-base" / "examples").glob("*.yml"))

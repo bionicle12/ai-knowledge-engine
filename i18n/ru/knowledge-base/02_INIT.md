@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/02_INIT.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
+source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
 source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+translated_at: 2026-06-29
+translator: ai-assisted
 ---
 
 # 02 — Инициализация базы знаний
@@ -96,7 +96,13 @@ knowledge-base/
 ├── kb.config.yml               # Роль, сущности, правила
 ├── repomix.config.json         # Конфиг индексации
 ├── requirements.txt            # Python-зависимости
-├── reindex.sh                  # Скрипт обновления
+├── reindex.command, watcher-start.command, watcher-stop.command   # macOS launcher-ы
+├── reindex.bat, watcher-start.bat                                 # Windows launcher-ы
+├── shell/                    # Linux / CLI wrappers
+│   ├── reindex.sh
+│   ├── watcher.sh
+│   ├── lint.sh
+│   └── doctor.sh
 │
 ├── scripts/
 │   └── kb_ingest.py            # Пайплайн обработки (см. 03_PIPELINE.md)

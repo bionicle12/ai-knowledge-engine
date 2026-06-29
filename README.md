@@ -122,6 +122,7 @@ your-project/
 
 ### Full Mode
 - 🔬 **Raw-First Pipeline** — Drop PDFs, DOCX, PPTX into `raw/` → auto-convert to Markdown → NLP enrichment → clean knowledge
+- 🎙️ **Media Processing** — Audio/video transcription, image OCR, and archive unpacking work out of the box with optional local-only backends
 - 🧠 **Self-Learning Loop** — `!save` sessions, `!reflect` for higher-level insights, `!audit` for comprehensive review
 - 🔗 **Cross-Linked Knowledge** — `[[wikilinks]]` + routing tables for scalable navigation across hundreds of pages
 - 📊 **NLP Enrichment** — Named Entity Recognition, keyword extraction, entity resolution (spaCy + KeyBERT) — zero tokens, pure CPU
@@ -131,6 +132,8 @@ your-project/
 - ⏰ **Smart Scheduling** — Auto-reflection when importance threshold is reached; skips when idle to save tokens
 - 🔐 **Privacy-by-Default** — Raw data, reviews, and interaction logs are never indexed
 - 🌍 **Fully Portable** — Pure Markdown files, no databases, no servers, works on any machine with `rsync`
+- 🔧 **Reference Implementations** — Python and shell scripts are copied and used as-is, not re-invented by the agent
+- ⬆️ **Upgrade Path** — `kb_upgrade.py` refreshes deployed bases while preserving user customizations where possible
 
 ---
 
@@ -353,6 +356,7 @@ The knowledge base system is built from modular instruction files that the AI ag
 | 12 | NLP Preprocess | NER + keyword extraction + entity resolution |
 | 13 | Autorun | File watcher, git hooks, smart scheduling |
 | 14 | Initial Population | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` |
+| 15 | Media Processing | STT, OCR, archives, and graceful degradation |
 
 ---
 
@@ -386,7 +390,7 @@ Tested and designed for:
 | Agent | Status | Notes |
 |-------|--------|-------|
 | **Claude** (Anthropic) | ✅ Fully supported | Cursor, API, Claude Desktop |
-| **GPT-4 / GPT-4o** | ✅ Fully supported | Cursor, Copilot, ChatGPT |
+| **GPT** (OpenAI) | ✅ Fully supported | Cursor, Copilot, ChatGPT |
 | **Codex CLI** | ✅ Fully supported | OpenAI Codex |
 | **Gemini** | ✅ Fully supported | JetBrains AI, Google AI Studio |
 | **Any Markdown-capable agent** | ✅ Compatible | Must read `.md` and run shell commands |
