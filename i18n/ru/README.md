@@ -384,6 +384,8 @@ AI подключается только для importance scoring и surprise c
 | `fiction-writer.yml` | Fiction writer | Craft theory, voice training по influences, critique драфтов |
 | `psychologist-gestalt.yml` | Gestalt-oriented psychologist | Этика, анонимизированные кейсы, супервизия, Gestalt interventions |
 | `music-video-director.yml` | Music video writer-director | Хип-хоп и short-form concepts, treatments, production, edit rhythm |
+| `battle-rap-producer.yml` | Battle rap producer & lyricist | Крафт текстов, панчи, вокальный стек, сведение, подготовка к баттлам |
+| `viral-short-form-veo.yml` | Viral short-form video director (TikTok / Veo3) | Вирусные хуки, раскадровка, промпты Veo 3, обучение на метриках рекламы |
 | `russian-software-engineering-student.yml` | Software engineering student in Russia | Учебный план, лабы, экзамены, вузовские документы, стажировки |
 
 Не нашли свою роль? Просто скажите AI-агенту свою профессию — он сгенерирует кастомную конфигурацию с релевантными сущностями, knowledge paths и примерами workflow.

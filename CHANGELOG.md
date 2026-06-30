@@ -48,6 +48,8 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 - Role templates:
   - `knowledge-base/examples/psychologist-gestalt.yml`
   - `knowledge-base/examples/music-video-director.yml`
+  - `knowledge-base/examples/battle-rap-producer.yml`
+  - `knowledge-base/examples/viral-short-form-veo.yml`
   - `knowledge-base/examples/russian-software-engineering-student.yml`
   - `knowledge-base/examples/startup-opportunity-explorer.yml`
 

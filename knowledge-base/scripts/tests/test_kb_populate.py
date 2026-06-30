@@ -16,6 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 REQUESTED_ROLE_TEMPLATES = {
     "psychologist-gestalt.yml": "Gestalt-oriented psychologist",
     "music-video-director.yml": "Music video writer-director",
+    "battle-rap-producer.yml": "Battle rap producer & lyricist",
+    "viral-short-form-veo.yml": "Viral short-form video director (TikTok / Veo3)",
     "russian-software-engineering-student.yml": "Software engineering student in Russia",
     "startup-opportunity-explorer.yml": "Startup Opportunity Explorer",
 }
