@@ -381,6 +381,8 @@ Pre-configured examples in `knowledge-base/examples/`:
 | `viral-short-form-veo.yml` | Viral short-form video director (TikTok / Veo3) | Viral hooks, storyboards, Veo 3 prompt chains, ad performance learning |
 | `russian-software-engineering-student.yml` | Software engineering student in Russia | Curriculum, labs, exams, university docs, internships |
 
+Starter fill-in templates: `knowledge-base/examples/starters/<role-slug>/`.
+
 Don't see your role? Tell the AI agent your profession — it will generate a custom configuration with relevant entities, knowledge paths, and example workflows.
 
 ---

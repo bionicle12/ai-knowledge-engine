@@ -94,6 +94,28 @@ ai_assistant_tasks:
   - "Flag risky claims, weak CTAs, or platform-policy issues before generation"
   - "Convert post-publish metrics into a prioritized revision plan for the next variant"
 
+# Starter templates: examples/starters/viral-short-form-veo/ (copy into raw/ per file frontmatter)
+example_conversations:
+  - topic: "Сценарий + раскадровка из брифа"
+    example: |
+      "Вот product-brief. Сделай сценарий 15 сек (UGC), раскадровку по секундам
+       с safe zones и 3 варианта хука для A/B."
+
+  - topic: "Промпты Veo 3 по кадрам"
+    example: |
+      "По этой storyboard сгенерируй промпт на каждый shot: vertical 9:16,
+       UGC handheld, одно действие на кадр. Добавь negative constraints."
+
+  - topic: "Разбор провала генерации"
+    example: |
+      "Veo выдал артефакт на руках в shot 03. Вот мой промпт и veo-run-failures log —
+       перепиши промпт и добавь правило в distilled rules."
+
+  - topic: "Итерация после публикации"
+    example: |
+      "Variant B удержание 3 сек 71%, variant A 54%. Вот скрин retention и комментарии —
+       что менять в хуке и монтаже для variant C?"
+
 placement_examples:
   intro: |
     Вирусный short-form — это инженерия внимания: хук, ритм монтажа, оффер и
@@ -177,6 +199,7 @@ placement_examples:
       tip: "Связка трек → монтаж → Veo-кадры особенно важна для музыкальных рекламных клипов."
 
   quickstart:
+    - "Скопируй шаблоны из examples/starters/viral-short-form-veo/ в raw/ (см. frontmatter в каждом файле)"
     - "Положи бриф продукта и 3 варианта хука → raw/work/unsorted/"
     - "Добавь одну раскадровку с таймингом по секундам → raw/work/unsorted/"
     - "Сохрани 2–3 удачных и 1 провальный промпт Veo 3 → raw/work/unsorted/"

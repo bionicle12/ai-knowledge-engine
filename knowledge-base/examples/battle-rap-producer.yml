@@ -96,6 +96,29 @@ ai_assistant_tasks:
   - "Extract reusable craft rules from a reference battle you paste or describe"
   - "Flag lines that sound generic, off-voice, or too predictable for your style"
 
+# Starter templates: examples/starters/battle-rap-producer/ (copy into raw/ per file frontmatter)
+example_conversations:
+  - topic: "Анализ текста на баттл"
+    example: |
+      "Вот мой черновик раунда на 3 минуты. Разбери схемы по барам,
+       отметь слабые места и предложи 3 усиления панчей без смены смысла.
+       Сверься с forbidden-phrases."
+
+  - topic: "Вокальный стек перед записью"
+    example: |
+      "Завтра записываю 16 баров агрессивного рэпа. У меня в базе vocal-stack —
+       что поменять в дублях, если бит плотный и много хай-хэтов?"
+
+  - topic: "Сведение — следующий проход"
+    example: |
+      "Прикладываю mix-notes по треку X. Приоритизируй 3 правки:
+       вокал тонет на припеве, сибилянты на 1:20, низ бита давит."
+
+  - topic: "Разбор референса"
+    example: |
+      "Вот 8 баров из баттла [имя] с моими пометками. Вытащи приёмы,
+       которые можно адаптировать под мой стиль, без копирования текста."
+
 placement_examples:
   intro: |
     В баттл-репе память — это не «вдохновение», а накопленный крафт: схемы,
@@ -183,6 +206,7 @@ placement_examples:
       tip: "Анти-паттерны так же важны, как стиль — AI перестаёт предлагать «чужие» панчи."
 
   quickstart:
+    - "Скопируй шаблоны из examples/starters/battle-rap-producer/ в raw/ (см. frontmatter в каждом файле)"
     - "Скинь 2–3 текущих текста на анализ → raw/work/unsorted/"
     - "Опиши свой вокальный стек одним файлом → raw/personal-context/unsorted/"
     - "Добавь разбор одного любимого баттла (5–10 баров с комментариями) → raw/reference/unsorted/"

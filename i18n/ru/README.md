@@ -388,6 +388,8 @@ AI подключается только для importance scoring и surprise c
 | `viral-short-form-veo.yml` | Viral short-form video director (TikTok / Veo3) | Вирусные хуки, раскадровка, промпты Veo 3, обучение на метриках рекламы |
 | `russian-software-engineering-student.yml` | Software engineering student in Russia | Учебный план, лабы, экзамены, вузовские документы, стажировки |
 
+Стартовые шаблоны для заливки: `knowledge-base/examples/starters/<role-slug>/`.
+
 Не нашли свою роль? Просто скажите AI-агенту свою профессию — он сгенерирует кастомную конфигурацию с релевантными сущностями, knowledge paths и примерами workflow.
 
 ---
