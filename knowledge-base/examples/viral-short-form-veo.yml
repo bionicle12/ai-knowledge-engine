@@ -1,0 +1,192 @@
+# Example: Viral short-form video director (TikTok / Veo3)
+
+role: "Viral short-form video director (TikTok / Veo3)"
+
+description: |
+  Creator of vertical viral ad clips and social-first mini-films: hooks in the
+  first second, UGC-style authenticity, beat-mapped edits, and AI-generated
+  footage via Google Veo 3. The AI assistant connects product/brand constraints,
+  trend mechanics, storyboards, shot grammar, and prompt chains — so each clip
+  is planned as a reproducible pipeline: concept → script → storyboard → Veo
+  prompts → iteration notes.
+
+  Unlike a traditional music-video director role, this profile optimizes for
+  **performance marketing**: scroll-stop hooks, CTA placement, variant testing,
+  and what actually retained viewers after publish.
+
+entities:
+  viral_hooks:
+    enabled: true
+    why: "First-3-second patterns, scroll-stoppers, UGC angles, hook formulas that worked"
+    knowledge_paths:
+      - "knowledge/playbooks/viral-hooks.md"
+      - "knowledge/domain/hook-patterns.md"
+      - "knowledge/insights/hook-learnings.md"
+
+  veo3_prompts:
+    enabled: true
+    why: "Shot prompts, camera language, what Veo accepts/rejects, iteration chains"
+    knowledge_paths:
+      - "knowledge/playbooks/veo3-prompting.md"
+      - "knowledge/domain/veo3-constraints.md"
+      - "knowledge/projects/veo3-runs/"
+
+  storyboards:
+    enabled: true
+    why: "Scene beats, shot lists, transitions mapped to seconds and platform safe zones"
+    knowledge_paths:
+      - "knowledge/projects/storyboards/"
+      - "knowledge/playbooks/storyboard-to-prompt.md"
+
+  brand_product:
+    enabled: true
+    why: "Offer, audience pains, tone, claims you can/can't make, visual brand codes"
+    knowledge_paths:
+      - "knowledge/domain/brand-product.md"
+      - "knowledge/voice/ad-copy-voice.md"
+      - "knowledge/domain/audience-pains.md"
+
+  short_form_grammar:
+    enabled: true
+    why: "TikTok/Reels/Shorts: vertical framing, loops, captions, trends, meme formats"
+    knowledge_paths:
+      - "knowledge/playbooks/short-form-video.md"
+      - "knowledge/domain/platform-grammar.md"
+
+  visual_references:
+    enabled: true
+    why: "Frames, color, pacing, UGC vs polished — reusable rules without copying"
+    knowledge_paths:
+      - "knowledge/domain/visual-references.md"
+      - "knowledge/voice/visual-style.md"
+
+  scripts_treatments:
+    enabled: true
+    why: "Mini-scripts, VO lines, scene intent, variant angles for A/B tests"
+    knowledge_paths:
+      - "knowledge/projects/scripts/"
+      - "knowledge/voice/script-voice.md"
+
+  release_learning:
+    enabled: true
+    why: "Post-publish: retention, saves, comments, which hooks/variants won"
+    knowledge_paths:
+      - "knowledge/insights/release-learnings.md"
+      - "knowledge/domain/creative-metrics.md"
+
+raw_data_examples:
+  - "Viral ad scripts and hook variants (15–60s)"
+  - "Storyboards and shot lists with second-by-second timing"
+  - "Veo 3 prompt chains per shot (what worked / failed)"
+  - "Product briefs, offers, audience notes, brand guidelines"
+  - "Reference frames and competitor ad breakdowns (notes, not full rips)"
+  - "TikTok/Reels trend mechanics you decoded"
+  - "Post-publish analytics screenshots and comment themes"
+  - "Caption/VO text variants and CTA experiments"
+
+ai_assistant_tasks:
+  - "Generate 3 viral ad concepts for a product: UGC-native, cinematic, and pattern-interrupt"
+  - "Turn a script into a second-timed storyboard with vertical safe zones"
+  - "Write a Veo 3 prompt chain per shot (camera, action, lighting, duration intent)"
+  - "Suggest hook variants for the first 3 seconds with different emotional angles"
+  - "Analyze a reference ad and extract reusable mechanics without copying visuals"
+  - "Map a chorus/beat or VO pacing to cut points and transitions"
+  - "Flag risky claims, weak CTAs, or platform-policy issues before generation"
+  - "Convert post-publish metrics into a prioritized revision plan for the next variant"
+
+placement_examples:
+  intro: |
+    Вирусный short-form — это инженерия внимания: хук, ритм монтажа, оффер и
+    промпт под Veo 3 должны жить в одной системе. Если хранить только «идеи»,
+    AI каждый раз начинает с нуля. Если хранить сценарии, раскадровки, цепочки
+    промптов и результаты после публикации — появляется воспроизводимый конвейер
+    для рекламных роликов.
+
+    Собирай не названия трендов, а механику: почему первые 3 секунды держат,
+    какой ракурс Veo стабильно отдаёт, какой CTA конвертил. Тренды умирают —
+    твои паттерны остаются.
+
+  by_artifact:
+    - artifact: "Сценарии и варианты хуков (15–60 сек)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "ad-script-skincare-hook-v3.md"
+        - "ugc-vo-lines-variant-A-B-C.md"
+      knowledge_target: "knowledge/projects/scripts/"
+      tip: "Сохраняй отклонённые хуки — они полезны для A/B и объясняют границы бренда."
+
+    - artifact: "Раскадровки и shot lists с таймингом"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "storyboard-15s-vertical-safe-zones.md"
+        - "shotlist-beat-map-0-30s.pdf"
+      knowledge_target: "knowledge/projects/storyboards/"
+      tip: "Пиши секунды: 0:00–0:03 хук, 0:03–0:08 проблема, 0:08–0:12 продукт."
+
+    - artifact: "Цепочки промптов Google Veo 3"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "veo3-shot-01-03-prompt-chain.md"
+        - "veo-run-failures-motion-artifacts.md"
+      knowledge_target: "knowledge/projects/veo3-runs/"
+      tip: "Фиксируй не только удачные промпты, но и брак — так быстрее итерации."
+
+    - artifact: "Брифы продукта, оффера и аудитории"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "product-offer-pains-objections.md"
+        - "brand-dos-donts-claims.md"
+      knowledge_target: "knowledge/domain/brand-product.md"
+
+    - artifact: "Референсы рекламы и кадры (заметки, не полные рипы)"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "competitor-ad-breakdown-screenshots.zip"
+        - "ugc-reference-frame-notes.png"
+      knowledge_target: "knowledge/domain/visual-references.md"
+      tip: "Одно предложение «почему работает» ценнее папки скринов без контекста."
+
+    - artifact: "Механики TikTok/Reels/Shorts"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "3-sec-hooks-that-worked-q2.md"
+        - "loop-structure-for-15s-ads.md"
+      knowledge_target: "knowledge/playbooks/short-form-video.md"
+      tip: "Записывай механику (pattern interrupt, fake stumble, POV), не имя тренда."
+
+    - artifact: "Аналитика после публикации"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "tiktok-retention-curve-variant-B.png"
+        - "comments-themes-conversion.md"
+      knowledge_target: "knowledge/insights/release-learnings.md"
+
+    - artifact: "Брендбук и tone of voice для рекламы"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "brand-voice-ugc-guidelines.pdf"
+        - "forbidden-claims-and-phrases.md"
+      knowledge_target: "knowledge/voice/ad-copy-voice.md"
+
+    - artifact: "Тексты песен / VO под бит (если клип музыкальный)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "track-hook-for-15s-ad.md"
+        - "vo-timing-over-beat-map.md"
+      knowledge_target: "knowledge/projects/scripts/"
+      tip: "Связка трек → монтаж → Veo-кадры особенно важна для музыкальных рекламных клипов."
+
+  quickstart:
+    - "Положи бриф продукта и 3 варианта хука → raw/work/unsorted/"
+    - "Добавь одну раскадровку с таймингом по секундам → raw/work/unsorted/"
+    - "Сохрани 2–3 удачных и 1 провальный промпт Veo 3 → raw/work/unsorted/"
+    - "Run ./shell/reindex.sh — AI получит твой конвейер short-form + Veo"
+    - "Спроси: «Из этого брифа сделай сценарий 15 сек, раскадровку по секундам и промпты Veo 3 на каждый кадр»"
+
+  do_not_drop:
+    - "Полные нелегальные рипы чужой рекламы — только разборы, кадры, ссылки"
+    - "Конфиденциальные метрики клиентов и договоры без разрешения"
+    - "Невыпущенные материалы брендов под NDA"
+    - "Персональные данные актёров/клиентов без согласия"
+    - "Запрещённые рекламные claims без юридической проверки"
+    - "API-ключи Google Cloud / Veo и токены доступа"

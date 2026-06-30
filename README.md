@@ -377,6 +377,8 @@ Pre-configured examples in `knowledge-base/examples/`:
 | `fiction-writer.yml` | Fiction writer | Craft theory, voice training from influences, draft critique |
 | `psychologist-gestalt.yml` | Gestalt-oriented psychologist | Ethics, anonymized case reflection, supervision, Gestalt interventions |
 | `music-video-director.yml` | Music video writer-director | Hip-hop and short-form concepts, treatments, production, edit rhythm |
+| `battle-rap-producer.yml` | Battle rap producer & lyricist | Lyrics craft, punchlines, vocal stacks, mix notes, battle prep |
+| `viral-short-form-veo.yml` | Viral short-form video director (TikTok / Veo3) | Viral hooks, storyboards, Veo 3 prompt chains, ad performance learning |
 | `russian-software-engineering-student.yml` | Software engineering student in Russia | Curriculum, labs, exams, university docs, internships |
 
 Don't see your role? Tell the AI agent your profession — it will generate a custom configuration with relevant entities, knowledge paths, and example workflows.

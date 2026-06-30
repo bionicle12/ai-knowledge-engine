@@ -1,0 +1,198 @@
+# Example: Battle rap producer & lyricist
+
+role: "Battle rap producer & lyricist"
+
+description: |
+  Battle rap artist and home-studio producer who writes lyrics, records vocal
+  stacks, mixes tracks, and iterates drafts against references. The AI assistant
+  is a craft-aware sparring partner: it knows rhyme schemes, flow, punchline
+  density, battle formats, vocal layering, and mix decisions — and helps
+  analyze existing lyrics, sharpen weak bars, and keep a consistent author voice
+  across tracks.
+
+  Two pillars make this work:
+  1. **Lyrics craft** — schemes, multis, internal rhymes, setups/payoffs, battle
+     structure, forbidden clichés, and what your references do well.
+  2. **Vocal production memory** — your stack recipe (doubles, ad-libs, buses,
+     plugins), what you tried, what sounded muddy, and notes from mix sessions.
+
+entities:
+  voice:
+    enabled: true
+    why: "Your rhyme voice — vocabulary, aggression level, humor, signature schemes, anti-patterns"
+    knowledge_paths:
+      - "knowledge/voice/songwriting-style.md"
+      - "knowledge/voice/forbidden-phrases.md"
+      - "knowledge/voice/flow-signature.md"
+
+  lyrics_craft:
+    enabled: true
+    why: "Durable rules: schemes, multis, punchline mechanics, battle structure, bar economy"
+    knowledge_paths:
+      - "knowledge/principles/lyrics-craft.md"
+      - "knowledge/principles/punchline-mechanics.md"
+      - "knowledge/principles/battle-structure.md"
+
+  tracks_wip:
+    enabled: true
+    why: "Active songs — drafts, revisions, opponent context, round notes, version history"
+    knowledge_paths:
+      - "knowledge/projects/tracks/"
+      - "knowledge/projects/current-battle/"
+
+  vocal_stack:
+    enabled: true
+    why: "Recording chain, track layers, plugin choices, gain staging, reference mixes"
+    knowledge_paths:
+      - "knowledge/playbooks/vocal-stack.md"
+      - "knowledge/domain/vocal-plugins.md"
+      - "knowledge/decisions/mix-decisions.md"
+
+  rap_references:
+    enabled: true
+    why: "Battles and tracks you admire — and why specific bars, flows, or mixes work"
+    knowledge_paths:
+      - "knowledge/domain/rap-references.md"
+      - "knowledge/insights/why-this-bar-works.md"
+
+  battle_formats:
+    enabled: true
+    why: "League rules, round length, time limits, themes, judging criteria, opponent prep"
+    knowledge_paths:
+      - "knowledge/domain/battle-formats.md"
+      - "knowledge/playbooks/opponent-prep.md"
+
+  beat_selection:
+    enabled: true
+    why: "Tempo, bounce, key, arrangement hooks — what fits your flow and the track's intent"
+    knowledge_paths:
+      - "knowledge/domain/beat-selection.md"
+      - "knowledge/projects/tracks/beat-notes.md"
+
+  mix_feedback:
+    enabled: true
+    why: "Session notes, A/B comparisons, what to fix on the next pass"
+    knowledge_paths:
+      - "knowledge/projects/tracks/mix-notes.md"
+      - "knowledge/insights/mix-learnings.md"
+
+raw_data_examples:
+  - "Lyrics drafts (any version — verse, hook, full round)"
+  - "Finished or scrapped battle texts with your own notes"
+  - "Vocal stack recipes and DAW session descriptions (not binary project files)"
+  - "Mix notes, plugin chains, before/after listening notes"
+  - "Reference battles — timestamps, bar quotes, scheme breakdowns"
+  - "Beat briefs, BPM/key, arrangement notes"
+  - "Voice memos and raw vocal takes (transcribed via STT)"
+  - "Chat exports with mixing or writing advice you want to keep"
+
+ai_assistant_tasks:
+  - "Analyze a lyrics draft: schemes, weak bars, punch density, and concrete rewrite options"
+  - "Suggest multis and internal rhymes for a target word or concept without losing meaning"
+  - "Compare two draft versions and recommend which bars to keep, cut, or merge"
+  - "Build or refine a vocal stack plan for a new recording session"
+  - "Answer mix questions in context of your saved plugin chain and past decisions"
+  - "Prep for a battle round: opponent angles, rebuttal hooks, time-fit bar count"
+  - "Extract reusable craft rules from a reference battle you paste or describe"
+  - "Flag lines that sound generic, off-voice, or too predictable for your style"
+
+placement_examples:
+  intro: |
+    В баттл-репе память — это не «вдохновение», а накопленный крафт: схемы,
+    панчи, стеки, плагины, что уже пробовал и что не зашло. Чем больше текстов,
+    заметок по сведению и разборов референсов ты складываешь сюда, тем точнее
+    AI помогает дорабатывать новые треки — без потери твоего голоса и без
+    советов «как для абстрактного рэпера».
+
+    Начни с текущих текстов на анализ и заметок по вокальному стеку. Даже
+    черновики и отброшенные куплеты полезны: они учат AI, чего ты избегаешь.
+
+  by_artifact:
+    - artifact: "Тексты песен и черновики (любая версия)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "battle-round-3-draft-v2.md"
+        - "hook-variants-chorus.md"
+        - "verse-16-bars-scheme-notes.txt"
+      knowledge_target: "knowledge/projects/tracks/"
+      tip: "Добавь пометки: что нравится, что режет ухо, под кого/какой бит писал."
+
+    - artifact: "Разборы референсных баттлов и треков"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "разбор-баттла-X-схемы-и-панчи.md"
+        - "why-this-8-bar-run-works.md"
+      knowledge_target: "knowledge/domain/rap-references.md"
+      tip: "Цитируй 2–4 бара и пиши механику, а не только «круто звучит»."
+
+    - artifact: "Заметки по вокальному стеку и записи"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "vocal-stack-main-recipe.md"
+        - "doubles-adlibs-bus-chain.md"
+        - "mic-preamp-interface-gain-notes.md"
+      knowledge_target: "knowledge/playbooks/vocal-stack.md"
+      tip: "Опиши дорожки словами: main, double L/R, ad-lib, room — и плагины на каждой."
+
+    - artifact: "Заметки по сведению и мастерингу"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "mix-v4-timecoded-notes.md"
+        - "компрессия-вокала-до-после.md"
+        - "master-loudness-target-lufs.md"
+      knowledge_target: "knowledge/projects/tracks/mix-notes.md"
+      tip: "Фиксируй отклонённые варианты — они показывают границы твоего звука."
+
+    - artifact: "Описания DAW-сессий (не бинарные проекты)"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "session-track-A-stems-layout.md"
+        - "plugin-chain-export-notes.md"
+      knowledge_target: "knowledge/domain/vocal-plugins.md"
+      tip: "Файлы .als / .flp / .flp не клади — только текстовое описание сессии."
+
+    - artifact: "Брифы по битам и темпу"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "beat-92bpm-am-hook-structure.md"
+        - "type-beat-reference-notes.md"
+      knowledge_target: "knowledge/domain/beat-selection.md"
+
+    - artifact: "Сырые вокальные дубли и войсы (STT)"
+      destination: "raw/media/unsorted/"
+      examples:
+        - "vocal-take-main-03.wav"
+        - "freestyle-voice-memo.m4a"
+      knowledge_target: "knowledge/projects/tracks/"
+      tip: "Пайплайн транскрибирует речь; для чистого пения/рэпа качество STT может быть ниже — добавь текст рядом."
+
+    - artifact: "Правила лиги, формата раунда, лимиты времени"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "league-round-rules-3min.md"
+        - "opponent-research-public-facts.md"
+      knowledge_target: "knowledge/domain/battle-formats.md"
+      tip: "Публичные факты об оппоненте — ок; личные данные и утечки — нет."
+
+    - artifact: "Анти-паттерны и запрещённые клише"
+      destination: "raw/personal-context/unsorted/"
+      examples:
+        - "phrases-i-never-use.md"
+        - "overused-schemes-to-avoid.md"
+      knowledge_target: "knowledge/voice/forbidden-phrases.md"
+      tip: "Анти-паттерны так же важны, как стиль — AI перестаёт предлагать «чужие» панчи."
+
+  quickstart:
+    - "Скинь 2–3 текущих текста на анализ → raw/work/unsorted/"
+    - "Опиши свой вокальный стек одним файлом → raw/personal-context/unsorted/"
+    - "Добавь разбор одного любимого баттла (5–10 баров с комментариями) → raw/reference/unsorted/"
+    - "Run ./shell/reindex.sh — AI получит контекст твоего крафта и микса"
+    - "Спроси: «Проанализируй этот текст: схемы, слабые бары, 3 варианта усиления панчей без смены смысла»"
+
+  do_not_drop:
+    - "Бинарные DAW-проекты (.als, .flp, .logicx) — только текстовые описания"
+    - "Чужие стемы, сэмплы и биты без лицензии"
+    - "Личные данные оппонентов, утечки, приватная переписка"
+    - "Невыпущенные тексты/стемы третьих лиц без разрешения"
+    - "Полные нелегальные сливы баттлов — используй свои заметки и таймкоды"
+    - "API-ключи плагинов, лицензии iLok, серийники"
