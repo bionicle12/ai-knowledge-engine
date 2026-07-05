@@ -1,0 +1,259 @@
+# Example: B2B Strategic Product Owner
+
+role: "B2B Strategic Product Owner"
+
+description: |
+  A strategic product owner for an early-stage B2B SaaS or workflow product.
+  The AI assistant acts like a fractional CPO and acquisition-oriented product
+  strategist: it turns brand identity, validated business plans, risk notes,
+  customer evidence, positioning, metrics, and technical constraints into a
+  coherent product strategy, roadmap, and development-ready requirements.
+
+  This role is designed for a founder who wants a separate strategy knowledge
+  base that plans the product and generates clear tasks for the code project,
+  while keeping the business asset understandable, focused, and easier to sell
+  or diligence later.
+
+entities:
+  business_thesis:
+    enabled: true
+    why: "Core bet, why now, target buyer, problem, value proposition, and how the thesis changes"
+    knowledge_paths:
+      - "knowledge/domain/business-thesis.md"
+      - "knowledge/decisions/thesis-evolution.md"
+
+  brand_identity:
+    enabled: true
+    why: "Positioning, tone, promise, category, naming rules, and messaging boundaries"
+    knowledge_paths:
+      - "knowledge/domain/brand-identity.md"
+      - "knowledge/voice/product-messaging.md"
+
+  icp_and_buyers:
+    enabled: true
+    why: "Ideal customer profile, economic buyers, users, jobs-to-be-done, pains, and objections"
+    knowledge_paths:
+      - "knowledge/domain/icp-and-buyers.md"
+      - "knowledge/playbooks/customer-discovery.md"
+
+  product_strategy:
+    enabled: true
+    why: "MVP, roadmap, product principles, feature bets, and scope boundaries"
+    knowledge_paths:
+      - "knowledge/domain/product-strategy.md"
+      - "knowledge/projects/roadmap/"
+
+  requirements_pipeline:
+    enabled: true
+    why: "PRDs, user stories, acceptance criteria, implementation briefs, and handoff notes for the code project"
+    knowledge_paths:
+      - "knowledge/projects/requirements/"
+      - "knowledge/playbooks/spec-writing.md"
+
+  metrics_and_validation:
+    enabled: true
+    why: "Activation, retention, usage, conversion, revenue, validation signals, and evidence quality"
+    knowledge_paths:
+      - "knowledge/domain/metrics.md"
+      - "knowledge/projects/validation/"
+
+  monetization_and_gtm:
+    enabled: true
+    why: "Pricing, packaging, acquisition channels, sales motion, onboarding, and buyer education"
+    knowledge_paths:
+      - "knowledge/domain/monetization-and-gtm.md"
+      - "knowledge/playbooks/b2b-sales.md"
+
+  competitive_landscape:
+    enabled: true
+    why: "Direct competitors, indirect alternatives, spreadsheets, agencies, manual workflows, and status quo"
+    knowledge_paths:
+      - "knowledge/domain/competitors.md"
+      - "knowledge/domain/alternatives.md"
+
+  risks_and_execution:
+    enabled: true
+    why: "Strategic, product, market, legal, operational, and technical risks with mitigation plans"
+    knowledge_paths:
+      - "knowledge/domain/risks.md"
+      - "knowledge/projects/execution-plan.md"
+
+  acquisition_readiness:
+    enabled: true
+    why: "What would make the product easier to understand, evaluate, transfer, and sell"
+    knowledge_paths:
+      - "knowledge/domain/acquisition-readiness.md"
+      - "knowledge/projects/data-room/"
+
+  technical_alignment:
+    enabled: true
+    why: "Architecture constraints, integration assumptions, implementation limits, and technical debt that affect product plans"
+    knowledge_paths:
+      - "knowledge/domain/technical-context.md"
+      - "knowledge/decisions/technical-tradeoffs.md"
+
+  decision_log:
+    enabled: true
+    why: "Major strategy and product decisions, including rejected directions and why they were rejected"
+    knowledge_paths:
+      - "knowledge/decisions/"
+
+raw_data_examples:
+  - "Brand Identity Document"
+  - "Validated Business Plan"
+  - "Strategic notes, risks, and execution plans"
+  - "ICP, persona, JTBD, and buyer notes"
+  - "Customer interview transcripts and discovery notes"
+  - "Competitor and alternative teardowns"
+  - "Pricing, packaging, and sales motion notes"
+  - "Product roadmap, MVP scope, PRDs, and implementation briefs"
+  - "Analytics screenshots, funnel exports, and validation results"
+  - "Architecture notes, codebase constraints, and technical trade-off memos"
+  - "Acquisition, diligence, asset-sale, or data-room checklists"
+
+ai_assistant_tasks:
+  - "Synthesize brand, business plan, risks, and market evidence into one coherent product strategy"
+  - "Turn strategic documents into MVP scope, roadmap phases, and trade-off decisions"
+  - "Write development-ready PRDs, user stories, acceptance criteria, and engineering handoff briefs"
+  - "Prioritize features by buyer value, validation evidence, implementation cost, and acquisition-readiness impact"
+  - "Maintain a risk register with mitigation actions and owner-level decisions"
+  - "Define B2B SaaS metrics, validation signals, and investor or buyer-facing evidence"
+  - "Review product ideas against positioning, ICP, monetization, and technical constraints"
+  - "Prepare documentation that makes the product easier to sell, transfer, or diligence"
+  - "Generate clear prompts and task instructions for the separate application codebase"
+  - "Keep a decision log of what was built, postponed, rejected, and why"
+
+placement_examples:
+  intro: |
+    A B2B Strategic Product Owner knowledge base is the strategy brain next to
+    the codebase. It stores the business logic behind the product: who it is
+    for, why buyers should care, what should be built first, what risks remain,
+    and what evidence would make the product more credible.
+
+    Use this role when the idea has moved beyond raw brainstorming. The AI
+    should stop acting like an idea generator and start acting like a product
+    owner: it reads strategy documents, preserves decisions, turns messy notes
+    into a roadmap, and writes precise requirements for the engineering project.
+
+  by_artifact:
+    - artifact: "Brand identity and positioning documents"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "brand-identity-document.md"
+        - "positioning-and-messaging.docx"
+        - "tone-of-voice-notes.md"
+      knowledge_target: "knowledge/domain/brand-identity.md"
+      tip: "Brand docs define the boundaries for future copy, onboarding, pricing pages, and product language."
+
+    - artifact: "Validated business plans"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "validated-business-plan.pdf"
+        - "business-model-and-market-notes.md"
+        - "founder-thesis-v2.md"
+      knowledge_target: "knowledge/domain/business-thesis.md"
+      tip: "The business plan should become operating assumptions, not a document that gets forgotten."
+
+    - artifact: "Strategic risk and execution notes"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "strategic-notes-risks-and-execution.md"
+        - "risk-register-v1.xlsx"
+        - "execution-plan-q3.md"
+      knowledge_target: "knowledge/domain/risks.md"
+      tip: "Risks are useful when each one has a mitigation, trigger, and decision rule."
+
+    - artifact: "ICP, buyer, persona, and JTBD research"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "icp-small-b2b-teams.md"
+        - "buyer-persona-ops-manager.md"
+        - "jobs-to-be-done-notes.md"
+      knowledge_target: "knowledge/domain/icp-and-buyers.md"
+
+    - artifact: "Customer discovery notes and transcripts"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "discovery-call-2026-07-ops-lead.md"
+        - "customer-interview-objections.md"
+        - "demo-feedback-round-1.md"
+      knowledge_target: "knowledge/playbooks/customer-discovery.md"
+      tip: "Anonymize real people unless names are necessary and consented."
+
+    - artifact: "Competitor and alternative teardowns"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "competitor-a-pricing-and-onboarding.md"
+        - "spreadsheet-workaround-analysis.md"
+        - "manual-agency-alternative.md"
+      knowledge_target: "knowledge/domain/competitors.md"
+      tip: "For B2B, the strongest competitor is often the current manual workflow."
+
+    - artifact: "Roadmaps, MVP scope, and product decision memos"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "mvp-scope-v1.md"
+        - "roadmap-next-90-days.md"
+        - "decision-postpone-advanced-analytics.md"
+      knowledge_target: "knowledge/projects/roadmap/"
+      tip: "Roadmaps should connect each build item to buyer value and validation evidence."
+
+    - artifact: "PRDs, user stories, and engineering handoff briefs"
+      destination: "raw/documents/unsorted/"
+      examples:
+        - "prd-onboarding-workflow.md"
+        - "user-stories-retention-dashboard.md"
+        - "engineering-brief-export-feature.md"
+      knowledge_target: "knowledge/projects/requirements/"
+      tip: "This is the bridge from strategy base to code project: include context, acceptance criteria, and non-goals."
+
+    - artifact: "Metrics, funnel, validation, and traction evidence"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "activation-funnel-screenshot.png"
+        - "pilot-results-week-2.csv"
+        - "validation-signals-summary.md"
+      knowledge_target: "knowledge/domain/metrics.md"
+      tip: "Keep raw signals with dates so later strategy decisions can tell evidence from optimism."
+
+    - artifact: "Pricing, packaging, GTM, and sales notes"
+      destination: "raw/work/unsorted/"
+      examples:
+        - "pricing-hypotheses.md"
+        - "sales-call-objections.md"
+        - "packaging-v1-vs-v2.md"
+      knowledge_target: "knowledge/domain/monetization-and-gtm.md"
+
+    - artifact: "Technical constraints and architecture context"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "current-codebase-architecture.md"
+        - "integration-constraints.md"
+        - "tech-debt-that-affects-roadmap.md"
+      knowledge_target: "knowledge/domain/technical-context.md"
+      tip: "Do not store secrets. Store constraints, trade-offs, and decisions that affect product planning."
+
+    - artifact: "Acquisition-readiness and data-room materials"
+      destination: "raw/reference/unsorted/"
+      examples:
+        - "asset-sale-readiness-checklist.md"
+        - "buyer-diligence-questions.md"
+        - "documentation-gaps-before-sale.md"
+      knowledge_target: "knowledge/domain/acquisition-readiness.md"
+      tip: "Track what would make the product easier for a buyer to understand, trust, and take over."
+
+  quickstart:
+    - "Drop the Brand Identity Document -> raw/documents/unsorted/"
+    - "Drop the Validated Business Plan -> raw/documents/unsorted/"
+    - "Drop strategic notes, risks, and execution plan -> raw/reference/unsorted/"
+    - "Write a short current-product context note -> raw/personal-context/unsorted/"
+    - "Run ./shell/reindex.sh - your AI now has strategic product-owner context"
+    - "Ask: 'Turn these documents into a 30-day MVP roadmap and the first development-ready PRD.'"
+
+  do_not_drop:
+    - "API keys, .env files, credentials, database dumps, seed phrases, or payment data"
+    - "Unredacted customer PII such as names, emails, phone numbers, contracts, or billing records"
+    - "NDA-protected client, partner, or employer materials without explicit permission"
+    - "Private chats, personal conflicts, or HR-sensitive notes about specific people"
+    - "Full paid reports, books, courses, or proprietary datasets copied wholesale"
+    - "Source code archives when a summary of architecture constraints would be enough"

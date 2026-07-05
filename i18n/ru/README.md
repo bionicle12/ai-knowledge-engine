@@ -380,6 +380,7 @@ AI подключается только для importance scoring и surprise c
 | `researcher.yml` | Researcher / Analyst | Literature graph, гипотезы, методология |
 | `founder.yml` | Startup founder | Инвесторы, найм, продукт, decision logs |
 | `startup-opportunity-explorer.yml` | Startup Opportunity Explorer | Идеи, рыночные гэпы, валидация, web-app MVPs |
+| `b2b-strategic-product-owner.yml` | B2B Strategic Product Owner | B2B SaaS стратегия, roadmap, риски, sale-ready PRD |
 | `content-creator.yml` | Content creator | Voice fingerprinting, аудитория, монетизация |
 | `fiction-writer.yml` | Fiction writer | Craft theory, voice training по influences, critique драфтов |
 | `psychologist-gestalt.yml` | Gestalt-oriented psychologist | Этика, анонимизированные кейсы, супервизия, Gestalt interventions |

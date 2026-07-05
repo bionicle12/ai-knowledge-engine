@@ -373,6 +373,7 @@ Pre-configured examples in `knowledge-base/examples/`:
 | `researcher.yml` | Researcher / Analyst | Literature graph, hypotheses, methodology |
 | `founder.yml` | Startup founder | Investors, hiring, product, decision logs |
 | `startup-opportunity-explorer.yml` | Startup Opportunity Explorer | Ideation, market gaps, validation, web-app MVPs |
+| `b2b-strategic-product-owner.yml` | B2B Strategic Product Owner | B2B SaaS strategy, roadmap, risks, sale-ready PRDs |
 | `content-creator.yml` | Content creator | Voice fingerprinting, audience, monetization |
 | `fiction-writer.yml` | Fiction writer | Craft theory, voice training from influences, draft critique |
 | `psychologist-gestalt.yml` | Gestalt-oriented psychologist | Ethics, anonymized case reflection, supervision, Gestalt interventions |

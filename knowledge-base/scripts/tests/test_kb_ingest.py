@@ -40,6 +40,7 @@ def test_init_dirs(kb_root: Path):
     assert (kb_root / "processed" / "markdown").is_dir()
     assert (kb_root / "knowledge" / "domain").is_dir()
     assert (kb_root / "review" / "needs-ai-decision").is_dir()
+    assert (kb_root / "interactions" / "sessions").is_dir()
 
 
 def test_ingest_simple_md(kb_root: Path):
@@ -183,6 +184,15 @@ def test_looks_like_long_book_long_pdf_is_true():
     ) is True
 
 
+def test_looks_like_long_book_many_pdf_pages_with_collapsed_spacing_is_true():
+    collapsed_pages = "\n\n".join(
+        f"## Page {i}\n\n" + ("A" * 1800) for i in range(1, 121)
+    )
+    assert kb_ingest._looks_like_long_book(
+        ext=".pdf", processed_text=collapsed_pages
+    ) is True
+
+
 def test_looks_like_long_book_long_epub_is_true():
     long_text = "word " * 26_000
     assert kb_ingest._looks_like_long_book(
@@ -298,3 +308,106 @@ def test_ingest_zip_archive_extracts_members(kb_root: Path):
     assert any(n.endswith("b.txt") for n in extracted)
     # A listing was written to processed/markdown
     assert list((kb_root / "processed" / "markdown").glob("*.md"))
+
+
+def test_ingest_routes_many_page_pdf_with_collapsed_spacing_to_review(
+    kb_root: Path, monkeypatch
+):
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    src = kb_root / "raw" / "reference" / "unsorted" / "book.pdf"
+    src.write_bytes(b"%PDF-1.7 fake content")
+
+    collapsed_pages = "\n\n".join(
+        f"## Page {i}\n\n" + ("A" * 1800) for i in range(1, 121)
+    )
+    monkeypatch.setattr(
+        kb_ingest,
+        "_convert",
+        lambda strategy, path: (collapsed_pages, "markdown"),
+    )
+
+    code = kb_ingest.main(["--root", str(kb_root), "--no-nlp"])
+    assert code == 0
+
+    review = list((kb_root / "review" / "needs-ai-decision").glob("*.md"))
+    assert len(review) == 1
+    text = review[0].read_text(encoding="utf-8")
+    assert "Likely long-form reference book" in text
+
+
+def test_reprocess_existing_asset_creates_processed_output(kb_root: Path, monkeypatch):
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+
+    asset = kb_root / "assets" / "documents" / "2026-07-01__manual.pdf"
+    asset.write_bytes(b"%PDF-1.7 fake content")
+    stem = asset.stem
+
+    metadata_path = kb_root / "processed" / "extracted-metadata" / f"{stem}.yml"
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text(
+        yaml.safe_dump(
+            {
+                "original_filename": "manual.pdf",
+                "stable_filename": asset.name,
+                "asset_path": f"assets/documents/{asset.name}",
+                "processed_path": None,
+                "source_hash": kbc.compute_source_hash(asset),
+                "file_type": "pdf",
+                "asset_type": "documents",
+                "strategy": "pdf",
+                "processing_date": "2026-07-01T00:00:00+00:00",
+                "extracted_at": "2026-07-01",
+                "valid_from": "2026-07-01",
+                "lifecycle": "evolving",
+                "confidence": "medium",
+                "complexity": 0.0,
+                "is_surprise": True,
+                "surprise_engine": "python",
+                "long_book_hint": False,
+                "needs_ai_review": True,
+                "review_reason": "conversion unavailable: pypdf not installed",
+                "nlp_meta_path": None,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    review_path = kb_root / "review" / "needs-ai-decision" / f"{stem}.md"
+    review_path.parent.mkdir(parents=True, exist_ok=True)
+    review_path.write_text("# placeholder\n", encoding="utf-8")
+
+    monkeypatch.setattr(kb_ingest, "_convert", lambda strategy, src: ("# Extracted\n", "markdown"))
+
+    code = kb_ingest.main(["--root", str(kb_root), "--no-nlp", str(asset)])
+    assert code == 0
+
+    processed_path = kb_root / "processed" / "markdown" / f"{stem}.md"
+    assert processed_path.is_file()
+    assert processed_path.read_text(encoding="utf-8") == "# Extracted\n"
+
+    meta = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+    assert meta["processed_path"].endswith(f"{stem}.md")
+    assert meta["needs_ai_review"] is False
+    assert meta["review_reason"] == ""
+    assert not review_path.exists()
+    log_text = (kb_root / "log.md").read_text(encoding="utf-8")
+    assert "NLP meta: —" in log_text
+    assert "вЂ”" not in log_text
+
+
+def test_upsert_assets_index_replaces_existing_windows_path_block(kb_root: Path):
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+
+    asset = kb_root / "assets" / "documents" / "2026-07-01__manual.pdf"
+    asset.write_bytes(b"pdf")
+    first_processed = kb_root / "processed" / "markdown" / "2026-07-01__manual.md"
+    first_processed.parent.mkdir(parents=True, exist_ok=True)
+    first_processed.write_text("v1\n", encoding="utf-8")
+
+    kb_ingest._upsert_assets_index(kb_root, "documents", asset, first_processed)
+    kb_ingest._upsert_assets_index(kb_root, "documents", asset, None)
+
+    text = (kb_root / "assets-index" / "documents.md").read_text(encoding="utf-8")
+    assert text.count("## 2026-07-01__manual") == 1
+    assert "assets\\documents\\2026-07-01__manual.pdf" in text

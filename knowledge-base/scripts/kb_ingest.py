@@ -26,6 +26,7 @@ import argparse
 import datetime as _dt
 import json
 import logging
+import re
 import shutil
 import sys
 import traceback
@@ -40,6 +41,10 @@ if str(SCRIPT_DIR) not in sys.path:
 import kb_common as kbc  # noqa: E402
 
 logger = logging.getLogger("kb_ingest")
+
+NO_VALUE_PLACEHOLDER = "—"
+LONG_BOOK_WORD_THRESHOLD = 25_000
+LONG_BOOK_PAGE_THRESHOLD = 80
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +194,8 @@ def _ensure_kb_dirs(root: Path) -> None:
         (root / "assets" / sub).mkdir(parents=True, exist_ok=True)
     for sub in kbc.REVIEW_DIRS:
         (root / "review" / sub).mkdir(parents=True, exist_ok=True)
+    for sub in ("sessions",):
+        (root / "interactions" / sub).mkdir(parents=True, exist_ok=True)
 
 
 def _files_in_unsorted(root: Path) -> list[Path]:
@@ -219,6 +226,13 @@ def _existing_source_hashes(root: Path) -> set[str]:
         except Exception:  # noqa: BLE001
             continue
     return out
+
+
+def _route_log_line(result: IngestResult) -> str:
+    line = f"Routed: {result.routed_to}"
+    if result.review_reason:
+        line += f" ({result.review_reason})"
+    return line
 
 
 # ---------------------------------------------------------------------------
@@ -629,6 +643,18 @@ def process_one(
     rel = src.relative_to(root) if src.is_absolute() and src.is_relative_to(root) else src
     result = IngestResult(source=str(rel))
 
+    try:
+        if src.resolve().is_relative_to((root / "assets").resolve()):
+            return reprocess_asset(
+                src,
+                root=root,
+                cfg=cfg,
+                nlp_enabled=nlp_enabled,
+                dry_run=dry_run,
+            )
+    except OSError:
+        pass
+
     ext = src.suffix.lower()
     if ext in cfg.skip_extensions:
         result.skipped = True
@@ -823,7 +849,7 @@ def process_one(
     result.metadata_path = str(metadata_path.relative_to(root))
 
     # Update assets-index/<type>.md
-    _update_assets_index(root, asset_type, asset_target, processed_path)
+    _upsert_assets_index(root, asset_type, asset_target, processed_path)
 
     # Log
     kbc.append_log(
@@ -832,8 +858,8 @@ def process_one(
         details=[
             f"Source hash: {source_hash}",
             f"Asset: {result.asset_path}",
-            f"Processed: {result.processed_path or '—'}",
-            f"NLP meta: {result.nlp_meta_path or '—'}",
+            f"Processed: {result.processed_path or NO_VALUE_PLACEHOLDER}",
+            f"NLP meta: {result.nlp_meta_path or NO_VALUE_PLACEHOLDER}",
             f"Complexity: {result.complexity:.2f}",
             *(
                 [f"Transcribed: {transcript_meta.get('stt_backend')} "
@@ -845,7 +871,7 @@ def process_one(
                 [f"Archive: unpacked {archive_count} file(s) into raw/unsorted/"]
                 if archive_count is not None else []
             ),
-            f"Routed: {result.routed_to}{(' (' + result.review_reason + ')') if result.review_reason else ''}",
+            _route_log_line(result),
         ],
         root=root,
     )
@@ -918,7 +944,10 @@ def _build_review_package(
     lines.append("## What to do")
     lines.append("")
     if long_book_hint:
-        lines.append("**Use the long-book flow above.** The standard steps below apply only if you've decided not to treat this as a reference book.")
+        lines.append(
+            "**Use the long-book flow above.** The standard steps below apply "
+            "only if you've decided not to treat this as a reference book."
+        )
         lines.append("")
     lines.append("1. Read the processed Markdown (if any) and the original asset.")
     lines.append("2. Extract durable knowledge into `knowledge/<category>/<slug>.md`")
@@ -933,17 +962,28 @@ def _looks_like_long_book(*, ext: str, processed_text: str | None) -> bool:
     """Heuristic: does this look like a copyrighted long-form book / manual?
 
     Triggers when *all* of these hold:
-    - File extension is .pdf / .epub / .docx (typical book formats)
-    - Extracted text exists and is very long (> 25 000 words ≈ 80+ pages)
+    - File extension is a typical long-form document format
+    - Extracted text is either very long by words, or a PDF with many page
+      markers even if the extractor collapsed intra-line spacing
 
     Returns False for the user's own short drafts, articles, and notes.
     """
-    if ext.lower() not in {".pdf", ".epub", ".docx"}:
+    normalized_ext = ext.lower()
+    if normalized_ext not in {".pdf", ".epub", ".docx", ".doc", ".odt"}:
         return False
     if not processed_text:
         return False
+
     word_count = len(processed_text.split())
-    return word_count >= 25_000
+    if word_count >= LONG_BOOK_WORD_THRESHOLD:
+        return True
+
+    if normalized_ext == ".pdf":
+        page_markers = len(re.findall(r"(?m)^## Page \d+\b", processed_text))
+        if page_markers >= LONG_BOOK_PAGE_THRESHOLD:
+            return True
+
+    return False
 
 
 def _update_assets_index(
@@ -972,6 +1012,238 @@ def _update_assets_index(
     ]
     with index_file.open("a", encoding="utf-8") as fh:
         fh.write("\n".join(block))
+
+
+def _upsert_assets_index(
+    root: Path, asset_type: str, asset_path: Path, processed_path: Path | None
+) -> None:
+    """Write or replace a single asset block in assets-index/<type>.md."""
+    index_file = root / "assets-index" / f"{asset_type}.md"
+    index_file.parent.mkdir(parents=True, exist_ok=True)
+    if not index_file.exists():
+        index_file.write_text(
+            f"# {asset_type.capitalize()}\n\n"
+            "Asset descriptions for files in `assets/" + asset_type + "/`.\n",
+            encoding="utf-8",
+        )
+
+    rel_asset = asset_path.relative_to(root)
+    rel_processed = processed_path.relative_to(root) if processed_path else None
+    block_lines = [
+        f"## {asset_path.stem}",
+        "",
+        f"- Type: {asset_type}",
+        f"- Original: `{rel_asset}`",
+        f"- Converted: `{rel_processed}`" if rel_processed else "- Converted: none yet",
+        "- Description: (to be filled by AI agent during review)",
+        "",
+    ]
+    block_text = "\n".join(block_lines) + "\n"
+    heading = f"## {asset_path.stem}"
+    text = index_file.read_text(encoding="utf-8")
+    pattern = rf"\n{re.escape(heading)}\n(?:.*?)(?=\n## |\Z)"
+
+    if heading in text:
+        updated = re.sub(pattern, lambda _: "\n" + block_text, text, flags=re.S)
+        index_file.write_text(updated, encoding="utf-8")
+        return
+
+    with index_file.open("a", encoding="utf-8") as fh:
+        if text and not text.endswith("\n"):
+            fh.write("\n")
+        fh.write("\n" + block_text)
+
+
+def reprocess_asset(
+    src: Path,
+    *,
+    root: Path,
+    cfg: kbc.KbConfig,
+    nlp_enabled: bool = True,
+    dry_run: bool = False,
+) -> IngestResult:
+    """Re-run conversion, metadata, and review routing for an existing asset."""
+    rel = src.relative_to(root) if src.is_absolute() and src.is_relative_to(root) else src
+    result = IngestResult(source=str(rel), asset_path=str(rel))
+
+    ext = src.suffix.lower()
+    asset_type = _detect_asset_type(ext)
+    strategy = _detect_strategy(ext)
+    stem = src.stem
+
+    try:
+        source_hash = kbc.compute_source_hash(src)
+    except Exception as e:  # noqa: BLE001
+        result.success = False
+        result.error = f"hashing failed: {e}"
+        return result
+    result.source_hash = source_hash
+
+    if dry_run:
+        result.routed_to = "dry-run"
+        return result
+
+    md_text: str | None = None
+    processed_subdir = "markdown"
+    transcript_meta: dict = {}
+    archive_count: int | None = None
+    try:
+        if strategy == "stt":
+            md_text, processed_subdir, transcript_meta = _run_stt(src, cfg)
+        elif strategy == "ocr":
+            md_text, processed_subdir = _run_ocr(src, cfg)
+        elif strategy == "archive":
+            md_text, processed_subdir, archive_count = _run_archive(src, root, cfg)
+        else:
+            md_text, processed_subdir = _convert(strategy, src)
+    except RuntimeError as e:
+        result.review_reason = f"conversion unavailable: {e}"
+
+    processed_path: Path | None = None
+    if md_text is not None:
+        processed_path = root / "processed" / processed_subdir / f"{stem}.md"
+        processed_path.parent.mkdir(parents=True, exist_ok=True)
+        processed_path.write_text(md_text, encoding="utf-8")
+        result.processed_path = str(processed_path.relative_to(root))
+
+    nlp_meta: dict = {}
+    if nlp_enabled and cfg.nlp_enabled and md_text:
+        try:
+            nlp_meta = nlp_enrich(md_text, cfg, knowledge_dir=root / "knowledge")
+            nlp_path = root / "processed" / "nlp-meta" / f"{stem}.yml"
+            nlp_path.parent.mkdir(parents=True, exist_ok=True)
+            import yaml  # type: ignore[import-untyped]
+
+            nlp_path.write_text(
+                yaml.safe_dump(nlp_meta, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            result.nlp_meta_path = str(nlp_path.relative_to(root))
+        except Exception as e:  # noqa: BLE001
+            logger.debug("NLP enrichment skipped for %s: %s", src.name, e)
+
+    complexity = nlp_meta.get("complexity") if nlp_meta else estimate_complexity(md_text or "")
+    result.complexity = float(complexity or 0.0)
+    long_book = _looks_like_long_book(ext=ext, processed_text=md_text)
+
+    review_pkg = root / "review" / "needs-ai-decision" / f"{stem}.md"
+    if md_text is None:
+        review_pkg.parent.mkdir(parents=True, exist_ok=True)
+        review_pkg.write_text(
+            _build_review_package(
+                asset_path=result.asset_path,
+                processed_path=None,
+                nlp_meta=nlp_meta,
+                reason=result.review_reason or "no automatic conversion available",
+                long_book_hint=long_book,
+            ),
+            encoding="utf-8",
+        )
+        result.routed_to = "review/needs-ai-decision/"
+    elif result.complexity >= cfg.complexity_threshold or long_book:
+        review_pkg.parent.mkdir(parents=True, exist_ok=True)
+        if long_book:
+            reason = "looks like a long-form reference book (>=25k words)"
+            result.review_reason = reason
+        else:
+            reason = (
+                f"complexity {result.complexity:.2f} >= threshold "
+                f"{cfg.complexity_threshold}"
+            )
+            result.review_reason = (
+                f"complexity {result.complexity:.2f} >= {cfg.complexity_threshold}"
+            )
+        review_pkg.write_text(
+            _build_review_package(
+                asset_path=result.asset_path,
+                processed_path=result.processed_path,
+                nlp_meta=nlp_meta,
+                reason=reason,
+                long_book_hint=long_book,
+            ),
+            encoding="utf-8",
+        )
+        result.routed_to = "review/needs-ai-decision/"
+    else:
+        if review_pkg.exists():
+            review_pkg.unlink()
+        result.routed_to = "processed/"
+        result.review_reason = ""
+
+    metadata_path = root / "processed" / "extracted-metadata" / f"{stem}.yml"
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    today = _dt.date.today().isoformat()
+
+    original_filename = src.name
+    if metadata_path.exists():
+        try:
+            import yaml  # type: ignore[import-untyped]
+
+            previous = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
+            original_filename = previous.get("original_filename", original_filename)
+        except Exception:  # noqa: BLE001
+            pass
+
+    metadata = {
+        "original_filename": original_filename,
+        "stable_filename": src.name,
+        "asset_path": result.asset_path,
+        "processed_path": result.processed_path,
+        "source_hash": source_hash,
+        "file_type": ext.lstrip("."),
+        "asset_type": asset_type,
+        "strategy": strategy,
+        "processing_date": kbc.now_iso(),
+        "extracted_at": today,
+        "valid_from": today,
+        "lifecycle": "evolving",
+        "confidence": "medium",
+        "complexity": result.complexity,
+        "is_surprise": True,
+        "surprise_engine": "python",
+        "long_book_hint": long_book,
+        "needs_ai_review": result.routed_to.startswith("review/"),
+        "review_reason": result.review_reason,
+        "nlp_meta_path": result.nlp_meta_path,
+    }
+    if transcript_meta:
+        metadata.update(transcript_meta)
+    if archive_count is not None:
+        metadata["archive_extracted_files"] = archive_count
+    import yaml  # type: ignore[import-untyped]
+
+    metadata_path.write_text(
+        yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    result.metadata_path = str(metadata_path.relative_to(root))
+
+    _upsert_assets_index(root, asset_type, src, processed_path)
+
+    kbc.append_log(
+        operation="reprocess",
+        title=f"{src.name}",
+        details=[
+            f"Source hash: {source_hash}",
+            f"Asset: {result.asset_path}",
+            f"Processed: {result.processed_path or NO_VALUE_PLACEHOLDER}",
+            f"NLP meta: {result.nlp_meta_path or NO_VALUE_PLACEHOLDER}",
+            f"Complexity: {result.complexity:.2f}",
+            *(
+                [f"Transcribed: {transcript_meta.get('stt_backend')} "
+                 f"({transcript_meta.get('stt_language')}, "
+                 f"{transcript_meta.get('stt_segments')} segments)"]
+                if transcript_meta else []
+            ),
+            *(
+                [f"Archive: unpacked {archive_count} file(s) into raw/unsorted/"]
+                if archive_count is not None else []
+            ),
+            _route_log_line(result),
+        ],
+        root=root,
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
