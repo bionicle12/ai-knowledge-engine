@@ -55,7 +55,7 @@ media:
     device: "auto"          # auto | cpu | cuda
     compute_type: "int8"    # int8 (быстрый CPU) | float16 (GPU) | float32
     timestamps: true        # добавлять [mm:ss] per segment
-    allow_cloud: false      # не отправлять аудио в облако, пока это false
+    allow_cloud: false      # зарезервировано под будущий cloud STT (пока не реализован)
   ocr:
     enabled: true
     backends: ["rapidocr", "tesseract"]

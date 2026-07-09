@@ -76,6 +76,16 @@ def test_available_backends_is_subset_of_configured(tmp_path: Path):
     assert set(usable) <= {"faster-whisper"}
 
 
+def test_cloud_backend_never_listed_even_when_allow_cloud(tmp_path: Path):
+    """Cloud STT is documented as future/opt-in but not implemented yet."""
+    cfg = _cfg_with_media(
+        tmp_path,
+        "media:\n  stt:\n    allow_cloud: true\n    backends: [cloud, faster-whisper]\n",
+    )
+    usable = kb_stt.available_backends(cfg)
+    assert "cloud" not in usable
+
+
 def test_transcript_metadata_shape():
     result = kb_stt.TranscriptResult(
         text="hi", markdown="# x", language="en", backend="faster-whisper",

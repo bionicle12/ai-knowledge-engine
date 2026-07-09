@@ -47,7 +47,7 @@ media:
     device: "auto"          # auto | cpu | cuda
     compute_type: "int8"    # int8 (fast CPU) | float16 (GPU) | float32
     timestamps: true        # add [mm:ss] markers per segment
-    allow_cloud: false      # never send audio to a cloud API unless true
+    allow_cloud: false      # reserved for a future cloud STT backend (not implemented)
   ocr:
     enabled: true
     backends: ["rapidocr", "tesseract"]

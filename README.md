@@ -11,9 +11,9 @@ local-first NLP and automatic context indexing.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](#requirements)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20+-339933.svg?logo=node.js&logoColor=white)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-166_passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-204_passing-brightgreen.svg)](#)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.9.3-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-0.10.0-blue.svg)](VERSION)
 [![No Cloud Required](https://img.shields.io/badge/Cloud-Not_Required-green.svg)](#)
 
 [Quick Start](#quick-start) · [Features](#features) · [Architecture](#architecture) · [Examples](#examples) · [Русский](i18n/ru/README.md)
@@ -206,11 +206,14 @@ your-project/
 │
 ├── scripts/                    # Python pipeline (do not modify lightly)
 │   ├── kb_ingest.py            # Raw → processed → knowledge
+│   ├── kb_stt.py / kb_ocr.py   # Speech-to-text / OCR (media)
+│   ├── kb_reindex.py           # Cross-platform reindex orchestrator
 │   ├── kb_lint.py              # Health check (Level 1)
 │   ├── kb_reflect.py           # Reflection trigger logic
 │   ├── kb_watch.py             # File watcher daemon
 │   ├── kb_nlp_batch.py         # Batch NLP re-enrichment
 │   ├── kb_populate.py          # Generate DATA_PLACEMENT_EXAMPLES.md
+│   ├── kb_save_session.py      # Optional CLI for session summaries
 │   ├── kb_doctor.py            # Smoke test
 │   └── kb_common.py            # Shared utilities
 ├── templates/                  # Kept for re-runs (kb_populate, kb_upgrade)

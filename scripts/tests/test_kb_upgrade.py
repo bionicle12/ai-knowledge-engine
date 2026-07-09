@@ -9,6 +9,19 @@ import pytest
 import kb_upgrade as up
 
 
+def test_script_files_includes_all_shipped_kb_scripts():
+    """Upgrade must sync every kb_*.py shipped under knowledge-base/scripts/."""
+    shipped = {
+        p.name
+        for p in (up.SRC_SCRIPTS_DIR).glob("kb_*.py")
+        if p.is_file()
+    }
+    listed = set(up.SCRIPT_FILES)
+    missing = shipped - listed
+    assert not missing, f"SCRIPT_FILES missing: {sorted(missing)}"
+    assert "kb_save_session.py" in listed
+
+
 def test_file_hash_matches_for_identical(tmp_path: Path):
     a = tmp_path / "a.txt"
     b = tmp_path / "b.txt"

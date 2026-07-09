@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/00_OVERVIEW.md
-source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
-source_version: 0.9.3
-translated_at: 2026-06-29
+source_commit: f2fd134c5214b12105acbf12b1ce88a20491e913
+source_version: 0.10.0
+translated_at: 2026-07-09
 translator: ai-assisted
 ---
 
@@ -38,9 +38,9 @@ translator: ai-assisted
 | 02 | `02_INIT.md` | Уточняешь роль, копируешь `kb.config.yml.template` и параметризуешь, создаёшь папки |
 | 03 | `03_PIPELINE.md` | Копируешь `scripts/kb_ingest.py` + `scripts/kb_common.py` |
 | 04 | `04_REVIEW.md` | Настраиваешь workflow ревью (без кода) |
-| 05 | `05_INDEX.md` | Копируешь `templates/repomix.config.json.template`, копируешь `shell/reindex.sh` |
+| 05 | `05_INDEX.md` | Копируешь `templates/repomix.config.json.template`, `shell/reindex.sh` + `scripts/kb_reindex.py` |
 | 06 | `06_AGENTS_TEMPLATE.md` | Копируешь и параметризуешь `templates/AGENTS.md.template` |
-| 07 | `07_INTERACTION_LOOP.md` | Объясняешь команды, скрипты копировать не нужно |
+| 07 | `07_INTERACTION_LOOP.md` | Объясняешь команды; опционально `scripts/kb_save_session.py` |
 | 08 | `08_PORTABLE.md` | Подключение базы к рабочим проектам |
 | 09 | `09_LINT.md` | Копируешь `scripts/kb_lint.py`, `shell/lint.sh` |
 | 10 | `10_LOG.md` | Создаёшь пустой `log.md`, всё остальное делают скрипты |
@@ -48,46 +48,56 @@ translator: ai-assisted
 | 12 | `12_NLP_PREPROCESS.md` | Ставишь spaCy-модель; NLP запускается из `kb_ingest.py` |
 | 13 | `13_AUTORUN.md` | Копируешь `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`; ставишь git hook |
 | 14 | `14_INITIAL_POPULATION.md` | Генерируешь role-specific `DATA_PLACEMENT_EXAMPLES.md` из `examples/<role>.yml` |
+| 15 | `15_MEDIA_PROCESSING.md` | Копируешь `scripts/kb_stt.py`, `scripts/kb_ocr.py`, `templates/requirements-media.txt`; настраиваешь `media:` |
 
 После всех модулей: запусти `bash shell/doctor.sh` (или `python3 scripts/kb_doctor.py`) для финальной проверки.
 
 ---
 
-## Что копируется в KB пользователя
+## Что создаётся при развёртывании
+
+Агент собирает базу внутри `<project-root>/knowledge-base/`, оставляя исходный `setup/`. После проверки запускает `bash setup/shell/finalize.sh` — содержимое поднимается в корень проекта, оба каталога `setup/` и `knowledge-base/` удаляются.
+
+Layout ДО finalize:
 
 ```
-{user-kb-root}/
-├── kb.config.yml                      ← параметризовано из templates/kb.config.yml.template
-├── repomix.config.json                ← из templates/repomix.config.json.template
-├── AGENTS.md                          ← параметризовано из templates/AGENTS.md.template
-├── KNOWLEDGE_STRUCTURE.md             ← из templates/KNOWLEDGE_STRUCTURE.md.template
-├── DATA_PLACEMENT_EXAMPLES.md         ← начальный скелет; Фаза 3 расширяет его
-├── requirements.txt                   ← из templates/requirements.txt
-├── .gitignore                         ← из templates/.gitignore.template
-│
-├── scripts/                           ← дословная копия из knowledge-base/scripts/
-│   ├── kb_common.py
-│   ├── kb_ingest.py
-│   ├── kb_lint.py
-│   ├── kb_watch.py
-│   ├── kb_reflect.py
-│   ├── kb_nlp_batch.py
-│   └── kb_doctor.py
-│
-├── reindex.command, watcher-start.command, watcher-stop.command   ← macOS launcher-ы
-├── reindex.bat, watcher-start.bat                                  ← Windows launcher-ы
-├── shell/
-│   ├── reindex.sh                     ← из shell/reindex.sh
-│   ├── watcher.sh                     ← из shell/watcher.sh
-│   ├── lint.sh                        ← из shell/lint.sh
-│   └── doctor.sh                      ← из shell/doctor.sh
-│
-└── (структура папок создаётся через kb_ingest.py --init-dirs)
+{user-project-root}/
+├── setup/                            ← upstream-инструкции (источник)
+│   ├── 00_OVERVIEW.md … 15_MEDIA_PROCESSING.md
+│   ├── README.md
+│   ├── scripts/, shell/, templates/, examples/
+│   └── shell/finalize.sh             ← запуск в конце
+└── knowledge-base/                   ← агент собирает базу здесь
+    ├── kb.config.yml                 ← параметризовано из templates/kb.config.yml.template
+    ├── repomix.config.json           ← из templates/repomix.config.json.template
+    ├── AGENTS.md                     ← параметризовано из templates/AGENTS.md.template
+    ├── KNOWLEDGE_STRUCTURE.md, DATA_PLACEMENT_EXAMPLES.md, START_HERE.md
+    ├── requirements.txt, .gitignore
+    ├── scripts/                      ← Python reference-скрипты (дословная копия)
+    ├── shell/                        ← POSIX-обёртки + macOS/Windows launcher-ы
+    ├── templates/, examples/         ← для повторных прогонов (kb_populate, kb_upgrade)
+    └── (структура папок через kb_ingest.py --init-dirs)
+        raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
 ```
+
+Layout ПОСЛЕ finalize — плоско в корне проекта:
+
+```
+{user-project-root}/
+├── kb.config.yml, AGENTS.md, KNOWLEDGE_STRUCTURE.md
+├── DATA_PLACEMENT_EXAMPLES.md, START_HERE.md, repomix.config.json
+├── reindex.command, watcher-start.command, watcher-stop.command   (macOS)
+├── reindex.bat, watcher-start.bat                                  (Windows)
+├── requirements.txt
+├── shell/                            ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
+├── scripts/                          ← Python pipeline
+├── templates/, examples/
+└── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+```
+
+> Примечание: `finalize.sh` поднимает `*.command` и `*.bat` из `shell/` в корень. `*.sh` остаются только в `shell/`.
 
 Скрипты в KB пользователя — **идентичны** скриптам в этом репо. При обновлении `kb_upgrade.py` сравнит версии и обновит их.
-
-> Примечание: `finalize.sh` автоматически поднимает `*.command` и `*.bat` из `shell/` в корень проекта, чтобы их можно было запускать двойным кликом. `*.sh` остаются только внутри `shell/`, чтобы не захламлять корень.
 
 ---
 
@@ -98,6 +108,26 @@ translator: ai-assisted
 - Не писать свой watcher с кастомным debouncing. Копируй `scripts/kb_watch.py`.
 - Не пропускай `kb_doctor.py` в конце развёртывания.
 
+## Если имена файлов сомнительны
+
+1. **Смотри, что реально лежит** в `setup/shell/` и `setup/scripts/`:
+   ```bash
+   ls setup/shell/
+   ls setup/scripts/
+   ```
+2. Канонические имена (на момент этой версии):
+   - Finalize: `setup/shell/finalize.sh`
+   - Pipeline: `setup/scripts/kb_ingest.py`
+   - Lint: `setup/scripts/kb_lint.py`
+   - Doctor: `setup/scripts/kb_doctor.py`
+   - Watcher: `setup/scripts/kb_watch.py` / `setup/shell/watcher.sh`
+   - Reindex: `setup/scripts/kb_reindex.py`
+   - Reflect / NLP batch: `kb_reflect.py`, `kb_nlp_batch.py`
+   - STT / OCR: `kb_stt.py`, `kb_ocr.py`
+   - Session save (опциональный CLI): `kb_save_session.py`
+   - Common / populate: `kb_common.py`, `kb_populate.py`
+3. Если скрипта нет — **не выдумывай**; покажи `ls` пользователю.
+
 ---
 
 ## Краткая ментальная модель
@@ -105,7 +135,7 @@ translator: ai-assisted
 ```
 Пользователь кидает файлы    ┌──── kb_ingest.py ────┐
 в raw/*/unsorted/        ────►│  - hash & rename     │──► assets/<type>/<stable>.ext
-                              │  - convert to MD     │──► processed/markdown/<stable>.md
+                              │  - convert / STT/OCR │──► processed/markdown|transcripts|ocr/
                               │  - NLP enrich        │──► processed/nlp-meta/<stable>.yml
                               │  - estimate complexity│──► processed/extracted-metadata/<stable>.yml
                               │  - route             │──► review/needs-ai-decision/  (если сложный)
@@ -126,6 +156,6 @@ kb_reflect.py решает, когда просить агента о higher-lev
 
 ## Версионирование
 
-`VERSION` в родительском репо хранит `instructions_version` (например, `0.7.0`).
+`VERSION` в родительском репо хранит `instructions_version` (например, `0.10.0`).
 При развёртывании параметризуешь `kb.config.yml.template` текущей версией.
 При будущем обновлении `kb_upgrade.py` сравнит версии и обновит скрипты.
