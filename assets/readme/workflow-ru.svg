@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="540" viewBox="0 0 1200 540"
+     role="img" aria-labelledby="title desc">
+  <title id="title">Схема хранения и обработки AI Knowledge Engine</title>
+  <desc id="desc">Четыре этапа проводят приватные исходные файлы через локальную обработку и проверку к индексируемым знаниям и пересобираемому AI-контексту.</desc>
+
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F7FAFC"/>
+      <stop offset="1" stop-color="#EDF4F8"/>
+    </linearGradient>
+    <marker id="flow-arrow" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#1685A8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="540" rx="28" fill="url(#background)"/>
+  <rect x="1" y="1" width="1198" height="538" rx="27" fill="none" stroke="#D2DEE8"/>
+
+  <g id="heading" transform="translate(58 48)">
+    <text x="0" y="0" fill="#1685A8" font-size="18" font-weight="750"
+          letter-spacing="2.1" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+      МОДЕЛЬ ХРАНЕНИЯ / РЕАЛЬНЫЕ ГРАНИЦЫ СИСТЕМЫ
+    </text>
+    <text x="0" y="54" fill="#10243A" font-size="42" font-weight="760"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">
+      От исходников к проверенному контексту
+    </text>
+  </g>
+
+  <path d="M270 229H328M552 229H610M834 229H892" fill="none"
+        stroke="#1685A8" stroke-width="4" marker-end="url(#flow-arrow)"/>
+
+  <g id="raw-stage" transform="translate(58 158)">
+    <rect width="212" height="176" rx="20" fill="#FFFFFF" stroke="#C7D6E2" stroke-width="1.5"/>
+    <rect width="212" height="8" rx="4" fill="#8A9BB5"/>
+    <text x="22" y="52" fill="#687A91" font-size="18" font-weight="750"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">01 / СБОР</text>
+    <text x="22" y="87" fill="#10243A" font-size="25" font-weight="760"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">raw/</text>
+    <text x="22" y="119" fill="#4C6077" font-size="18"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Оригиналы сохранены.</text>
+    <text x="22" y="148" fill="#8A3E47" font-size="18" font-weight="700"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ВНЕ ИНДЕКСА</text>
+  </g>
+
+  <g id="process-stage" transform="translate(340 158)">
+    <rect width="212" height="176" rx="20" fill="#FFFFFF" stroke="#9DCFE0" stroke-width="1.5"/>
+    <rect width="212" height="8" rx="4" fill="#62D8FF"/>
+    <text x="22" y="52" fill="#1685A8" font-size="18" font-weight="750"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">02 / ОБРАБОТКА</text>
+    <text x="22" y="87" fill="#10243A" font-size="25" font-weight="760"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">processed/</text>
+    <text x="22" y="119" fill="#4C6077" font-size="18"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Текст · NLP · хеш.</text>
+    <text x="22" y="148" fill="#8A3E47" font-size="18" font-weight="700"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ВНЕ ИНДЕКСА</text>
+  </g>
+
+  <g id="knowledge-stage" transform="translate(622 158)">
+    <rect width="212" height="176" rx="20" fill="#F6FFF8" stroke="#8DCB9D" stroke-width="1.5"/>
+    <rect width="212" height="8" rx="4" fill="#4F9F67"/>
+    <text x="22" y="52" fill="#3D8051" font-size="18" font-weight="750"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">03 / ПРОВЕРКА</text>
+    <text x="22" y="87" fill="#10243A" font-size="25" font-weight="760"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">knowledge/</text>
+    <text x="22" y="119" fill="#4C6077" font-size="18"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Проверка · связи.</text>
+    <text x="22" y="148" fill="#3D8051" font-size="18" font-weight="750"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">В ИНДЕКСЕ</text>
+  </g>
+
+  <g id="context-stage" transform="translate(904 158)">
+    <rect width="238" height="176" rx="20" fill="#0E1E31" stroke="#29435F" stroke-width="1.5"/>
+    <rect width="238" height="8" rx="4" fill="#1685A8"/>
+    <text x="22" y="52" fill="#62D8FF" font-size="18" font-weight="750"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">04 / КОНТЕКСТ</text>
+    <text x="22" y="87" fill="#F3F7FF" font-size="23" font-weight="760"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.repomix/</text>
+    <text x="22" y="118" fill="#B8C5D8" font-size="18"
+          font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">output.xml</text>
+    <text x="22" y="148" fill="#8A9BB5" font-size="18"
+          font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Можно пересобрать.</text>
+  </g>
+
+  <g id="control-plane" transform="translate(58 382)">
+    <rect width="1084" height="104" rx="18" fill="#10243A"/>
+    <text x="24" y="35" fill="#8A9BB5" font-size="18" font-weight="750"
+          letter-spacing="1.6" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+      ЛОКАЛЬНЫЙ КОНТУР УПРАВЛЕНИЯ
+    </text>
+
+    <g transform="translate(24 54)"
+       font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+       font-size="18" font-weight="650">
+      <circle cx="8" cy="8" r="8" fill="#62D8FF"/>
+      <text x="26" y="14" fill="#F3F7FF">наблюдатель</text>
+
+      <circle cx="194" cy="8" r="8" fill="#7EE787"/>
+      <text x="212" y="14" fill="#F3F7FF">источники</text>
+
+      <circle cx="370" cy="8" r="8" fill="#F2CC60"/>
+      <text x="388" y="14" fill="#F3F7FF">очереди проверки</text>
+
+      <circle cx="640" cy="8" r="8" fill="#A9B9CE"/>
+      <text x="658" y="14" fill="#F3F7FF">lint + doctor</text>
+
+      <circle cx="860" cy="8" r="8" fill="#62D8FF"/>
+      <text x="878" y="14" fill="#F3F7FF">рефлексия</text>
+    </g>
+  </g>
+</svg>
