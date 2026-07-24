@@ -183,11 +183,25 @@ Token figures are planning estimates, not benchmarks. Actual usage depends on do
 
 ## Role blueprints
 
-Full mode includes 15 starting configurations in [`knowledge-base/examples/`](knowledge-base/examples/), including:
+Full mode includes 15 starting configurations in [`knowledge-base/examples/`](knowledge-base/examples/):
 
-- software engineer, product manager, founder, researcher, and marketing director;
-- content creator, fiction writer, music-video director, and viral short-form director;
-- B2B product owner, startup opportunity explorer, psychologist, and software engineering student.
+| Template | Role | Focus |
+|---|---|---|
+| [`b2b-strategic-product-owner.yml`](knowledge-base/examples/b2b-strategic-product-owner.yml) | B2B Strategic Product Owner | SaaS strategy, roadmaps, risks, sales-ready PRDs |
+| [`battle-rap-producer.yml`](knowledge-base/examples/battle-rap-producer.yml) | Battle rap producer & lyricist | Lyric craft, punchlines, vocal stacks, mixing, battle prep |
+| [`content-creator.yml`](knowledge-base/examples/content-creator.yml) | Content creator | Voice, audience, formats, publishing, monetization |
+| [`creative-hybrid.yml`](knowledge-base/examples/creative-hybrid.yml) | Creative Hybrid | Software, music production, indie game development |
+| [`fiction-writer.yml`](knowledge-base/examples/fiction-writer.yml) | Fiction writer | Craft theory, voice studies, story development, draft critique |
+| [`founder.yml`](knowledge-base/examples/founder.yml) | Startup founder | Product, investors, hiring, decisions, company building |
+| [`marketing-director.yml`](knowledge-base/examples/marketing-director.yml) | Marketing Director | Strategy, brand, campaigns, audience analysis |
+| [`music-video-director.yml`](knowledge-base/examples/music-video-director.yml) | Music video writer-director | Treatments, production, shot planning, edit rhythm |
+| [`product-manager.yml`](knowledge-base/examples/product-manager.yml) | Product Manager | Prioritization, metrics, research, product requirements |
+| [`programmer-senior.yml`](knowledge-base/examples/programmer-senior.yml) | Senior Software Engineer | Architecture, debugging, stack knowledge, engineering principles |
+| [`psychologist-gestalt.yml`](knowledge-base/examples/psychologist-gestalt.yml) | Gestalt-oriented psychologist | Ethics, anonymized cases, supervision, interventions |
+| [`researcher.yml`](knowledge-base/examples/researcher.yml) | Researcher / Analyst | Literature, hypotheses, evidence, methodology |
+| [`russian-software-engineering-student.yml`](knowledge-base/examples/russian-software-engineering-student.yml) | Software engineering student in Russia | Coursework, labs, exams, internships |
+| [`startup-opportunity-explorer.yml`](knowledge-base/examples/startup-opportunity-explorer.yml) | Startup Opportunity Explorer | Market gaps, validation, idea scoring, web-app MVPs |
+| [`viral-short-form-veo.yml`](knowledge-base/examples/viral-short-form-veo.yml) | Viral short-form video director | Hooks, storyboards, Veo 3 prompt chains, ad learning |
 
 A role file defines useful entities, folder routes, placement examples, recurring queries, and review priorities. If none fits, the deployment agent can derive a custom configuration from your work.
 

@@ -191,11 +191,25 @@ assets-index/            доступные для поиска описания
 
 ## Ролевые шаблоны
 
-Full mode включает 15 стартовых конфигураций в [`knowledge-base/examples/`](../../knowledge-base/examples/), среди них:
+Full mode включает 15 стартовых конфигураций в [`knowledge-base/examples/`](../../knowledge-base/examples/):
 
-- software engineer, product manager, founder, researcher и marketing director;
-- content creator, fiction writer, music-video director и viral short-form director;
-- B2B product owner, startup opportunity explorer, psychologist и software engineering student.
+| Шаблон | Роль | Основные задачи |
+|---|---|---|
+| [`b2b-strategic-product-owner.yml`](../../knowledge-base/examples/b2b-strategic-product-owner.yml) | Стратегический владелец B2B-продукта | B2B SaaS-стратегия, roadmap, риски, готовые для продаж PRD |
+| [`battle-rap-producer.yml`](../../knowledge-base/examples/battle-rap-producer.yml) | Продюсер и автор баттл-рэпа | Тексты, панчлайны, вокальные стеки, сведение, подготовка к баттлам |
+| [`content-creator.yml`](../../knowledge-base/examples/content-creator.yml) | Контент-креатор | Авторский голос, аудитория, форматы, публикации, монетизация |
+| [`creative-hybrid.yml`](../../knowledge-base/examples/creative-hybrid.yml) | Креативный гибрид | Разработка, музыкальное производство, инди-геймдев |
+| [`fiction-writer.yml`](../../knowledge-base/examples/fiction-writer.yml) | Писатель | Теория писательского мастерства, голос, развитие сюжета, разбор черновиков |
+| [`founder.yml`](../../knowledge-base/examples/founder.yml) | Основатель стартапа | Продукт, инвесторы, найм, решения, развитие компании |
+| [`marketing-director.yml`](../../knowledge-base/examples/marketing-director.yml) | Директор по маркетингу | Стратегия, бренд, кампании, анализ аудитории |
+| [`music-video-director.yml`](../../knowledge-base/examples/music-video-director.yml) | Режиссёр-сценарист музыкальных клипов | Тритменты, производство, планирование кадров, ритм монтажа |
+| [`product-manager.yml`](../../knowledge-base/examples/product-manager.yml) | Продакт-менеджер | Приоритизация, метрики, исследования, продуктовые требования |
+| [`programmer-senior.yml`](../../knowledge-base/examples/programmer-senior.yml) | Senior Software Engineer | Архитектура, отладка, знания о стеке, инженерные принципы |
+| [`psychologist-gestalt.yml`](../../knowledge-base/examples/psychologist-gestalt.yml) | Гештальт-психолог | Этика, анонимизированные кейсы, супервизия, интервенции |
+| [`researcher.yml`](../../knowledge-base/examples/researcher.yml) | Исследователь / аналитик | Литература, гипотезы, доказательства, методология |
+| [`russian-software-engineering-student.yml`](../../knowledge-base/examples/russian-software-engineering-student.yml) | Студент программной инженерии в России | Учебный план, лабораторные, экзамены, стажировки |
+| [`startup-opportunity-explorer.yml`](../../knowledge-base/examples/startup-opportunity-explorer.yml) | Исследователь стартап-возможностей | Рыночные ниши, валидация, оценка идей, web-app MVP |
+| [`viral-short-form-veo.yml`](../../knowledge-base/examples/viral-short-form-veo.yml) | Режиссёр вирусных short-form видео | Хуки, раскадровки, цепочки промптов Veo 3, обучение на рекламе |
 
 Файл роли задаёт полезные сущности, маршруты папок, примеры размещения, повторяющиеся запросы и приоритеты проверки. Если готового варианта нет, агент развёртывания может создать пользовательскую конфигурацию на основе вашей работы.
 
