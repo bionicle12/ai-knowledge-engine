@@ -94,7 +94,7 @@ ASSET_TYPE_BY_EXT: dict[str, str] = {
     ".mpeg": "media",
     ".zip": "archives",
     ".tar": "archives",
-    ".gz": "archives",
+    ".tar.gz": "archives",
     ".tgz": "archives",
     ".rar": "archives",
 }
@@ -134,9 +134,10 @@ PROCESSING_STRATEGY_BY_EXT: dict[str, str] = {
     ".mpg": "stt",
     ".mpeg": "stt",
     # Archives → unpack into raw/unsorted for re-ingestion (see kb_ingest._run_archive)
+    # Note: bare ".gz" is not listed — gzip-only streams need a container (.tar.gz).
     ".zip": "archive",
     ".tar": "archive",
-    ".gz": "archive",
+    ".tar.gz": "archive",
     ".tgz": "archive",
     ".rar": "archive",
 }
@@ -171,12 +172,30 @@ class IngestResult:
 # ---------------------------------------------------------------------------
 
 
+def _file_ext(path: Path) -> str:
+    """Return the processing extension, treating ``.tar.gz`` as one unit."""
+    name = path.name.lower()
+    if name.endswith(".tar.gz"):
+        return ".tar.gz"
+    return path.suffix.lower()
+
+
 def _detect_asset_type(ext: str) -> str:
     return ASSET_TYPE_BY_EXT.get(ext.lower(), "documents")
 
 
 def _detect_strategy(ext: str) -> str:
     return PROCESSING_STRATEGY_BY_EXT.get(ext.lower(), "unknown")
+
+
+def _is_under_unsorted(src: Path, root: Path) -> bool:
+    """True when *src* lives under ``raw/**/unsorted/`` (ingest intake)."""
+    try:
+        rel = src.resolve().relative_to(root.resolve())
+    except (OSError, ValueError):
+        return False
+    parts = rel.parts
+    return len(parts) >= 3 and parts[0] == "raw" and "unsorted" in parts[:-1]
 
 
 def _ensure_kb_dirs(root: Path) -> None:
@@ -428,7 +447,7 @@ def _run_archive(src: Path, root: Path, cfg: kbc.KbConfig) -> tuple[str, str, in
     stem = src.stem
     extracted: list[str] = []
 
-    suffix = src.suffix.lower()
+    suffix = _file_ext(src)
     if zipfile.is_zipfile(src):
         with zipfile.ZipFile(src) as zf:
             for info in zf.infolist():
@@ -458,7 +477,8 @@ def _run_archive(src: Path, root: Path, cfg: kbc.KbConfig) -> tuple[str, str, in
         raise RuntimeError(
             f"unsupported archive format '{suffix}'. Extract it manually into "
             "raw/<category>/unsorted/ and re-run ingest "
-            "(.rar needs an external tool such as 'unar')."
+            "(.rar needs an external tool such as 'unar'; "
+            "bare .gz streams are not supported — use .tar.gz / .zip)."
         )
 
     listing = [f"# Archive: {src.name}", "", f"Unpacked {len(extracted)} file(s) "
@@ -655,7 +675,16 @@ def process_one(
     except OSError:
         pass
 
-    ext = src.suffix.lower()
+    if not _is_under_unsorted(src, root):
+        result.success = False
+        result.error = (
+            f"refusing to ingest path outside raw/**/unsorted/: {src}. "
+            "Drop the file under raw/<category>/unsorted/ (or omit explicit "
+            "paths to scan unsorted automatically)."
+        )
+        return result
+
+    ext = _file_ext(src)
     if ext in cfg.skip_extensions:
         result.skipped = True
         result.skip_reason = f"extension {ext} in skip_extensions"
@@ -986,34 +1015,6 @@ def _looks_like_long_book(*, ext: str, processed_text: str | None) -> bool:
     return False
 
 
-def _update_assets_index(
-    root: Path, asset_type: str, asset_path: Path, processed_path: Path | None
-) -> None:
-    index_file = root / "assets-index" / f"{asset_type}.md"
-    index_file.parent.mkdir(parents=True, exist_ok=True)
-    if not index_file.exists():
-        index_file.write_text(
-            f"# {asset_type.capitalize()}\n\n"
-            "Asset descriptions for files in `assets/" + asset_type + "/`.\n",
-            encoding="utf-8",
-        )
-    rel_asset = asset_path.relative_to(root)
-    rel_processed = (
-        processed_path.relative_to(root) if processed_path else None
-    )
-    block = [
-        f"\n## {asset_path.stem}",
-        "",
-        f"- Type: {asset_type}",
-        f"- Original: `{rel_asset}`",
-        f"- Converted: `{rel_processed}`" if rel_processed else "- Converted: —",
-        "- Description: (to be filled by AI agent during review)",
-        "",
-    ]
-    with index_file.open("a", encoding="utf-8") as fh:
-        fh.write("\n".join(block))
-
-
 def _upsert_assets_index(
     root: Path, asset_type: str, asset_path: Path, processed_path: Path | None
 ) -> None:
@@ -1027,8 +1028,10 @@ def _upsert_assets_index(
             encoding="utf-8",
         )
 
-    rel_asset = asset_path.relative_to(root)
-    rel_processed = processed_path.relative_to(root) if processed_path else None
+    rel_asset = asset_path.relative_to(root).as_posix()
+    rel_processed = (
+        processed_path.relative_to(root).as_posix() if processed_path else None
+    )
     block_lines = [
         f"## {asset_path.stem}",
         "",
@@ -1066,7 +1069,7 @@ def reprocess_asset(
     rel = src.relative_to(root) if src.is_absolute() and src.is_relative_to(root) else src
     result = IngestResult(source=str(rel), asset_path=str(rel))
 
-    ext = src.suffix.lower()
+    ext = _file_ext(src)
     asset_type = _detect_asset_type(ext)
     strategy = _detect_strategy(ext)
     stem = src.stem

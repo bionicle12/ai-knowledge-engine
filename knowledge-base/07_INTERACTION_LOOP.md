@@ -34,7 +34,7 @@ The AI agent **decides on its own** when to write a session summary:
 |-----------|--------|
 | 5–7 substantive exchanges have accumulated | Writes summary, continues working |
 | Dialogue logically wraps up | Writes a final summary |
-| User issues `!save` | Writes summary immediately |
+| User issues `!save` | Writes summary immediately (agent writes under `interactions/sessions/`; optional CLI: `python3 scripts/kb_save_session.py`) |
 | User asks not to save | No write |
 
 ### Layout in `interactions/sessions/`

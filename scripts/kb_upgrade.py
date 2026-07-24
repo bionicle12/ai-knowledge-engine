@@ -55,6 +55,7 @@ SCRIPT_FILES = (
     "kb_populate.py",
     "kb_reflect.py",
     "kb_reindex.py",
+    "kb_save_session.py",
     "kb_stt.py",
     "kb_watch.py",
 )

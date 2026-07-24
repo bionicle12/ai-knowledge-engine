@@ -262,9 +262,13 @@ def test_strategy_mapping_media_and_archive():
     assert kb_ingest._detect_strategy(".webp") == "ocr"
     assert kb_ingest._detect_strategy(".tiff") == "ocr"
     assert kb_ingest._detect_strategy(".tgz") == "archive"
+    assert kb_ingest._detect_strategy(".tar.gz") == "archive"
+    assert kb_ingest._detect_strategy(".gz") == "unknown"
+    assert kb_ingest._file_ext(Path("bundle.tar.gz")) == ".tar.gz"
     assert kb_ingest._detect_asset_type(".flac") == "media"
     assert kb_ingest._detect_asset_type(".tiff") == "images"
     assert kb_ingest._detect_asset_type(".tgz") == "archives"
+    assert kb_ingest._detect_asset_type(".tar.gz") == "archives"
 
 
 def test_ingest_audio_without_backend_routes_to_review(kb_root: Path, monkeypatch):
@@ -410,4 +414,27 @@ def test_upsert_assets_index_replaces_existing_windows_path_block(kb_root: Path)
 
     text = (kb_root / "assets-index" / "documents.md").read_text(encoding="utf-8")
     assert text.count("## 2026-07-01__manual") == 1
-    assert "assets\\documents\\2026-07-01__manual.pdf" in text
+    # Paths in assets-index must be POSIX (stable across Windows/Linux/macOS).
+    assert "assets/documents/2026-07-01__manual.pdf" in text
+    assert "assets\\documents\\" not in text
+
+
+def test_ingest_rejects_path_outside_unsorted(kb_root: Path):
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    outside = kb_root / "outside.md"
+    outside.write_text("# secret\n", encoding="utf-8")
+
+    code = kb_ingest.main(["--root", str(kb_root), str(outside)])
+    assert code == 1
+    assert outside.exists()
+    assert not any((kb_root / "assets").rglob("outside.md"))
+
+
+def test_ingest_accepts_path_under_unsorted(kb_root: Path):
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    src = kb_root / "raw" / "documents" / "unsorted" / "ok.md"
+    src.write_text("# ok\n", encoding="utf-8")
+
+    code = kb_ingest.main(["--root", str(kb_root), str(src)])
+    assert code == 0
+    assert not src.exists()

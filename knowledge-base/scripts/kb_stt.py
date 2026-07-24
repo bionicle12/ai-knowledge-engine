@@ -15,7 +15,8 @@ Backends are tried in the order configured in ``kb.config.yml`` →
 
   1. ``faster-whisper`` — pip-only, no system deps (recommended, all platforms)
   2. ``openai-whisper`` — requires a system ``ffmpeg`` on PATH
-  3. ``cloud``          — disabled unless ``media.stt.allow_cloud: true`` (privacy)
+  3. ``cloud``          — reserved; ``allow_cloud`` gates future wiring only
+                          (not implemented — never selected as usable today)
 
 If no backend is available, :func:`transcribe` raises :class:`SttUnavailable`
 with an OS-specific install hint; the ingest pipeline catches it and routes the
@@ -92,9 +93,13 @@ def _module_available(name: str) -> bool:
 
 
 def available_backends(cfg: kbc.KbConfig | None = None) -> list[str]:
-    """Return the configured backends that are actually usable right now."""
+    """Return the configured backends that are actually usable right now.
+
+    ``cloud`` is reserved for a future opt-in backend and is never listed as
+    usable today — even when ``media.stt.allow_cloud: true`` — so callers do
+    not attempt an unimplemented path.
+    """
     usable: list[str] = []
-    allow_cloud = bool(cfg.stt.get("allow_cloud", False)) if cfg else False
     for backend in _configured_backends(cfg):
         if backend == "faster-whisper" and _module_available("faster_whisper"):
             usable.append(backend)
@@ -102,8 +107,7 @@ def available_backends(cfg: kbc.KbConfig | None = None) -> list[str]:
             # openai-whisper additionally needs a system ffmpeg
             if kbc.find_ffmpeg() is not None:
                 usable.append(backend)
-        elif backend == "cloud" and allow_cloud:
-            usable.append(backend)
+        # "cloud" intentionally omitted until a real backend is wired.
     return usable
 
 

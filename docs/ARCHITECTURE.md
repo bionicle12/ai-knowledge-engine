@@ -16,52 +16,48 @@ Why both: instructions alone leave too many decisions to the agent. Implementati
 
 ```
 ai-knowledge-engine/
-├── README.md, README.ru.md      ← Project landing pages
-├── VERSION                       ← semver of instructions (e.g., 0.1.0)
+├── README.md                     ← Project landing (EN); RU → i18n/ru/README.md
+├── VERSION                       ← semver of instructions (e.g., 0.10.0)
 ├── CHANGELOG.md                  ← Keep-a-Changelog format
 ├── LICENSE
 │
 ├── docs/                         ← Meta-docs (contributors)
 │   ├── ARCHITECTURE.md           ← this file
 │   ├── MAINTENANCE.md
+│   ├── ROADMAP.md
 │   └── …                          (UPGRADING, TRANSLATING, etc.)
 │
 ├── knowledge-base/               ← Full Mode (canonical EN)
 │   ├── README.md                 ← Reading order & principles
-│   ├── 00_OVERVIEW.md            ← Agent's deployment checklist
-│   ├── 01_…13_*.md               ← Instruction modules
-│   ├── 14_INITIAL_POPULATION.md  ← (Phase 3) per-role onboarding
+│   ├── 00_OVERVIEW.md … 15_MEDIA_PROCESSING.md
 │   ├── templates/                ← Files to copy & parameterize
 │   │   ├── kb.config.yml.template
 │   │   ├── repomix.config.json.template
-│   │   ├── AGENTS.md.template
-│   │   ├── KNOWLEDGE_STRUCTURE.md.template
-│   │   ├── DATA_PLACEMENT_EXAMPLES.md.template
-│   │   ├── requirements.txt
+│   │   ├── AGENTS.md.template, START_HERE.md.template, …
+│   │   ├── requirements.txt, requirements-media.txt, requirements-dev.txt
 │   │   └── .gitignore.template
 │   ├── scripts/                  ← Reference Python implementations
 │   │   ├── kb_common.py          ← shared utilities
-│   │   ├── kb_ingest.py
-│   │   ├── kb_lint.py
-│   │   ├── kb_watch.py
-│   │   ├── kb_reflect.py
-│   │   ├── kb_nlp_batch.py
-│   │   ├── kb_doctor.py          ← post-deploy smoke-test
+│   │   ├── kb_ingest.py, kb_stt.py, kb_ocr.py
+│   │   ├── kb_reindex.py         ← cross-platform orchestrator
+│   │   ├── kb_lint.py, kb_watch.py, kb_reflect.py, kb_nlp_batch.py
+│   │   ├── kb_populate.py, kb_save_session.py, kb_doctor.py
 │   │   └── tests/
-│   ├── shell/                    ← POSIX-safe wrappers
-│   │   ├── reindex.sh
-│   │   ├── watcher.sh
-│   │   ├── lint.sh
-│   │   └── doctor.sh
-│   └── examples/                 ← Role templates
-│       ├── programmer-senior.yml
-│       ├── marketing-director.yml
-│       └── creative-hybrid.yml
+│   ├── shell/                    ← POSIX wrappers + macOS/Windows launchers
+│   │   ├── reindex.sh, watcher.sh, lint.sh, doctor.sh, finalize.sh
+│   │   ├── reindex.command, watcher-start.command, watcher-stop.command
+│   │   └── reindex.bat, watcher-start.bat
+│   └── examples/                 ← Role templates (*.yml)
 │
 ├── quick-start/                  ← Lite Mode
 │   └── INIT_GUIDE.md
 │
-└── i18n/                         ← (Phase 2) Translations
+├── scripts/                      ← Repo-level tooling (upgrade, i18n sync)
+│   ├── kb_upgrade.py
+│   ├── check_translations.py, sync_translations.py
+│   └── sync_deployed_bases.py
+│
+└── i18n/                         ← Translations
     ├── TRANSLATION_STATUS.md     ← auto-generated drift report
     └── ru/
         ├── README.md
@@ -77,20 +73,22 @@ Agent flow:
 
 1. **Read `00_OVERVIEW.md`** — sequential reading list + which template to copy at each step
 2. **`01_PREREQUISITES.md`** — verify env, copy `templates/requirements.txt`, install deps
-3. **`02_INIT.md`** — ask user about role, copy & parameterize `kb.config.yml.template`, create folder structure
-4. **`03_PIPELINE.md`** — copy `scripts/kb_ingest.py` and `scripts/kb_common.py`, configure pipeline
+3. **`02_INIT.md`** — ask user about role, copy & parameterize `kb.config.yml.template`, create folder structure (copy `scripts/`, `shell/`, `templates/`, `examples/` verbatim)
+4. **`03_PIPELINE.md`** — configure ingest (`kb_ingest.py` + `kb_common.py`)
 5. **`04_REVIEW.md`** — set up review queues
-6. **`05_INDEX.md`** — copy `repomix.config.json.template`, parameterize, copy `shell/reindex.sh`
+6. **`05_INDEX.md`** — copy `repomix.config.json.template`, parameterize, wire `kb_reindex.py` / `shell/reindex.sh`
 7. **`06_AGENTS_TEMPLATE.md`** — copy & parameterize `templates/AGENTS.md.template`
-8. **`07_INTERACTION_LOOP.md`** — explain commands, no scripts to copy here
+8. **`07_INTERACTION_LOOP.md`** — explain commands; optional `kb_save_session.py`
 9. **`08_PORTABLE.md`** — instructions for cross-project use
-10. **`09_LINT.md`** — copy `scripts/kb_lint.py`, `shell/lint.sh`
+10. **`09_LINT.md`** — `kb_lint.py`, `shell/lint.sh`
 11. **`10_LOG.md`** — initialize `log.md`
 12. **`11_PROVENANCE.md`** — config tweaks, no scripts
-13. **`12_NLP_PREPROCESS.md`** — install spaCy model, NLP runs from kb_ingest.py
-14. **`13_AUTORUN.md`** — copy `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `shell/watcher.sh`; install git hook
-15. **`14_INITIAL_POPULATION.md`** (Phase 3) — generate role-specific `DATA_PLACEMENT_EXAMPLES.md`
-16. **Run `kb_doctor.py`** — smoke-test the deployment
+13. **`12_NLP_PREPROCESS.md`** — install spaCy model, NLP runs from `kb_ingest.py`
+14. **`13_AUTORUN.md`** — `kb_watch.py`, `kb_reflect.py`, `kb_nlp_batch.py`, `shell/watcher.sh`; install git hook
+15. **`14_INITIAL_POPULATION.md`** — generate role-specific `DATA_PLACEMENT_EXAMPLES.md`
+16. **`15_MEDIA_PROCESSING.md`** — STT/OCR/archives (`kb_stt.py`, `kb_ocr.py`, `requirements-media.txt`)
+17. **Run `kb_doctor.py`** — smoke-test the deployment
+18. **Run `finalize.sh`** — flatten into the project root
 
 ## Key invariants
 
@@ -99,16 +97,17 @@ Agent flow:
 - **Mode-aware behavior** is configured via `kb.config.yml.mode_profiles`. Reference scripts read this and branch accordingly.
 - **Lifecycle** (`permanent` / `evolving` / `temporal`) is the cross-cutting concept that both `kb_lint.py` and `kb_reflect.py` must respect identically.
 - **Reference scripts must be idempotent** — re-running on already-processed inputs is safe.
+- **Privacy:** never index `raw/`, `assets/`, `review/`, `interactions/` — only `knowledge/**` and `assets-index/**`.
 
 ## Versioning model
 
 ```
-ai-knowledge-engine repo:        VERSION = 0.3.0
+ai-knowledge-engine repo:        VERSION = 0.10.0
 └── User's deployed knowledge base
-    └── kb.config.yml: instructions_version = 0.2.5
+    └── kb.config.yml: instructions_version = 0.9.3
                                       ↑
                                 user is one minor behind
-                                kb_upgrade.py (Phase 4) helps migrate
+                                kb_upgrade.py helps migrate
 ```
 
 ## Languages

@@ -18,6 +18,15 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+### Fixed
+- Audit follow-ups: ingest refuses paths outside `raw/**/unsorted/`;
+  `assets-index` paths are always POSIX; bare `.gz` no longer mapped as an
+  archive strategy; cloud STT is not advertised as usable until implemented;
+  `kb_save_session.py` included in `kb_upgrade.SCRIPT_FILES`; docs/overview/
+  architecture/README badges aligned with `VERSION` 0.10.0.
+
+## [0.10.0] - 2026-07-09
+
 ### Added
 - **Out-of-the-box media processing (transcription, OCR, archives).**
   - `knowledge-base/scripts/kb_stt.py` — speech-to-text for audio/video.
@@ -37,14 +46,13 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 - `knowledge-base/scripts/kb_reindex.py` — cross-platform (pure-Python) reindex
   orchestrator so the pipeline runs on Windows without Git Bash/WSL. The watcher
   now uses it; `reindex.bat` delegates to it.
+- `knowledge-base/scripts/kb_save_session.py` — optional CLI helper to write a
+  session summary under `interactions/sessions/` (agent `!save` remains primary).
 - `kb_common.find_ffmpeg()` (cross-platform, probes `/opt/homebrew/bin` etc.)
   and `os_install_hint()`.
 - `.cursor/rules/` — repo rules for AI agents (architecture/privacy/
   cross-platform + media handling).
 - `docs/ROADMAP.md` — phased roadmap with task checklists
-- `VERSION` file (semver of instructions)
-- `CHANGELOG.md`
-- `docs/MAINTENANCE.md` — contributor rules for keeping instructions/scripts/translations in sync
 - Role templates:
   - `knowledge-base/examples/psychologist-gestalt.yml`
   - `knowledge-base/examples/music-video-director.yml`
@@ -68,7 +76,7 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   is never deployed, so `.github/workflows/ci.yml.disabled` stays off and is
   documented as such (run `pytest` locally instead).
 - `scripts/kb_upgrade.py` syncs the new scripts (`kb_stt`, `kb_ocr`,
-  `kb_reindex`) and the previously-missing `kb_populate`.
+  `kb_reindex`, `kb_save_session`) and the previously-missing `kb_populate`.
 
 ### Translation impact
 - `README.md` role-template table updated; `i18n/ru/README.md` updated
@@ -77,6 +85,8 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   chat-attached file rule.
 - `i18n/ru/knowledge-base/03_PIPELINE.md` updated for the chat attachment
   staging rule.
+- `i18n/ru/knowledge-base/00_OVERVIEW.md` refreshed for finalize layout and
+  module 15.
 
 ## [0.1.0] - 2026-05-16
 

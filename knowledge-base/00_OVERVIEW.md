@@ -30,9 +30,9 @@ Deploying a **Raw-First Knowledge Pipeline** into a user's project:
 | 02 | `02_INIT.md` | Ask about role, copy `kb.config.yml.template` and parameterize, create folders |
 | 03 | `03_PIPELINE.md` | Copy `scripts/kb_ingest.py` + `scripts/kb_common.py` |
 | 04 | `04_REVIEW.md` | Set up review workflow (no code needed) |
-| 05 | `05_INDEX.md` | Copy `templates/repomix.config.json.template`, copy `shell/reindex.sh` |
+| 05 | `05_INDEX.md` | Copy `templates/repomix.config.json.template`, copy `shell/reindex.sh` + `scripts/kb_reindex.py` |
 | 06 | `06_AGENTS_TEMPLATE.md` | Copy `templates/AGENTS.md.template` and parameterize |
-| 07 | `07_INTERACTION_LOOP.md` | Document commands, no scripts to copy |
+| 07 | `07_INTERACTION_LOOP.md` | Document commands; optional `scripts/kb_save_session.py` for CLI session capture |
 | 08 | `08_PORTABLE.md` | Cross-project usage |
 | 09 | `09_LINT.md` | Copy `scripts/kb_lint.py`, copy `shell/lint.sh` |
 | 10 | `10_LOG.md` | Touch `log.md`; the scripts handle the rest |
@@ -40,6 +40,7 @@ Deploying a **Raw-First Knowledge Pipeline** into a user's project:
 | 12 | `12_NLP_PREPROCESS.md` | Install spaCy model; NLP runs from `kb_ingest.py` |
 | 13 | `13_AUTORUN.md` | Copy `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`; install git hook |
 | 14 | `14_INITIAL_POPULATION.md` | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` from `examples/<role>.yml` |
+| 15 | `15_MEDIA_PROCESSING.md` | Copy `scripts/kb_stt.py`, `scripts/kb_ocr.py`, `templates/requirements-media.txt`; configure `media:` |
 
 After all modules: run `bash shell/doctor.sh` (or `python3 scripts/kb_doctor.py`) to verify.
 
@@ -54,7 +55,7 @@ Layout BEFORE finalize:
 ```
 {user-project-root}/
 ├── setup/                            ← upstream instructions (source)
-│   ├── 00_OVERVIEW.md … 14_INITIAL_POPULATION.md
+│   ├── 00_OVERVIEW.md … 15_MEDIA_PROCESSING.md
 │   ├── README.md
 │   ├── scripts/, shell/, templates/, examples/
 │   └── shell/finalize.sh             ← run at the end
@@ -114,8 +115,11 @@ Instructions sometimes lag reality. If a step says to run a script that you cann
    - Lint: `setup/scripts/kb_lint.py`
    - Doctor (smoke-test): `setup/scripts/kb_doctor.py`
    - Watcher: `setup/scripts/kb_watch.py` (Python) or `setup/shell/watcher.sh`/`watcher-start.command`/`watcher-start.bat`
+   - Reindex orchestrator: `setup/scripts/kb_reindex.py`
    - Reflection trigger: `setup/scripts/kb_reflect.py`
    - NLP batch: `setup/scripts/kb_nlp_batch.py`
+   - STT / OCR: `setup/scripts/kb_stt.py`, `setup/scripts/kb_ocr.py`
+   - Session save (optional CLI): `setup/scripts/kb_save_session.py`
    - Common utils: `setup/scripts/kb_common.py`
    - Populate (DATA_PLACEMENT_EXAMPLES.md generator): `setup/scripts/kb_populate.py`
 3. If a script you expected is missing, **do not invent it** — show the user `ls` output and ask. Older docs or your own memory may reference renamed files (e.g., `install.sh` was renamed to `finalize.sh`); always trust the filesystem over recall.
@@ -127,7 +131,7 @@ Instructions sometimes lag reality. If a step says to run a script that you cann
 ```
 User drops files          ┌──── kb_ingest.py ────┐
 into raw/*/unsorted/  ────►│  - hash & rename     │──► assets/<type>/<stable>.ext
-                          │  - convert to MD     │──► processed/markdown/<stable>.md
+                          │  - convert / STT/OCR │──► processed/markdown|transcripts|ocr/
                           │  - NLP enrich        │──► processed/nlp-meta/<stable>.yml
                           │  - estimate complexity│──► processed/extracted-metadata/<stable>.yml
                           │  - route             │──► review/needs-ai-decision/  (if complex)
@@ -148,6 +152,6 @@ kb_reflect.py decides when to ask the agent for higher-level reflection.
 
 ## Versioning
 
-`VERSION` in the parent repo holds `instructions_version` (e.g., `0.1.0`).
+`VERSION` in the parent repo holds `instructions_version` (e.g., `0.10.0`).
 At deployment, parameterize `kb.config.yml.template` with the current version.
 On a future update, `kb_upgrade.py` (Phase 4) compares versions and refreshes scripts.
