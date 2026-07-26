@@ -59,6 +59,7 @@ translator: ai-assisted
 | Тип | Обработка | Выход |
 |---|---|---|
 | `.md`, `.txt` | чтение напрямую | `processed/markdown/` |
+| `.rtf` | `striprtf` | `processed/markdown/` |
 | `.docx` | `python-docx` или `pandoc` | `processed/markdown/` |
 | `.pdf` | `pypdf`, `pdftotext`, OCR fallback | `processed/markdown/` или `processed/ocr/` |
 | `.pptx` | `python-pptx` | `processed/markdown/` |

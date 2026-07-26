@@ -42,9 +42,10 @@ When a new file appears in raw/:
 
 When a knowledge/ file changes:
 1. Wait 2 seconds (debounce)
-2. Regenerate the Repomix index
-3. Run quick lint (--quick)
-4. Append to log.md
+2. Refresh deterministic routing pages
+3. Regenerate the Repomix index
+4. Run quick lint (--quick)
+5. Append to log.md
 
 Usage:
     ./shell/watcher.sh                         # Foreground

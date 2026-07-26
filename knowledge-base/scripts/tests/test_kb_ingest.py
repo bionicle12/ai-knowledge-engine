@@ -271,6 +271,23 @@ def test_strategy_mapping_media_and_archive():
     assert kb_ingest._detect_asset_type(".tar.gz") == "archives"
 
 
+def test_strategy_mapping_rtf():
+    assert kb_ingest._detect_strategy(".rtf") == "rtf"
+
+
+def test_convert_dispatches_rtf_converter(tmp_path: Path, monkeypatch):
+    source = tmp_path / "document.rtf"
+    source.write_text(r"{\rtf1 Hello}", encoding="utf-8")
+    monkeypatch.setattr(
+        kb_ingest,
+        "_convert_rtf",
+        lambda path: "# Converted RTF\n",
+        raising=False,
+    )
+
+    assert kb_ingest._convert("rtf", source) == ("# Converted RTF\n", "markdown")
+
+
 def test_ingest_audio_without_backend_routes_to_review(kb_root: Path, monkeypatch):
     import kb_stt
 

@@ -7,10 +7,11 @@ watcher (``kb_watch.py``) calls this instead of shelling out to ``bash``.
 
 Steps:
   1. ingest        — python kb_ingest.py
-  2. quick lint    — python kb_lint.py --quick
-  3. consolidation — lint report + nlp batch + reflection trigger (throttled by
+  2. routing       — python kb_route.py
+  3. quick lint    — python kb_lint.py --quick
+  4. consolidation — lint report + nlp batch + reflection trigger (throttled by
                      a ``.last_consolidation`` marker; default every 24h)
-  4. index         — repomix (if installed)
+  5. index         — repomix (if installed)
 
 Usage:
   python3 scripts/kb_reindex.py                # full pipeline
@@ -86,6 +87,9 @@ def reindex(
     if do_ingest:
         print("🔄 [reindex] ingest pipeline...")
         _py("kb_ingest.py", root=root)
+
+    print("🧭 [reindex] routing pages...")
+    _py("kb_route.py", root=root)
 
     print("🩺 [reindex] quick lint...")
     _py("kb_lint.py", "--quick", root=root)

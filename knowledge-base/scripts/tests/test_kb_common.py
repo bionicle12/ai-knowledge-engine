@@ -179,6 +179,18 @@ def test_scan_knowledge_slugs_duplicates(tmp_path: Path):
     assert len(slugs["shared"]) == 2
 
 
+def test_posix_relpath_returns_portable_wikilink_target(tmp_path: Path):
+    knowledge = tmp_path / "knowledge"
+    page = knowledge / "projects" / "roadmap" / "near-term.md"
+    page.parent.mkdir(parents=True)
+    page.write_text("# Near term\n", encoding="utf-8")
+
+    assert (
+        kbc.posix_relpath(page, knowledge, without_suffix=True)
+        == "projects/roadmap/near-term"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Config loading
 # ---------------------------------------------------------------------------

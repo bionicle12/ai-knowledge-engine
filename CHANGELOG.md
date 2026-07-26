@@ -35,6 +35,11 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 - A deployed `scripts/kb_update.py` launcher that locates the authoritative
   source checkout, plus central `--all-root`, repeatable `--accept`, and
   current-directory upgrade modes.
+- Deterministic `kb_route.py` generation for section routing pages and the
+  managed block in `knowledge/routing-table.md`; reindex refreshes routes
+  before linting.
+- RTF ingestion through `striprtf`, portable POSIX wikilink paths on every OS,
+  and batch NLP refresh across Markdown, transcripts, OCR, and table outputs.
 
 ### Fixed
 - Upgrades now preserve the finalized layout by syncing POSIX wrappers under
@@ -45,6 +50,8 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   deployed base has an inaccurate `instructions_version`; `!view` is added
   through an idempotent managed block without replacing local `AGENTS.md`
   instructions.
+- LF/CRLF-only differences are treated as up to date, avoiding false
+  customization conflicts on Windows.
 - Audit follow-ups: ingest refuses paths outside `raw/**/unsorted/`;
   `assets-index` paths are always POSIX; bare `.gz` no longer mapped as an
   archive strategy; cloud STT is not advertised as usable until implemented;

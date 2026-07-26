@@ -43,6 +43,9 @@ done
 echo "🔄 [reindex] ingest pipeline..."
 $PYTHON scripts/kb_ingest.py
 
+echo "🧭 [reindex] routing pages..."
+$PYTHON scripts/kb_route.py || true
+
 echo "🩺 [reindex] quick lint..."
 $PYTHON scripts/kb_lint.py --quick || true
 

@@ -199,6 +199,17 @@ def test_compute_plan_up_to_date(tmp_path: Path, monkeypatch):
     assert plan.state == "up_to_date"
 
 
+def test_compute_plan_treats_crlf_and_lf_as_up_to_date(tmp_path: Path):
+    src = tmp_path / "source.py"
+    dst = tmp_path / "deployed.py"
+    src.write_bytes(b"print('one')\nprint('two')\n")
+    dst.write_bytes(b"print('one')\r\nprint('two')\r\n")
+
+    plan = up.compute_plan(src, dst, prev_version="unknown", force=False)
+
+    assert plan.state == "up_to_date"
+
+
 def test_compute_plan_missing(tmp_path: Path, monkeypatch):
     repo = _setup_fake_repo(tmp_path, monkeypatch)
     src = repo / "knowledge-base" / "scripts" / "kb_lint.py"

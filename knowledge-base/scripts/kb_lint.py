@@ -281,7 +281,7 @@ def _check_orphans(pages: list[Path], root: Path, report: LintReport) -> None:
             incoming.setdefault(target.strip(), set()).add(p)
     for p in pages:
         slug = p.stem
-        rel_no_ext = str(p.relative_to(knowledge).with_suffix(""))
+        rel_no_ext = kbc.posix_relpath(p, knowledge, without_suffix=True)
         sources = incoming.get(slug, set()) | incoming.get(rel_no_ext, set())
         sources_excluding_self = sources - {p}
         if sources_excluding_self:
@@ -605,7 +605,7 @@ def _compute_metrics(pages: list[Path], root: Path) -> dict:
     for p in pages:
         slug = p.stem
         rel = p.relative_to(knowledge)
-        rel_no_ext = str(rel.with_suffix(""))
+        rel_no_ext = kbc.posix_relpath(rel, without_suffix=True)
         if rel.parts and rel.parts[0] == "routing":
             continue
         if rel.name == "routing-table.md":

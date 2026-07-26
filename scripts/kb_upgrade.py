@@ -56,6 +56,7 @@ SCRIPT_FILES = (
     "kb_populate.py",
     "kb_reflect.py",
     "kb_reindex.py",
+    "kb_route.py",
     "kb_save_session.py",
     "kb_stt.py",
     "kb_update.py",
@@ -202,9 +203,12 @@ def compute_plan(
         return UpgradePlan(name=name, src=src, dst=dst, state="missing")
     if file_hash(src) == file_hash(dst):
         return UpgradePlan(name=name, src=src, dst=dst, state="up_to_date")
+    source_bytes = src.read_bytes()
+    deployed_bytes = dst.read_bytes()
+    if _normalise_newlines(source_bytes) == _normalise_newlines(deployed_bytes):
+        return UpgradePlan(name=name, src=src, dst=dst, state="up_to_date")
     # Try to fetch the previous-version content from git tag
     prev_blob = file_at_commit(src, prev_version)
-    deployed_bytes = dst.read_bytes()
     if prev_blob is not None and _normalise_newlines(
         prev_blob
     ) == _normalise_newlines(deployed_bytes):

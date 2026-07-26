@@ -50,9 +50,10 @@ kb_watch.py — File system watcher для knowledge base.
 
 При изменении файла в knowledge/:
 1. Ждёт 2 секунды (debounce)
-2. Перегенерирует Repomix-индекс
-3. Запускает quick lint (--quick)
-4. Пишет в log.md
+2. Обновляет детерминированные routing-страницы
+3. Перегенерирует Repomix-индекс
+4. Запускает quick lint (--quick)
+5. Пишет в log.md
 
 Usage:
     ./shell/watcher.sh                         # Foreground

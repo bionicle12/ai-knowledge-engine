@@ -51,6 +51,7 @@ Files attached/uploaded in chat are not pipeline input until the user confirms t
 | Type | Handling | Output |
 |------|----------|--------|
 | `.md`, `.txt` | direct read | `processed/markdown/` |
+| `.rtf` | `striprtf` | `processed/markdown/` |
 | `.docx` | `python-docx` or `pandoc` | `processed/markdown/` |
 | `.pdf` | `pypdf`, `pdftotext`, OCR fallback | `processed/markdown/` or `processed/ocr/` |
 | `.pptx` | `python-pptx` | `processed/markdown/` |

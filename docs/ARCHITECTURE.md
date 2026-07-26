@@ -39,7 +39,8 @@ ai-knowledge-engine/
 │   ├── scripts/                  ← Reference Python implementations
 │   │   ├── kb_common.py          ← shared utilities
 │   │   ├── kb_ingest.py, kb_stt.py, kb_ocr.py
-│   │   ├── kb_reindex.py         ← cross-platform orchestrator
+│   │   ├── kb_reindex.py, kb_route.py
+│   │   │                           ← orchestration + deterministic navigation
 │   │   ├── kb_lint.py, kb_watch.py, kb_reflect.py, kb_nlp_batch.py
 │   │   ├── kb_populate.py, kb_save_session.py, kb_doctor.py, kb_view.py
 │   │   ├── kb_update.py           ← thin launcher for the central updater

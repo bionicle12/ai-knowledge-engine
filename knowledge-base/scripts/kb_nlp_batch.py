@@ -48,12 +48,18 @@ def main(argv: list[str] | None = None) -> int:
 
     root = args.root or kbc.find_kb_root()
     cfg = kbc.load_config(root)
-    processed = root / "processed" / "markdown"
     nlp_dir = root / "processed" / "nlp-meta"
     nlp_dir.mkdir(parents=True, exist_ok=True)
+    text_dirs = [
+        root / "processed" / "markdown",
+        root / "processed" / "transcripts",
+        root / "processed" / "ocr",
+        root / "processed" / "tables",
+    ]
+    available_dirs = [path for path in text_dirs if path.is_dir()]
 
-    if not processed.is_dir():
-        print(f"[nlp-batch] no {processed}; nothing to do")
+    if not available_dirs:
+        print("[nlp-batch] no processed text directories; nothing to do")
         return 0
 
     try:
@@ -63,34 +69,37 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     results: list[NlpRunResult] = []
-    for md in sorted(processed.glob("*.md")):
-        target = nlp_dir / f"{md.stem}.yml"
-        if args.incremental and target.exists():
+    for directory in available_dirs:
+        for md in sorted(directory.glob("*.md")):
+            target = nlp_dir / f"{md.stem}.yml"
+            if args.incremental and target.exists():
+                results.append(
+                    NlpRunResult(
+                        processed_path=str(md.relative_to(root)),
+                        nlp_meta_path=str(target.relative_to(root)),
+                        skipped=True,
+                        reason="incremental: nlp-meta already exists",
+                    )
+                )
+                continue
+            try:
+                text = md.read_text(encoding="utf-8")
+            except Exception as e:  # noqa: BLE001
+                kbc.print_err(f"[nlp-batch] cannot read {md}: {e}")
+                continue
+            meta = kb_ingest.nlp_enrich(
+                text, cfg, knowledge_dir=root / "knowledge"
+            )
+            target.write_text(
+                yaml.safe_dump(meta, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
             results.append(
                 NlpRunResult(
                     processed_path=str(md.relative_to(root)),
                     nlp_meta_path=str(target.relative_to(root)),
-                    skipped=True,
-                    reason="incremental: nlp-meta already exists",
                 )
             )
-            continue
-        try:
-            text = md.read_text(encoding="utf-8")
-        except Exception as e:  # noqa: BLE001
-            kbc.print_err(f"[nlp-batch] cannot read {md}: {e}")
-            continue
-        meta = kb_ingest.nlp_enrich(text, cfg, knowledge_dir=root / "knowledge")
-        target.write_text(
-            yaml.safe_dump(meta, allow_unicode=True, sort_keys=False),
-            encoding="utf-8",
-        )
-        results.append(
-            NlpRunResult(
-                processed_path=str(md.relative_to(root)),
-                nlp_meta_path=str(target.relative_to(root)),
-            )
-        )
 
     kbc.append_log(
         operation="nlp-batch",

@@ -136,6 +136,21 @@ def lint_report_path(root: Path) -> Path:
     return root / DEFAULT_LINT_REPORT_FILENAME
 
 
+def posix_relpath(
+    path: Path | str,
+    start: Path | str | None = None,
+    *,
+    without_suffix: bool = False,
+) -> str:
+    """Return a forward-slash relative path for wikilinks and metadata."""
+    result = Path(path)
+    if start is not None:
+        result = result.relative_to(Path(start))
+    if without_suffix:
+        result = result.with_suffix("")
+    return result.as_posix()
+
+
 # ---------------------------------------------------------------------------
 # Config loading
 # ---------------------------------------------------------------------------
@@ -532,6 +547,7 @@ __all__ = [
     "kb_config_path",
     "log_path",
     "lint_report_path",
+    "posix_relpath",
     "load_config",
     "compute_source_hash",
     "parse_frontmatter",

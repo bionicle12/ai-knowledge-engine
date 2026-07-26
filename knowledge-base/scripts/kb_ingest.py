@@ -102,6 +102,7 @@ ASSET_TYPE_BY_EXT: dict[str, str] = {
 PROCESSING_STRATEGY_BY_EXT: dict[str, str] = {
     ".md": "passthrough",
     ".txt": "passthrough",
+    ".rtf": "rtf",
     ".docx": "docx",
     ".pdf": "pdf",
     ".pptx": "pptx",
@@ -292,6 +293,15 @@ def _convert_docx(src: Path) -> str:
     return "\n\n".join(parts) + "\n"
 
 
+def _convert_rtf(src: Path) -> str:
+    try:
+        from striprtf.striprtf import rtf_to_text  # type: ignore[import-untyped]
+    except ImportError as e:
+        raise RuntimeError("striprtf not installed") from e
+    raw = src.read_text(encoding="utf-8", errors="replace")
+    return rtf_to_text(raw).strip() + "\n"
+
+
 def _convert_pdf(src: Path) -> str:
     try:
         from pypdf import PdfReader  # type: ignore[import-untyped]
@@ -360,6 +370,8 @@ def _convert(strategy: str, src: Path) -> tuple[str | None, str]:
     try:
         if strategy == "passthrough":
             return _convert_passthrough(src), "markdown"
+        if strategy == "rtf":
+            return _convert_rtf(src), "markdown"
         if strategy == "docx":
             return _convert_docx(src), "markdown"
         if strategy == "pdf":
@@ -573,7 +585,10 @@ def nlp_enrich(text: str, cfg: kbc.KbConfig, knowledge_dir: Path) -> dict:
                 key = kbc.slugify(ent["text"])
                 if key in slugs:
                     ent["canonical"] = key
-                    ent["existing_page"] = str(slugs[key][0].relative_to(knowledge_dir.parent))
+                    ent["existing_page"] = kbc.posix_relpath(
+                        slugs[key][0],
+                        knowledge_dir.parent,
+                    )
                     continue
                 best = (None, 0.0)
                 for k in slug_keys:
@@ -582,8 +597,9 @@ def nlp_enrich(text: str, cfg: kbc.KbConfig, knowledge_dir: Path) -> dict:
                         best = (k, ratio)
                 if best[0] and best[1] >= cfg.fuzzy_match_threshold:
                     ent["canonical"] = best[0]
-                    ent["existing_page"] = str(
-                        slugs[best[0]][0].relative_to(knowledge_dir.parent)
+                    ent["existing_page"] = kbc.posix_relpath(
+                        slugs[best[0]][0],
+                        knowledge_dir.parent,
                     )
         except Exception as e:  # noqa: BLE001
             logger.debug("entity resolution skipped: %s", e)
