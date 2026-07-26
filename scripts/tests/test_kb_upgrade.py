@@ -22,6 +22,120 @@ def test_script_files_includes_all_shipped_kb_scripts():
     assert "kb_save_session.py" in listed
 
 
+def test_collect_plans_recursively_includes_viewer_bundle(
+    tmp_path: Path, monkeypatch
+):
+    """Dropping a nested viewer asset must add it to deployed upgrade plans."""
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    viewer = repo / "knowledge-base" / "scripts" / "kb_viewer"
+    (viewer / "vendor").mkdir(parents=True)
+    (viewer / "index.html").write_text("<main></main>", encoding="utf-8")
+    (viewer / "vendor" / "graph.js").write_text("graph();", encoding="utf-8")
+    deployed = tmp_path / "deployed"
+
+    plans = up.collect_plans(
+        deployed,
+        prev_version="0.7.0",
+        force=False,
+    )
+
+    viewer_plans = {
+        plan.name: plan.dst.relative_to(deployed).as_posix()
+        for plan in plans
+        if plan.name.startswith("kb_viewer/")
+    }
+    assert viewer_plans == {
+        "kb_viewer/index.html": "scripts/kb_viewer/index.html",
+        "kb_viewer/vendor/graph.js": "scripts/kb_viewer/vendor/graph.js",
+    }
+
+
+def test_collect_plans_keeps_posix_wrappers_in_shell_directory(
+    tmp_path: Path, monkeypatch
+):
+    """Finalized KBs keep *.sh wrappers in shell/, never at project root."""
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    source = repo / "knowledge-base" / "shell" / "reindex.sh"
+    source.write_text("#!/bin/sh\n", encoding="utf-8")
+    deployed = tmp_path / "deployed"
+    target = deployed / "shell" / "reindex.sh"
+    target.parent.mkdir(parents=True)
+    shutil.copy2(source, target)
+
+    plans = up.collect_plans(deployed, prev_version="0.7.0", force=False)
+    reindex = next(plan for plan in plans if plan.name == "shell/reindex.sh")
+
+    assert reindex.dst == target
+    assert reindex.state == "up_to_date"
+
+
+def test_collect_plans_can_accept_one_customized_file_only(
+    tmp_path: Path, monkeypatch
+):
+    """Selective acceptance must not have the destructive scope of --force."""
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    scripts = repo / "knowledge-base" / "scripts"
+    (scripts / "kb_lint.py").write_text("new lint\n", encoding="utf-8")
+    (scripts / "kb_stt.py").write_text("new stt\n", encoding="utf-8")
+    deployed = tmp_path / "deployed" / "scripts"
+    deployed.mkdir(parents=True)
+    (deployed / "kb_lint.py").write_text("old lint\n", encoding="utf-8")
+    (deployed / "kb_stt.py").write_text("old stt\n", encoding="utf-8")
+
+    plans = up.collect_plans(
+        tmp_path / "deployed",
+        prev_version="0.0.0",
+        force=False,
+        accepted={"kb_stt.py"},
+    )
+    states = {plan.name: plan.state for plan in plans}
+
+    assert states["kb_stt.py"] == "clean_overwrite"
+    assert states["kb_lint.py"] == "customized"
+
+
+def test_managed_view_block_is_appended_and_replaced_idempotently(
+    tmp_path: Path,
+):
+    agents = tmp_path / "AGENTS.md"
+    agents.write_text("# My custom instructions\n", encoding="utf-8")
+
+    assert up.managed_view_block_state(agents) == "missing"
+    assert up.update_managed_view_block(agents, dry_run=True) == "would append"
+    assert "!view" not in agents.read_text(encoding="utf-8")
+
+    assert up.update_managed_view_block(agents, dry_run=False) == "appended"
+    first = agents.read_text(encoding="utf-8")
+    assert "# My custom instructions" in first
+    assert first.count(up.VIEW_BLOCK_BEGIN) == 1
+    assert up.managed_view_block_state(agents) == "up_to_date"
+
+    agents.write_text(
+        first.replace("python3 scripts/kb_view.py", "python OLD.py"),
+        encoding="utf-8",
+    )
+    assert up.managed_view_block_state(agents) == "outdated"
+    assert up.update_managed_view_block(agents, dry_run=False) == "updated"
+    final = agents.read_text(encoding="utf-8")
+    assert "python OLD.py" not in final
+    assert final.count(up.VIEW_BLOCK_BEGIN) == 1
+
+
+def test_discover_kb_roots_scans_only_configured_kb_directories(tmp_path: Path):
+    (tmp_path / "kb-one").mkdir()
+    (tmp_path / "kb-one" / "kb.config.yml").write_text("", encoding="utf-8")
+    (tmp_path / "kb-two").mkdir()
+    (tmp_path / "kb-two" / "kb.config.yml").write_text("", encoding="utf-8")
+    (tmp_path / "kb-no-config").mkdir()
+    (tmp_path / "other").mkdir()
+    (tmp_path / "other" / "kb.config.yml").write_text("", encoding="utf-8")
+
+    assert [path.name for path in up.discover_kb_roots(tmp_path)] == [
+        "kb-one",
+        "kb-two",
+    ]
+
+
 def test_file_hash_matches_for_identical(tmp_path: Path):
     a = tmp_path / "a.txt"
     b = tmp_path / "b.txt"
@@ -168,3 +282,57 @@ def test_apply_plan_customized_writes_new_sidecar(tmp_path: Path, monkeypatch):
     # Original is untouched
     assert dst.read_text() == "old + customizations\n"
     assert "WROTE" in msg or "wrote" in msg.lower()
+
+
+def test_main_dry_run_never_claims_sidecars_were_created(
+    tmp_path: Path, monkeypatch, capsys
+):
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ("kb_lint.py",))
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    source = repo / "knowledge-base" / "scripts" / "kb_lint.py"
+    source.write_text("new\n", encoding="utf-8")
+    deployed = tmp_path / "deployed"
+    (deployed / "scripts").mkdir(parents=True)
+    (deployed / "scripts" / "kb_lint.py").write_text(
+        "custom\n", encoding="utf-8"
+    )
+    (deployed / "kb.config.yml").write_text(
+        'instructions_version: "0.0.0"\n', encoding="utf-8"
+    )
+    (deployed / "AGENTS.md").write_text("# Local\n", encoding="utf-8")
+
+    result = up.main(["--kb-root", str(deployed), "--dry-run"])
+    output = capsys.readouterr().out
+
+    assert result == 2
+    assert "wrote no .new sidecars" in output
+    assert not list(deployed.rglob("*.new"))
+    assert "!view" not in (deployed / "AGENTS.md").read_text(encoding="utf-8")
+
+
+def test_main_selective_accept_updates_file_block_and_version(
+    tmp_path: Path, monkeypatch
+):
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ("kb_lint.py",))
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    source = repo / "knowledge-base" / "scripts" / "kb_lint.py"
+    source.write_text("new\n", encoding="utf-8")
+    deployed = tmp_path / "deployed"
+    (deployed / "scripts").mkdir(parents=True)
+    target = deployed / "scripts" / "kb_lint.py"
+    target.write_text("custom\n", encoding="utf-8")
+    config = deployed / "kb.config.yml"
+    config.write_text('instructions_version: "0.0.0"\n', encoding="utf-8")
+    agents = deployed / "AGENTS.md"
+    agents.write_text("# Local\n", encoding="utf-8")
+
+    result = up.main(
+        ["--kb-root", str(deployed), "--accept", "kb_lint.py"]
+    )
+
+    assert result == 0
+    assert target.read_text(encoding="utf-8") == "new\n"
+    assert 'instructions_version: "0.7.0"' in config.read_text(encoding="utf-8")
+    assert up.VIEW_BLOCK_BEGIN in agents.read_text(encoding="utf-8")

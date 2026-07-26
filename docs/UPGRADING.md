@@ -1,125 +1,184 @@
-# Upgrading a deployed knowledge base
+# Upgrading deployed knowledge bases
 
-> Guide for upgrading the reference scripts in an already-deployed knowledge base when the source repo (`ai-knowledge-engine`) ships a new version.
+The authoritative updater lives in the current `ai-knowledge-engine` source
+checkout. A deployed KB records its source version in
+`kb.config.yml → instructions_version`.
 
-## How versioning works
+## Safe upgrade flow
 
-- Source repo holds `VERSION` (e.g., `0.5.0`)
-- A deployed KB records `instructions_version` in `kb.config.yml`
-- When the deployed value lags the source, an upgrade is available
+1. Update or otherwise select the source checkout you trust.
+2. Run a dry-run against the deployed KB.
+3. Review any `customized` files.
+4. Run the upgrade.
+5. Run the deployed doctor and reindex commands.
 
-## When to upgrade
+The upgrader changes reference scripts, `shell/*.sh`, the offline graph viewer,
+and its own thin deployed launcher. It also appends or refreshes a marked
+`!view` block inside `AGENTS.md`. Text outside that managed block is preserved.
 
-- New features land (new module, new command, new lint rule)
-- Bug fixes in the reference scripts
-- Security fixes
+It does not modify `knowledge/`, `raw/`, `processed/`, `assets/`, review
+queues, interactions, role configuration, or other user-authored AGENTS
+instructions.
 
-Check the source repo's `CHANGELOG.md` to see what changed and whether you need it.
+## First upgrade
 
-## How to upgrade
+Run the central updater by absolute path.
 
-### Step 1: get the latest source
+### Windows PowerShell
 
-```bash
-cd /path/to/ai-knowledge-engine
-git pull   # or download the latest release
-cat VERSION
+```powershell
+$repo = "C:\path\to\ai-knowledge-engine"
+$kb = "C:\path\to\kb-name"
+
+python "$repo\scripts\kb_upgrade.py" --kb-root $kb --dry-run
+python "$repo\scripts\kb_upgrade.py" --kb-root $kb
 ```
 
-### Step 2: dry-run the upgrade
+### macOS
+
+```bash
+repo="$HOME/path/to/ai-knowledge-engine"
+kb="$HOME/path/to/kb-name"
+
+python3 "$repo/scripts/kb_upgrade.py" --kb-root "$kb" --dry-run
+python3 "$repo/scripts/kb_upgrade.py" --kb-root "$kb"
+```
+
+### Linux
+
+```bash
+repo="/path/to/ai-knowledge-engine"
+kb="/path/to/kb-name"
+
+python3 "$repo/scripts/kb_upgrade.py" --kb-root "$kb" --dry-run
+python3 "$repo/scripts/kb_upgrade.py" --kb-root "$kb"
+```
+
+## Later upgrades from inside the KB
+
+The first upgrade installs `scripts/kb_update.py`, a thin launcher that always
+delegates to the current central updater instead of carrying stale upgrade
+rules.
+
+```powershell
+# Windows
+cd C:\path\to\kb-name
+python scripts\kb_update.py --dry-run
+python scripts\kb_update.py
+```
+
+```bash
+# macOS / Linux
+cd /path/to/kb-name
+python3 scripts/kb_update.py --dry-run
+python3 scripts/kb_update.py
+```
+
+The launcher searches the current directory and its parents for
+`ai-knowledge-engine`. If the source checkout is elsewhere, use either:
+
+```text
+--repo-root /path/to/ai-knowledge-engine
+```
+
+or set `AI_KNOWLEDGE_ENGINE_HOME`:
+
+```powershell
+$env:AI_KNOWLEDGE_ENGINE_HOME = "C:\path\to\ai-knowledge-engine"
+```
+
+```bash
+export AI_KNOWLEDGE_ENGINE_HOME="/path/to/ai-knowledge-engine"
+```
+
+## Updating several `kb-*` bases
+
+The central updater scans only immediate `kb-*` children containing
+`kb.config.yml`.
+
+```powershell
+python C:\path\to\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --all-root C:\path\to\brain-my-ai --dry-run
+```
 
 ```bash
 python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
-    --kb-root /path/to/your-kb \
-    --dry-run
+  --all-root /path/to/brain-my-ai --dry-run
 ```
 
-You will see a plan with one of these states per file:
+Remove `--dry-run` after reviewing every section of the batch plan.
 
-- **up_to_date** — no change needed
-- **missing** — the file is absent in the deployed KB; will be added
-- **clean_overwrite** — your file matches the previous release's version exactly → safe to overwrite
-- **customized** — you (or someone) modified the file locally → upgrade will write a `.new` sidecar instead of overwriting
+## Understanding the plan
 
-### Step 3: actually upgrade
+- `up_to_date` — deployed content already equals the source.
+- `missing` — the reference file or managed block will be added.
+- `clean_overwrite` — the file matches a known historical upstream version.
+- `customized` — the updater cannot prove replacement is safe; the normal run
+  writes `<file>.new` and leaves the original untouched.
+
+A dry-run never changes files and never writes `.new` sidecars.
+
+## Customized files
+
+Show focused diffs:
 
 ```bash
 python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
-    --kb-root /path/to/your-kb
+  --kb-root /path/to/kb-name --dry-run --diff
 ```
 
-If everything is `up_to_date` or `clean_overwrite`, this is the whole story. Your `kb.config.yml` gets a fresh `instructions_version`.
-
-### Step 4: handle customized files
-
-If you see `customized` files, the upgrade tool wrote `<name>.new` next to each. Open them in your editor:
-
-```bash
-diff scripts/kb_lint.py scripts/kb_lint.py.new
-```
-
-Decide:
-- If your customization is no longer needed → delete the original, rename `.new` to the original
-- If your customization is still needed → port your changes onto the new version, then delete `.new`
-- If you want to see a tidy unified diff first:
+If inspection confirms that one file should use the upstream version, accept
+only that file:
 
 ```bash
 python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
-    --kb-root /path/to/your-kb \
-    --diff
+  --kb-root /path/to/kb-name \
+  --accept kb_ingest.py \
+  --accept kb_stt.py
 ```
 
-### Step 5: re-run smoke tests
+Names may be written as `kb_ingest.py`, `scripts/kb_ingest.py`, or
+`shell/reindex.sh`. `--accept` is repeatable and does not authorize overwriting
+other customized files.
 
-```bash
-cd /path/to/your-kb
-./doctor.sh
-```
-
-The doctor script verifies the environment, dependencies, structure, and that the spaCy model loads. Fix any reported errors before continuing daily work.
-
-### Step 6: re-bump if you handled customizations
-
-After resolving every `.new`, run the upgrade again:
-
-```bash
-python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py --kb-root /path/to/your-kb
-```
-
-This time it should report `up_to_date` and bump `instructions_version` cleanly.
-
-## What the upgrade does NOT touch
-
-- `kb.config.yml` (only the `instructions_version` field is updated)
-- `repomix.config.json`
-- `AGENTS.md`, `KNOWLEDGE_STRUCTURE.md`, `DATA_PLACEMENT_EXAMPLES.md` (your customizations)
-- `knowledge/`, `raw/`, `processed/`, `assets/`, `assets-index/`
-- `interactions/`, `review/`
-- `log.md`
-
-## Force mode
-
-If you are certain you want to discard local changes to reference scripts:
+Use `--force` only when every customization in reference scripts may be
+discarded:
 
 ```bash
 python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
-    --kb-root /path/to/your-kb \
-    --force
+  --kb-root /path/to/kb-name --force
 ```
 
-This treats every file as `clean_overwrite`. Use sparingly.
+## Verification
 
-## Major-version bumps
+After a successful upgrade:
 
-When source `VERSION` jumps a major (e.g., `0.x → 1.0`), there may be breaking changes — config schema changes, removed flags, restructured directories. Read `CHANGELOG.md` carefully and check for migration notes here in `UPGRADING.md` (added under the version heading).
+```powershell
+# Windows
+python scripts\kb_doctor.py
+python scripts\kb_view.py --background
+```
 
-## Rollback
+```bash
+# macOS / Linux
+./shell/doctor.sh
+python3 scripts/kb_view.py --background
+```
 
-If an upgrade breaks your setup:
+Re-running `kb_update.py --dry-run` should show all reference files and the
+managed `!view` block as `up_to_date`.
 
-1. Restore each script from a backup or the previous git tag:
-   ```bash
-   git -C /path/to/ai-knowledge-engine show v0.4.0:knowledge-base/scripts/kb_lint.py > /path/to/your-kb/scripts/kb_lint.py
-   ```
-2. Manually edit `kb.config.yml`'s `instructions_version` back to the previous value
-3. Investigate the breakage; if it's a bug, file an issue against `ai-knowledge-engine`
+## Exit codes
+
+- `0` — dry-run completed without manual conflicts, already current, or
+  upgraded successfully.
+- `2` — one or more customized files or managed-marker conflicts require
+  review.
+- `3` — target/source discovery or KB validation failed.
+
+## Major versions and rollback
+
+For a major version change, read `CHANGELOG.md` before applying the plan.
+Rollback should restore the deployed scripts and `instructions_version` from
+version control or a backup; knowledge content is outside the updater's write
+scope.

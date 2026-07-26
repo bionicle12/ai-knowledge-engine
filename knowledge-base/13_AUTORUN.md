@@ -481,6 +481,7 @@ The last point matters: in active sessions reflection fires before 7 days, preve
 
 | Event | Action | Source |
 |-------|--------|--------|
+| `!view` | Start or reopen the local read-only graph viewer | `python3 scripts/kb_view.py --background` |
 | New file in `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./shell/watcher.sh` |
 | Edit in `knowledge/` | Reindex + quick lint | `./shell/watcher.sh` or git hook |
 | `!save` in AI session | Session capture (with enrichment) → Reindex | AI agent |

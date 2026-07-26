@@ -490,6 +490,7 @@ fi
 
 | Событие | Действие | Кто запускает |
 |---------|---------|--------------|
+| `!view` | Запустить или повторно открыть локальный read-only граф знаний | `python3 scripts/kb_view.py --background` |
 | Новый файл в `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./shell/watcher.sh` |
 | Файл изменён в `knowledge/` | Reindex + Quick lint | `./shell/watcher.sh` или git hook |
 | `!save` в AI-сессии | Session capture (с enrichment) → Reindex | AI-агент |
