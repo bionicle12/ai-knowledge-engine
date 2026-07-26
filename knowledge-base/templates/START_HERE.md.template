@@ -24,6 +24,7 @@ After the agent has read `AGENTS.md`, these commands work:
 
 | Command | What it does | Cost |
 |---------|--------------|------|
+| `!view` | Open the local read-only knowledge graph viewer | 0 tokens |
 | `!save` | Save a session summary now (decisions, conclusions, processed materials) | ~2K tokens |
 | `!reflect` | Synthesize higher-level insights from accumulated facts | ~15K tokens |
 | `!audit` | Full AI review of the base — contradictions, gaps, merge candidates | ~50–100K tokens |
@@ -71,6 +72,7 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 | Generated `DATA_PLACEMENT_EXAMPLES.md` doesn't fit me | Edit `examples/<role>.yml`, then say `!populate`. |
 | Watcher won't pick up files | Check `./shell/watcher.sh --status`. Make sure files are in `raw/<sub>/unsorted/`, not just `raw/`. |
 | Need a smoke test of the install | Run `./shell/doctor.sh` (or `python3 scripts/kb_doctor.py`). |
+| Want to browse the knowledge base visually | Say `!view`; use `!view status` for the URL or `!view stop` to stop it. |
 
 ## Where to find more
 

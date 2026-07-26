@@ -80,6 +80,7 @@ While working with the user the agent captures conclusions:
 
 | Command | What it does | Cost |
 |---------|--------------|------|
+| `!view` | Start or reopen the local read-only knowledge graph viewer | 0 tokens |
 | `!save` | Save session summary + enrichment now | ~2K tokens |
 | `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
 | `!audit` | Run AI lint level 2 (review the entire base) | ~50–100K tokens |
@@ -88,6 +89,13 @@ While working with the user the agent captures conclusions:
 | `!super` | Toggle mode: default ↔ super | 0 tokens |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |
+
+For `!view`, use the deterministic local tool rather than reading or rebuilding
+the graph with AI:
+
+- `!view` → run `python3 scripts/kb_view.py --background` and report its URL
+- `!view status` → run `python3 scripts/kb_view.py --status`
+- `!view stop` → run `python3 scripts/kb_view.py --stop`
 
 ## Knowledge lifecycle
 

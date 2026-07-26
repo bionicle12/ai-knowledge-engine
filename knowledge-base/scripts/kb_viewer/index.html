@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>AI Knowledge Engine — Graph Explorer</title>
+  <link rel="stylesheet" href="app.css">
+  <script defer src="vendor/vis-network.min.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <header class="topbar">
+      <button class="icon-button sidebar-toggle" id="sidebar-toggle"
+              type="button" aria-label="Toggle filters" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16M4 12h10M4 18h16"/>
+        </svg>
+      </button>
+      <div class="brand">
+        <span class="brand-name">AI Knowledge Engine</span>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="product-name">Graph Explorer</span>
+      </div>
+
+      <div class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"></circle>
+          <path d="m16 16 4 4"></path>
+        </svg>
+        <input id="search-input" type="search" autocomplete="off"
+               placeholder="Search pages…" aria-label="Search pages">
+        <div class="search-results" id="search-results" hidden></div>
+      </div>
+
+      <nav class="toolbar" aria-label="Graph controls">
+        <button class="toolbar-button" id="fit-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/>
+          </svg>
+          <span>Fit</span>
+        </button>
+        <button class="toolbar-button" id="focus-button" type="button"
+                aria-pressed="false" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <circle cx="12" cy="12" r="8"></circle>
+          </svg>
+          <span>Focus</span>
+        </button>
+        <button class="toolbar-button" id="refresh-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>
+          </svg>
+          <span>Refresh</span>
+        </button>
+      </nav>
+    </header>
+
+    <aside class="sidebar" id="sidebar" aria-label="Knowledge filters">
+      <section class="stats" aria-label="Knowledge statistics">
+        <div><span class="stat-label">Pages</span><strong id="stat-pages">—</strong></div>
+        <div><span class="stat-label">Links</span><strong id="stat-links">—</strong></div>
+        <div><span class="stat-label">Orphans</span><strong class="warning" id="stat-orphans">—</strong></div>
+        <div><span class="stat-label">Broken</span><strong class="danger" id="stat-broken">—</strong></div>
+      </section>
+
+      <section class="filter-section">
+        <div class="section-heading">
+          <h2>Folders</h2>
+          <button class="text-button" id="clear-folder" type="button">All</button>
+        </div>
+        <div class="filter-list" id="folder-filters"></div>
+      </section>
+
+      <section class="filter-section">
+        <div class="section-heading">
+          <h2>Tags</h2>
+          <button class="text-button" id="clear-tag" type="button">All</button>
+        </div>
+        <div class="tag-list" id="tag-filters"></div>
+      </section>
+
+      <section class="filter-section">
+        <h2>Lifecycle</h2>
+        <div class="check-list" id="lifecycle-filters"></div>
+      </section>
+
+      <section class="filter-section quality-section">
+        <h2>Quality lens <span class="muted">(one at a time)</span></h2>
+        <div class="radio-list" id="quality-filters">
+          <label><input type="radio" name="quality" value="none" checked><span>None</span></label>
+          <label><input type="radio" name="quality" value="orphans"><span>Orphans</span><output id="lens-orphans">0</output></label>
+          <label><input type="radio" name="quality" value="broken"><span>Broken links</span><output id="lens-broken">0</output></label>
+          <label><input type="radio" name="quality" value="stale"><span>Stale</span></label>
+          <label><input type="radio" name="quality" value="important"><span>High importance</span></label>
+        </div>
+      </section>
+    </aside>
+
+    <main class="canvas-shell">
+      <div class="canvas-context">
+        <span class="home-dot" aria-hidden="true"></span>
+        <button id="full-graph-button" type="button">Full graph</button>
+        <span id="selection-crumb" hidden></span>
+      </div>
+      <div id="graph" role="application"
+           aria-label="Interactive graph of Markdown knowledge pages"></div>
+      <div class="canvas-empty" id="canvas-empty" hidden>
+        <strong>No pages match these filters.</strong>
+        <button type="button" id="clear-all-filters">Clear filters</button>
+      </div>
+      <div class="graph-legend" id="graph-legend" aria-label="Folder color legend"></div>
+      <div class="canvas-status" id="canvas-status" aria-live="polite">Loading graph…</div>
+    </main>
+
+    <aside class="inspector" id="inspector" aria-label="Page details">
+      <div class="resize-handle" id="resize-handle" aria-hidden="true"></div>
+      <div class="inspector-empty" id="inspector-empty">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 3h7l4 4v14H7z"></path>
+          <path d="M14 3v5h5M10 13h5M10 17h5"></path>
+        </svg>
+        <h2>Select a page</h2>
+        <p>Choose a node or use search to inspect its Markdown and connections.</p>
+      </div>
+
+      <div class="inspector-content" id="inspector-content" hidden>
+        <div class="inspector-header">
+          <div>
+            <h1 id="page-title"></h1>
+            <p id="page-path"></p>
+          </div>
+          <button class="icon-button inspector-close" id="inspector-close"
+                  type="button" aria-label="Close inspector">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="inspector-scroll">
+          <section class="markdown-preview" id="markdown-preview"
+                   aria-label="Markdown preview"></section>
+          <section class="metadata-section">
+            <h2>Metadata</h2>
+            <dl id="metadata-list"></dl>
+          </section>
+          <section class="links-section">
+            <h2>Inbound links <span id="inbound-count"></span></h2>
+            <div class="neighbor-list" id="inbound-list"></div>
+          </section>
+          <section class="links-section">
+            <h2>Outbound links <span id="outbound-count"></span></h2>
+            <div class="neighbor-list" id="outbound-list"></div>
+          </section>
+        </div>
+
+        <div class="inspector-actions">
+          <button class="open-file-button" id="open-file-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 7h7l2 2h9v10H3z"></path>
+              <path d="M3 7V5h7l2 2"></path>
+            </svg>
+            Open file
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

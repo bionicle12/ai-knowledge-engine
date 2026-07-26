@@ -80,6 +80,7 @@ translator: ai-assisted
 
 | Команда | Что делает | Стоимость |
 |---------|-----------|-----------|
+| `!view` | Запустить или повторно открыть локальный read-only граф знаний | 0 токенов |
 | `!save` | Сохранить session summary + enrichment сейчас | ~2K токенов |
 | `!reflect` | Запустить рефлексию: синтез insights из накопленного | ~15K токенов |
 | `!audit` | Запустить AI-ревью базы (lint уровня 2) | ~50-100K токенов |
@@ -88,6 +89,13 @@ translator: ai-assisted
 | `!super` | Переключить режим: default ↔ super | 0 токенов |
 | `!super on/off` | Явно включить или выключить super mode | 0 токенов |
 | `!super status` | Показать текущий режим | 0 токенов |
+
+Для `!view` используй детерминированный локальный инструмент: не читай и не
+перестраивай граф средствами AI.
+
+- `!view` → запусти `python3 scripts/kb_view.py --background` и сообщи URL
+- `!view status` → запусти `python3 scripts/kb_view.py --status`
+- `!view stop` → запусти `python3 scripts/kb_view.py --stop`
 
 ## Жизненный цикл знаний
 

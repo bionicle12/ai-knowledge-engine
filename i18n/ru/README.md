@@ -11,7 +11,7 @@ translator: ai-assisted
 </p>
 
 <p align="center">
-  <a href="../../VERSION"><img src="https://img.shields.io/badge/версия-0.10.0-62D8FF?style=flat-square" alt="Версия 0.10.0"></a>
+  <a href="../../VERSION"><img src="https://img.shields.io/badge/версия-0.11.0-62D8FF?style=flat-square" alt="Версия 0.11.0"></a>
   <a href="#требования"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 или новее"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/лицензия-MIT-7EE787?style=flat-square" alt="Лицензия MIT"></a>
   <img src="https://img.shields.io/badge/хранение-локальный%20Markdown-8A9BB5?style=flat-square" alt="Локальное хранение в Markdown">
@@ -173,6 +173,7 @@ assets-index/            доступные для поиска описания
 
 | Команда | Назначение | Обычная стоимость AI |
 |---|---|---:|
+| `!view` | Открыть локальный read-only просмотрщик графа знаний | 0 токенов |
 | `!save` | Сохранить решения и инсайты продуктивной сессии | ~2K токенов |
 | `!reflect` | Синтезировать общие закономерности из накопленных знаний | ~15K токенов |
 | `!review` | Разобрать материалы, ожидающие решения в очередях проверки | ~5–30K токенов |
@@ -188,6 +189,51 @@ assets-index/            доступные для поиска описания
 | `super` | AI-анализ новизны, аннотаций, сущностей и частых проверок | ~50–200K+ токенов/день |
 
 Числа приведены для планирования и не являются бенчмарками. Реальный расход зависит от объёма документов, активности, модели и поведения агента.
+
+## Обновление развёрнутых баз знаний
+
+Всегда запускайте upgrader из актуального checkout
+`ai-knowledge-engine`. Сначала используйте `--dry-run` и убирайте его только
+после проверки плана.
+
+### Windows
+
+```powershell
+python C:\путь\к\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --kb-root C:\путь\к\kb-name --dry-run
+python C:\путь\к\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --kb-root C:\путь\к\kb-name
+```
+
+### macOS
+
+```bash
+python3 ~/путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root ~/путь/к/kb-name --dry-run
+python3 ~/путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root ~/путь/к/kb-name
+```
+
+### Linux
+
+```bash
+python3 /путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root /путь/к/kb-name --dry-run
+python3 /путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root /путь/к/kb-name
+```
+
+Первое обновление устанавливает в KB файл `scripts/kb_update.py`. После этого
+из корня самой базы можно запускать `python scripts/kb_update.py --dry-run`
+на Windows или `python3 scripts/kb_update.py --dry-run` на macOS/Linux.
+Launcher автоматически находит исходный репозиторий; для нестандартного пути
+есть `--repo-root PATH` и `AI_KNOWLEDGE_ENGINE_HOME`.
+
+Для нескольких баз используйте `--all-root /путь/к/родительской-папке`:
+обрабатываются непосредственные подпапки `kb-*`. Для подтверждения замены
+конкретного файла используйте повторяемый `--accept FILE`, а не глобальный
+`--force`. Подробности и правила безопасности — в
+[гайде по обновлению](../../docs/UPGRADING.md).
 
 ## Ролевые шаблоны
 

@@ -18,7 +18,33 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-26
+
+### Added
+- A lightweight, local-only knowledge graph viewer launched through `!view`.
+  It derives nodes and links directly from Markdown and wikilinks, requires no
+  vector store or database, and includes search, filters, page details,
+  one-hop focus, and diagnostics for orphaned, broken, ambiguous, and stale
+  knowledge.
+- `scripts/kb_view.py` with idempotent background start, status, stop, refresh,
+  safe page reads, and explicit open-in-default-app actions.
+- A self-contained offline web UI with a vendored `vis-network` bundle and its
+  license notices. The deployment upgrader now copies the full viewer bundle.
+- Tests for graph extraction, path safety, HTTP behavior, background lifecycle,
+  the offline bundle, and upgrade planning.
+- A deployed `scripts/kb_update.py` launcher that locates the authoritative
+  source checkout, plus central `--all-root`, repeatable `--accept`, and
+  current-directory upgrade modes.
+
 ### Fixed
+- Upgrades now preserve the finalized layout by syncing POSIX wrappers under
+  `shell/` instead of creating false missing files at the KB root.
+- Dry-runs no longer claim `.new` files were written, use console-safe status
+  text on Windows, and return success when a conflict-free plan completes.
+- Existing upstream versions can be recognized from Git history even when a
+  deployed base has an inaccurate `instructions_version`; `!view` is added
+  through an idempotent managed block without replacing local `AGENTS.md`
+  instructions.
 - Audit follow-ups: ingest refuses paths outside `raw/**/unsorted/`;
   `assets-index` paths are always POSIX; bare `.gz` no longer mapped as an
   archive strategy; cloud STT is not advertised as usable until implemented;

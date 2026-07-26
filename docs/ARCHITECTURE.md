@@ -17,7 +17,7 @@ Why both: instructions alone leave too many decisions to the agent. Implementati
 ```
 ai-knowledge-engine/
 ├── README.md                     ← Project landing (EN); RU → i18n/ru/README.md
-├── VERSION                       ← semver of instructions (e.g., 0.10.0)
+├── VERSION                       ← semver of instructions (e.g., 0.11.0)
 ├── CHANGELOG.md                  ← Keep-a-Changelog format
 ├── LICENSE
 │
@@ -41,7 +41,9 @@ ai-knowledge-engine/
 │   │   ├── kb_ingest.py, kb_stt.py, kb_ocr.py
 │   │   ├── kb_reindex.py         ← cross-platform orchestrator
 │   │   ├── kb_lint.py, kb_watch.py, kb_reflect.py, kb_nlp_batch.py
-│   │   ├── kb_populate.py, kb_save_session.py, kb_doctor.py
+│   │   ├── kb_populate.py, kb_save_session.py, kb_doctor.py, kb_view.py
+│   │   ├── kb_update.py           ← thin launcher for the central updater
+│   │   ├── kb_viewer/             ← offline graph viewer UI + vendored library
 │   │   └── tests/
 │   ├── shell/                    ← POSIX wrappers + macOS/Windows launchers
 │   │   ├── reindex.sh, watcher.sh, lint.sh, doctor.sh, finalize.sh
@@ -102,7 +104,7 @@ Agent flow:
 ## Versioning model
 
 ```
-ai-knowledge-engine repo:        VERSION = 0.10.0
+ai-knowledge-engine repo:        VERSION = 0.11.0
 └── User's deployed knowledge base
     └── kb.config.yml: instructions_version = 0.9.3
                                       ↑

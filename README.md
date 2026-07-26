@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.10.0-62D8FF?style=flat-square" alt="Version 0.10.0"></a>
+  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.11.0-62D8FF?style=flat-square" alt="Version 0.11.0"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-7EE787?style=flat-square" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/storage-local%20Markdown-8A9BB5?style=flat-square" alt="Local Markdown storage">
@@ -165,6 +165,7 @@ These commands are messages to your AI agent, not shell commands.
 
 | Command | Purpose | Typical AI cost |
 |---|---|---:|
+| `!view` | Open the local read-only knowledge graph viewer | 0 tokens |
 | `!save` | Capture decisions and insights from a productive session | ~2K tokens |
 | `!reflect` | Synthesize higher-level patterns from accumulated knowledge | ~15K tokens |
 | `!review` | Resolve items waiting in review queues | ~5–30K tokens |
@@ -180,6 +181,49 @@ These commands are messages to your AI agent, not shell commands.
 | `super` | AI reasoning for surprise detection, annotations, entity resolution, and frequent review | ~50–200K+ tokens/day |
 
 Token figures are planning estimates, not benchmarks. Actual usage depends on document size, activity, model, and agent behavior.
+
+## Updating deployed knowledge bases
+
+Always run the upgrader from your current `ai-knowledge-engine` checkout. Start
+with `--dry-run`; remove it only after reviewing the plan.
+
+### Windows
+
+```powershell
+python C:\path\to\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --kb-root C:\path\to\kb-name --dry-run
+python C:\path\to\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --kb-root C:\path\to\kb-name
+```
+
+### macOS
+
+```bash
+python3 ~/path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root ~/path/to/kb-name --dry-run
+python3 ~/path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root ~/path/to/kb-name
+```
+
+### Linux
+
+```bash
+python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root /path/to/kb-name --dry-run
+python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root /path/to/kb-name
+```
+
+The first upgrade installs `scripts/kb_update.py` into the KB. After that,
+run `python scripts/kb_update.py --dry-run` (Windows) or
+`python3 scripts/kb_update.py --dry-run` (macOS/Linux) from the KB root. The
+launcher finds the source repo automatically; use `--repo-root PATH` or
+`AI_KNOWLEDGE_ENGINE_HOME` when it lives elsewhere.
+
+For a directory of bases, use
+`--all-root /path/to/parent` (immediate `kb-*` children). If a file is truly
+safe to replace, prefer repeatable `--accept FILE` over global `--force`.
+See [the upgrading guide](docs/UPGRADING.md) for examples and safety rules.
 
 ## Role blueprints
 
