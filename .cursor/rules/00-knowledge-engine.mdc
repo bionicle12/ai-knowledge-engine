@@ -25,7 +25,7 @@ knowledge base. Keep these invariants in mind for every change.
 
 When you touch ingest/conversion/routing logic, update **all** of:
 1. the script (`scripts/kb_*.py`),
-2. its contract module (`03_PIPELINE.md`, `15_MEDIA_PROCESSING.md`, …),
+2. its contract module (`03_PIPELINE.md`, `15_MEDIA_PROCESSING.md`, `16_MERGE.md`, …),
 3. the config template (`templates/kb.config.yml.template`) if you add settings,
 4. `scripts/kb_upgrade.py` `SCRIPT_FILES` if you add a new `kb_*.py`,
 5. tests under `knowledge-base/scripts/tests/`.

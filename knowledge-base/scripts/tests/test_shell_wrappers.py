@@ -24,7 +24,9 @@ def _setup_project(root: Path, *, with_scripts: bool = True) -> None:
 
     # Copy real shell wrappers and launchers
     for fname in ("watcher.sh", "reindex.sh", "lint.sh", "doctor.sh",
-                  "watcher-start.command", "reindex.command"):
+                  "export.sh", "import.sh",
+                  "watcher-start.command", "reindex.command",
+                  "export.command", "import.command"):
         src = SHELL_DIR / fname
         dst = root / "shell" / fname
         shutil.copy2(src, dst)
@@ -37,6 +39,10 @@ def _setup_project(root: Path, *, with_scripts: bool = True) -> None:
             ("kb_ingest.py", "print('ingest ok'); raise SystemExit(0)"),
             ("kb_lint.py", "import sys; print('lint ok'); sys.exit(0)"),
             ("kb_doctor.py", "print('doctor ok'); raise SystemExit(0)"),
+            ("kb_export.py", "print('export ok'); raise SystemExit(0)"),
+            # Exit 1 = "merged, conflicts pending" — a normal outcome the
+            # wrapper must pass through rather than treat as a failure.
+            ("kb_import.py", "print('import ok'); raise SystemExit(1)"),
         ]:
             p = root / "scripts" / name
             p.write_text(f"#!/usr/bin/env python3\n{body}\n", encoding="utf-8")
@@ -118,6 +124,46 @@ def test_doctor_sh_resolves_project_root(tmp_path: Path):
     assert "doctor ok" in result.stdout
 
 
+def test_export_sh_resolves_project_root(tmp_path: Path):
+    _setup_project(tmp_path)
+    result = subprocess.run(
+        ["bash", "shell/export.sh"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0
+    assert "export ok" in result.stdout
+
+
+def test_import_sh_passes_through_conflict_exit_code(tmp_path: Path):
+    """Exit 1 means "conflicts queued", not a wrapper failure."""
+    _setup_project(tmp_path)
+    result = subprocess.run(
+        ["bash", "shell/import.sh"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 1
+    assert "import ok" in result.stdout
+
+
+def test_import_sh_reports_missing_script(tmp_path: Path):
+    _setup_project(tmp_path, with_scripts=False)
+    result = subprocess.run(
+        ["bash", "shell/import.sh"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 2
+    assert "kb_import.py not found" in result.stdout
+
+
 # ---------------------------------------------------------------------------
 # .command launchers (the macOS double-click case)
 # ---------------------------------------------------------------------------
@@ -178,3 +224,50 @@ def test_watcher_start_command_reports_when_no_scripts(tmp_path: Path):
     )
     assert result.returncode != 0
     assert "Cannot find scripts/kb_watch.py" in result.stdout
+
+
+def test_export_command_launcher(tmp_path: Path):
+    """macOS double-click path for export."""
+    _setup_project(tmp_path)
+    result = subprocess.run(
+        ["bash", str(tmp_path / "shell" / "export.command")],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        stdin=subprocess.DEVNULL,
+    )
+    assert result.returncode == 0, (
+        f"Launcher failed:\nstdout={result.stdout}\nstderr={result.stderr}"
+    )
+    assert "export ok" in result.stdout
+    assert str(tmp_path) in result.stdout
+
+
+def test_import_command_launcher_explains_pending_conflicts(tmp_path: Path):
+    """Exit 1 from kb_import means conflicts are queued — say so, don't look broken."""
+    _setup_project(tmp_path)
+    result = subprocess.run(
+        ["bash", str(tmp_path / "shell" / "import.command")],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        stdin=subprocess.DEVNULL,
+    )
+    assert "import ok" in result.stdout
+    assert "!merge" in result.stdout
+
+
+def test_import_command_launcher_at_project_root(tmp_path: Path):
+    _setup_project(tmp_path)
+    dst = tmp_path / "import.command"
+    shutil.copy2(tmp_path / "shell" / "import.command", dst)
+    dst.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(dst)],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        stdin=subprocess.DEVNULL,
+    )
+    assert "import ok" in result.stdout

@@ -158,6 +158,7 @@ Read the contributor-level [architecture overview](docs/ARCHITECTURE.md) for the
 | Knowledge graph | Markdown pages use `[[wikilinks]]`, routing tables, lifecycle metadata, and provenance |
 | Automation | Cross-platform reindexing, watchers, health checks, and importance-based reflection triggers |
 | Portability | The complete system is files and folders that can be copied, synced, versioned, or inspected directly |
+| Multi-machine | Two deployments of one base exchange knowledge through bundles, with content-hash dedup, fast-forward, and conflicts routed to review |
 
 ## Working with the engine
 
@@ -171,6 +172,9 @@ These commands are messages to your AI agent, not shell commands.
 | `!review` | Resolve items waiting in review queues | ~5–30K tokens |
 | `!audit` | Deep review for contradictions, gaps, and merge candidates | ~50–100K tokens |
 | `!populate` | Regenerate role-specific placement examples | ~50 tokens |
+| `!export` | Pack this base into a bundle for another machine | ~100 tokens |
+| `!import` | Merge bundles waiting in `sync/inbox/` | ~200 tokens |
+| `!merge` | Finish an import: resolve conflicts, audit contradictions, cross-link | ~5–40K tokens |
 | `!super on/off` | Switch between Python-first and AI-first operation | 0 tokens |
 
 ### Operating modes
@@ -181,6 +185,144 @@ These commands are messages to your AI agent, not shell commands.
 | `super` | AI reasoning for surprise detection, annotations, entity resolution, and frequent review | ~50–200K+ tokens/day |
 
 Token figures are planning estimates, not benchmarks. Actual usage depends on document size, activity, model, and agent behavior.
+
+## Running one base on several machines
+
+Two deployments of the same base drift apart. One laptop accumulates knowledge
+about your tools and gear; the other accumulates analysis notes; both edited the
+same page last week. Copying folders around loses one side's work, and `rsync`
+cannot tell an edit from a stale copy. So the engine ships an explicit merge
+path: **export a bundle, import it on the other machine, let the agent settle
+what only a human-level reader can settle.** Full contract in
+[`16_MERGE.md`](knowledge-base/16_MERGE.md).
+
+```text
+   machine A                              machine B
+┌──────────────┐                       ┌──────────────┐
+│  knowledge/  │                       │  knowledge/  │
+└──────┬───────┘                       └──────▲───────┘
+       │ export                               │ import
+       ▼                                      │
+ sync/outbox/bundle.zip ───── copy ─────► sync/inbox/bundle.zip
+                                              │
+                                              ├─ safe cases → applied automatically
+                                              └─ ambiguous  → review/needs-merge/
+                                                                    │
+                                                              !merge (agent)
+```
+
+### One-time setup
+
+Each machine needs its own name. Open `kb.config.yml` on both and set a
+**different** `sync.label` — it is stamped onto every page that travels, which
+is what makes a merge traceable later:
+
+```yaml
+sync:
+  label: "studio-laptop"     # on the other machine: "work-laptop"
+```
+
+If your bases were deployed before this feature existed, pull it in with the
+upgrader (see [Updating deployed knowledge bases](#updating-deployed-knowledge-bases)) —
+it adds the scripts, the launchers, the `sync/` folder and the config section,
+defaulting `label` to the base's folder name.
+
+### Step 1 — export on the machine that has new knowledge
+
+| OS | How |
+|---|---|
+| **macOS** | Double-click `export.command` |
+| **Windows** | Double-click `export.bat` |
+| **Linux / any terminal** | `./shell/export.sh` |
+| **In the AI chat** | `!export` |
+
+A file appears in `sync/outbox/`:
+`kb-bundle__studio-laptop__2026-07-31.zip`
+
+Useful flags (append them in the terminal, or ask the agent):
+
+```bash
+./shell/export.sh --since 2026-06-01    # only knowledge touched since a date
+./shell/export.sh --with-assets         # include the binary originals too
+./shell/export.sh --only knowledge      # knowledge pages and nothing else
+./shell/export.sh --dry-run             # show what would be packed
+```
+
+### Step 2 — move the file
+
+Copy that one `.zip` into the other machine's `sync/inbox/` folder — USB stick,
+cloud folder, `scp`, anything. Nothing here touches the network on its own.
+
+### Step 3 — import there
+
+| OS | How |
+|---|---|
+| **macOS** | Double-click `import.command` |
+| **Windows** | Double-click `import.bat` |
+| **Linux / any terminal** | `./shell/import.sh` |
+| **In the AI chat** | `!import` |
+
+Every bundle sitting in `sync/inbox/` is processed. You get a summary in the
+terminal and a full report in `sync/reports/`.
+
+### Step 4 — `!merge` in the AI chat
+
+```
+Read AGENTS.md and use it as the primary instruction for everything that follows.
+!merge
+```
+
+The agent resolves each queued conflict by folding the two versions together —
+keeping every fact that is true in either — records genuine contradictions in
+`knowledge/open-questions/` with both sources instead of silently picking a
+winner, cross-links the imported pages into the existing graph, refreshes
+routing, lints and reindexes.
+
+Run the same four steps in the other direction and both machines hold the union
+of the knowledge.
+
+### What the importer decides on its own
+
+It only does what is provably safe and leaves judgement to the agent:
+
+| Situation | What happens |
+|---|---|
+| Page exists only in the bundle | Added, stamped with `merged_from:` provenance |
+| Same content, same place | Skipped |
+| Same content, richer metadata | Tags, counters and missing fields merged; body untouched |
+| Same content under a different name | Skipped, reported as a duplicate |
+| Local copy untouched since the last import | Fast-forwarded, previous version backed up |
+| Changed on **both** machines | Local file untouched; incoming version + diff queued in `review/needs-merge/` |
+| Different name, ~85%+ overlap | Added, plus a merge-candidate note for consolidation |
+
+Two pages count as the same knowledge when their **bodies** match; frontmatter is
+bookkeeping and merges instead of conflicting, so simply reading a page on one
+machine never looks like an edit on the other. Re-importing the same bundle
+changes nothing.
+
+### Safety and privacy
+
+- **Nothing is overwritten silently.** Every file the import touches is copied to
+  `sync/backups/<timestamp>/` first.
+- **Bundles carry knowledge, not raw material.** `raw/`, `processed/`, `review/`
+  and `sync/` never travel. Binary assets are opt-in via `--with-assets`; without
+  them the imported `assets-index/` entries are annotated as "original file not
+  present in this base" rather than left dangling.
+- **`sync/` is excluded** from the AI index and from git.
+- `--dry-run` classifies everything and writes nothing.
+- Sharing the base with someone else? Export with `--only knowledge` and read the
+  result first — `interactions/` holds session history and the provenance
+  metadata holds original filenames.
+
+### If something looks stuck
+
+| Symptom | What it means |
+|---|---|
+| Import printed "N conflicts waiting" | Normal. Say `!merge` in the AI chat. |
+| Import exits with code `1` | Same thing — `1` means "merged, conflicts queued", not a failure. |
+| "No bundle to import" | The `.zip` is not in `sync/inbox/` on **this** machine. |
+| Both machines produce identically named bundles | Their `sync.label` is the same. Give each its own. |
+| Want to check before committing to it | Run the import with `--dry-run`. |
 
 ## Updating deployed knowledge bases
 
@@ -255,7 +397,7 @@ A role file defines useful entities, folder routes, placement examples, recurrin
 ai-knowledge-engine/
 ├── quick-start/                 Lite mode: codebase indexing guide
 ├── knowledge-base/
-│   ├── 00_…15_*.md             16 ordered instruction modules
+│   ├── 00_…16_*.md             17 ordered instruction modules
 │   ├── scripts/                Python reference pipeline and tests
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              config, agent, structure, and dependency templates
@@ -294,6 +436,7 @@ The instructions are designed for Claude, Codex, GPT, Gemini, Cursor, and other 
 | See system architecture | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
 | Fix a failed setup | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) |
 | Upgrade a deployed base | [`docs/UPGRADING.md`](docs/UPGRADING.md) |
+| Merge two machines' bases | [`knowledge-base/16_MERGE.md`](knowledge-base/16_MERGE.md) |
 | Maintain or contribute | [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) and [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) |
 | Translate the project | [`docs/TRANSLATING.md`](docs/TRANSLATING.md) |
 | Review planned work | [`docs/ROADMAP.md`](docs/ROADMAP.md) |

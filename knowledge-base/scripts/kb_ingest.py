@@ -216,6 +216,7 @@ def _ensure_kb_dirs(root: Path) -> None:
         (root / "review" / sub).mkdir(parents=True, exist_ok=True)
     for sub in ("sessions",):
         (root / "interactions" / sub).mkdir(parents=True, exist_ok=True)
+    kbc.ensure_sync_dirs(root)
 
 
 def _files_in_unsorted(root: Path) -> list[Path]:

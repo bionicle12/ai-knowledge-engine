@@ -95,7 +95,12 @@ REVIEW_DIRS = (
     "needs-ai-decision",
     "needs-redaction",
     "excluded-sensitive",
+    "needs-merge",
 )
+
+# Cross-base sync workspace (see 16_MERGE.md). Never indexed.
+SYNC_ROOT = "sync"
+SYNC_DIRS = ("inbox", "outbox", "applied", "backups", "reports")
 
 PROCESSED_DIRS = (
     "markdown",
@@ -188,6 +193,7 @@ class KbConfig:
     indexer_output_path: str = ".repomix/output.xml"
     instructions_version: str = "0.0.0"
     media: dict[str, Any] = field(default_factory=dict)
+    sync: dict[str, Any] = field(default_factory=dict)
 
     @property
     def stt(self) -> dict[str, Any]:
@@ -203,6 +209,24 @@ class KbConfig:
     def archives(self) -> dict[str, Any]:
         """Archive-unpacking settings (media.archives in kb.config.yml)."""
         return (self.media or {}).get("archives", {}) or {}
+
+    @property
+    def sync_label(self) -> str:
+        """Name this base carries into another one (sync.label)."""
+        label = (self.sync or {}).get("label")
+        if label and not str(label).startswith("{{"):
+            return str(label)
+        return (self.raw.get("knowledge_base", {}) or {}).get("name") or self.root.name
+
+    @property
+    def sync_export(self) -> dict[str, Any]:
+        """Export defaults (sync.export in kb.config.yml)."""
+        return (self.sync or {}).get("export", {}) or {}
+
+    @property
+    def sync_import(self) -> dict[str, Any]:
+        """Import defaults (sync.import in kb.config.yml)."""
+        return (self.sync or {}).get("import", {}) or {}
 
     def profile(self) -> ModeProfile:
         profiles = self.raw.get("mode_profiles", {})
@@ -259,6 +283,7 @@ def load_config(root: Path | None = None) -> KbConfig:
         indexer_output_path=raw.get("indexer", {}).get("output_path", ".repomix/output.xml"),
         instructions_version=raw.get("instructions_version", "0.0.0"),
         media=raw.get("media", {}) or {},
+        sync=raw.get("sync", {}) or {},
     )
     return cfg
 
@@ -316,6 +341,98 @@ def read_frontmatter_file(path: Path | str) -> tuple[dict[str, Any], str]:
 
 def write_frontmatter_file(path: Path | str, meta: dict[str, Any], body: str) -> None:
     Path(path).write_text(render_frontmatter(meta, body), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Content fingerprinting (cross-base sync — see 16_MERGE.md)
+# ---------------------------------------------------------------------------
+
+# Frontmatter keys that change without the knowledge itself changing. They are
+# excluded from the fingerprint so a page read on one machine is not treated as
+# "modified" relative to the same page on another machine.
+VOLATILE_FRONTMATTER_KEYS = (
+    "last_accessed",
+    "access_count",
+    "imported_at",
+    "merged_from",
+    "merge_bundle",
+    "merge_source_fingerprint",
+)
+
+
+def normalize_for_fingerprint(text: str) -> str:
+    """Return a canonical form of a knowledge page for content comparison.
+
+    **The body is the knowledge; frontmatter is bookkeeping.** Only the body is
+    normalized here — line endings unified, trailing whitespace stripped per
+    line, trailing blank lines collapsed. Two pages with the same normalized
+    body carry the same knowledge even when their tags, importance or access
+    counters drifted apart on two machines; that metadata is merged
+    non-destructively rather than treated as a conflict.
+    """
+    _, body = parse_frontmatter(text)
+    body_lines = [ln.rstrip() for ln in body.replace("\r\n", "\n").split("\n")]
+    while body_lines and not body_lines[-1]:
+        body_lines.pop()
+    return "\n".join(body_lines)
+
+
+def stable_metadata(meta: dict[str, Any]) -> dict[str, Any]:
+    """Frontmatter without the keys that drift on their own."""
+    return {k: v for k, v in (meta or {}).items() if k not in VOLATILE_FRONTMATTER_KEYS}
+
+
+def content_fingerprint(text: str, prefix_len: int = 16) -> str:
+    """Stable ``sha256:<hex>`` fingerprint of a page's *knowledge content*."""
+    digest = hashlib.sha256(
+        normalize_for_fingerprint(text).encode("utf-8")
+    ).hexdigest()
+    return f"sha256:{digest[:prefix_len]}"
+
+
+def fingerprint_file(path: Path | str, prefix_len: int = 16) -> str:
+    return content_fingerprint(
+        Path(path).read_text(encoding="utf-8", errors="replace"), prefix_len
+    )
+
+
+# ---------------------------------------------------------------------------
+# Sync workspace paths (cross-base import/export)
+# ---------------------------------------------------------------------------
+
+
+def sync_dir(root: Path, name: str = "") -> Path:
+    """Path inside the ``sync/`` workspace (``sync/inbox`` etc.)."""
+    base = root / SYNC_ROOT
+    return base / name if name else base
+
+
+def ensure_sync_dirs(root: Path) -> Path:
+    """Create the ``sync/`` workspace. Idempotent."""
+    base = ensure_dir(sync_dir(root))
+    for sub in SYNC_DIRS:
+        ensure_dir(base / sub)
+    readme = base / "README.md"
+    if not readme.exists():
+        readme.write_text(
+            "# sync/ — cross-base import & export\n\n"
+            "Workspace for merging two deployments of this knowledge base\n"
+            "(see `16_MERGE.md`). Never indexed.\n\n"
+            "| Folder | What lives here |\n"
+            "|--------|-----------------|\n"
+            "| `inbox/` | Drop bundles (`.zip`) from another base here, then run import |\n"
+            "| `outbox/` | Bundles produced by export |\n"
+            "| `applied/` | Bundles already imported |\n"
+            "| `backups/` | Pre-import snapshots of every file the import touched |\n"
+            "| `reports/` | Per-import merge reports |\n",
+            encoding="utf-8",
+        )
+    return base
+
+
+def timestamp_slug() -> str:
+    """``YYYY-MM-DDTHH-MM-SS`` — filesystem-safe, sortable."""
+    return _dt.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
 
 
 # ---------------------------------------------------------------------------

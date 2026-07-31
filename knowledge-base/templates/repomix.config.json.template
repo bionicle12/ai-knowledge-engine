@@ -30,6 +30,7 @@
       "assets/**",
       "review/**",
       "interactions/**",
+      "sync/**",
       "setup/**",
       "scripts/**",
       "shell/**",

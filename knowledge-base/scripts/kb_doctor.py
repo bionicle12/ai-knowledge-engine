@@ -327,6 +327,75 @@ def check_media(root: Path) -> list[CheckResult]:
     return results
 
 
+def check_sync(root: Path) -> list[CheckResult]:
+    """Cross-base import/export readiness (see 16_MERGE.md)."""
+    results: list[CheckResult] = []
+
+    missing_scripts = [
+        name for name in ("kb_export.py", "kb_import.py")
+        if not (root / "scripts" / name).is_file()
+    ]
+    if missing_scripts:
+        results.append(
+            CheckResult(
+                "sync:scripts",
+                "warn",
+                f"missing: {', '.join(missing_scripts)} "
+                "(run kb_update.py to pull them into this base)",
+            )
+        )
+    else:
+        results.append(CheckResult("sync:scripts", "ok"))
+
+    sync_root = kbc.sync_dir(root)
+    if not sync_root.is_dir():
+        results.append(
+            CheckResult(
+                "sync:workspace",
+                "warn",
+                "sync/ not created yet (kb_ingest.py --init-dirs or the first "
+                "export/import will create it)",
+            )
+        )
+    else:
+        missing_dirs = [d for d in kbc.SYNC_DIRS if not (sync_root / d).is_dir()]
+        results.append(
+            CheckResult("sync:workspace", "warn", f"missing sub-dirs: {', '.join(missing_dirs)}")
+            if missing_dirs
+            else CheckResult("sync:workspace", "ok")
+        )
+
+    queue = root / "review" / "needs-merge"
+    if queue.is_dir():
+        pending = [p for p in queue.glob("*.md")]
+        if pending:
+            results.append(
+                CheckResult(
+                    "sync:pending-merges",
+                    "warn",
+                    f"{len(pending)} unresolved merge package(s) in review/needs-merge/ "
+                    "— run !merge in the AI chat",
+                    details=[p.name for p in pending[:10]],
+                )
+            )
+        else:
+            results.append(CheckResult("sync:pending-merges", "ok"))
+
+    inbox = kbc.sync_dir(root, "inbox")
+    if inbox.is_dir():
+        waiting = list(inbox.glob("*.zip"))
+        if waiting:
+            results.append(
+                CheckResult(
+                    "sync:inbox",
+                    "warn",
+                    f"{len(waiting)} bundle(s) waiting in sync/inbox/ — run scripts/kb_import.py",
+                    details=[p.name for p in waiting[:10]],
+                )
+            )
+    return results
+
+
 def check_repomix_config(root: Path) -> CheckResult:
     p = root / "repomix.config.json"
     if not p.is_file():
@@ -374,6 +443,7 @@ def run_all_checks(
 
     results.append(check_frontmatter_roundtrip())
     results.extend(check_media(root))
+    results.extend(check_sync(root))
     results.append(check_repomix_config(root))
     results.append(check_log_writable(root, ephemeral=ephemeral_log))
     return results

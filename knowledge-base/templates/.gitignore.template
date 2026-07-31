@@ -20,6 +20,15 @@ __pycache__/
 # Lint reports (regenerated)
 lint-report.md
 
+# Cross-base sync workspace (see 16_MERGE.md). Bundles are large binaries and
+# backups are machine-local; the merge reports are worth keeping if you version
+# the base — drop the last line to do that.
+sync/inbox/
+sync/outbox/
+sync/applied/
+sync/backups/
+sync/reports/
+
 # Optional: ignore raw materials (sensitive). Uncomment if you don't want
 # to version-control source documents.
 # raw/

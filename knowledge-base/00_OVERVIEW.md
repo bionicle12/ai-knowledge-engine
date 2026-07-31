@@ -41,6 +41,7 @@ Deploying a **Raw-First Knowledge Pipeline** into a user's project:
 | 13 | `13_AUTORUN.md` | Copy `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`; install git hook |
 | 14 | `14_INITIAL_POPULATION.md` | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` from `examples/<role>.yml` |
 | 15 | `15_MEDIA_PROCESSING.md` | Copy `scripts/kb_stt.py`, `scripts/kb_ocr.py`, `templates/requirements-media.txt`; configure `media:` |
+| 16 | `16_MERGE.md` | Copy `scripts/kb_export.py`, `scripts/kb_import.py`, `shell/export.sh`, `shell/import.sh`; configure `sync:` (only needed if the base runs on more than one machine) |
 
 After all modules: run `bash shell/doctor.sh` (or `python3 scripts/kb_doctor.py`) to verify.
 
@@ -55,7 +56,7 @@ Layout BEFORE finalize:
 ```
 {user-project-root}/
 ├── setup/                            ← upstream instructions (source)
-│   ├── 00_OVERVIEW.md … 15_MEDIA_PROCESSING.md
+│   ├── 00_OVERVIEW.md … 16_MERGE.md
 │   ├── README.md
 │   ├── scripts/, shell/, templates/, examples/
 │   └── shell/finalize.sh             ← run at the end

@@ -291,3 +291,88 @@ def test_media_accessors_parse(tmp_path: Path):
     assert cfg.stt["model"] == "small"
     assert cfg.ocr["enabled"] is False
     assert cfg.archives["max_files"] == 50
+
+
+# ---------------------------------------------------------------------------
+# Cross-base sync primitives (see 16_MERGE.md)
+# ---------------------------------------------------------------------------
+
+
+def test_fingerprint_ignores_frontmatter_drift():
+    a = "---\ntags: [x]\naccess_count: 0\n---\n\n# T\n\nBody.\n"
+    b = "---\ntags: [x, y]\naccess_count: 12\nimportance: 8\n---\n\n# T\n\nBody.\n"
+    assert kbc.content_fingerprint(a) == kbc.content_fingerprint(b)
+
+
+def test_fingerprint_ignores_trailing_whitespace_and_line_endings():
+    a = "---\ntitle: T\n---\n\n# T\n\nBody.\n"
+    b = "---\ntitle: T\n---\r\n\r\n# T   \r\n\r\nBody.   \r\n\r\n\r\n"
+    assert kbc.content_fingerprint(a) == kbc.content_fingerprint(b)
+
+
+def test_fingerprint_detects_body_change():
+    a = "---\ntitle: T\n---\n\n# T\n\nBody.\n"
+    b = "---\ntitle: T\n---\n\n# T\n\nBody, extended.\n"
+    assert kbc.content_fingerprint(a) != kbc.content_fingerprint(b)
+
+
+def test_fingerprint_file_matches_content_fingerprint(tmp_path: Path):
+    page = tmp_path / "p.md"
+    text = "---\ntitle: T\n---\n\n# T\n\nBody.\n"
+    page.write_text(text, encoding="utf-8")
+    assert kbc.fingerprint_file(page) == kbc.content_fingerprint(text)
+
+
+def test_stable_metadata_drops_volatile_keys():
+    meta = {"title": "T", "access_count": 5, "merged_from": "other", "tags": ["a"]}
+    assert kbc.stable_metadata(meta) == {"title": "T", "tags": ["a"]}
+
+
+def test_ensure_sync_dirs_is_idempotent(tmp_path: Path):
+    first = kbc.ensure_sync_dirs(tmp_path)
+    kbc.ensure_sync_dirs(tmp_path)
+    assert first == tmp_path / "sync"
+    for sub in kbc.SYNC_DIRS:
+        assert (first / sub).is_dir()
+    assert (first / "README.md").is_file()
+
+
+def test_sync_dir_paths(tmp_path: Path):
+    assert kbc.sync_dir(tmp_path) == tmp_path / "sync"
+    assert kbc.sync_dir(tmp_path, "inbox") == tmp_path / "sync" / "inbox"
+
+
+def test_sync_label_falls_back_to_kb_name(tmp_path: Path):
+    (tmp_path / "kb.config.yml").write_text(
+        "knowledge_base:\n  name: my-kb\n", encoding="utf-8"
+    )
+    assert kbc.load_config(tmp_path).sync_label == "my-kb"
+
+
+def test_sync_label_ignores_unparameterized_placeholder(tmp_path: Path):
+    (tmp_path / "kb.config.yml").write_text(
+        'knowledge_base:\n  name: my-kb\nsync:\n  label: "{{KB_LABEL}}"\n',
+        encoding="utf-8",
+    )
+    assert kbc.load_config(tmp_path).sync_label == "my-kb"
+
+
+def test_sync_sections_parse(tmp_path: Path):
+    (tmp_path / "kb.config.yml").write_text(
+        "knowledge_base:\n  name: t\n"
+        "sync:\n"
+        "  label: laptop-a\n"
+        "  export:\n    with_assets: true\n"
+        "  import:\n    strategy: prefer-local\n",
+        encoding="utf-8",
+    )
+    cfg = kbc.load_config(tmp_path)
+    assert cfg.sync_label == "laptop-a"
+    assert cfg.sync_export["with_assets"] is True
+    assert cfg.sync_import["strategy"] == "prefer-local"
+
+
+def test_timestamp_slug_is_filesystem_safe():
+    slug = kbc.timestamp_slug()
+    assert ":" not in slug
+    assert len(slug) == len("2026-07-31T10-14-36")

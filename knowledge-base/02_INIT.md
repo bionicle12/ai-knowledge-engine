@@ -62,11 +62,12 @@ my-project/
 ├── repomix.config.json
 ├── requirements.txt
 ├── reindex.command, watcher-start.command, watcher-stop.command   (macOS — double-click)
-├── reindex.bat, watcher-start.bat                                  (Windows — double-click)
-├── shell/        ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
+├── export.command, import.command                                  (macOS — cross-base sync)
+├── reindex.bat, watcher-start.bat, export.bat, import.bat          (Windows — double-click)
+├── shell/        ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh, export.sh, import.sh
 ├── scripts/      ← Python pipeline
 ├── templates/, examples/
-├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, sync/
 ├── .repomix/
 └── .venv/
 ```
@@ -161,12 +162,15 @@ knowledge-base/
 ├── repomix.config.json         # Indexer config
 ├── requirements.txt            # Python dependencies
 ├── reindex.command, watcher-start.command, watcher-stop.command   # macOS launchers
-├── reindex.bat, watcher-start.bat                                 # Windows launchers
+├── export.command, import.command                                 # macOS: cross-base sync
+├── reindex.bat, watcher-start.bat, export.bat, import.bat         # Windows launchers
 ├── shell/                      # Linux / CLI wrappers
 │   ├── reindex.sh
 │   ├── watcher.sh
 │   ├── lint.sh
-│   └── doctor.sh
+│   ├── doctor.sh
+│   ├── export.sh
+│   └── import.sh
 │
 ├── scripts/
 │   └── kb_ingest.py            # Pipeline (see 03_PIPELINE.md)
@@ -218,12 +222,20 @@ knowledge-base/
 │   ├── needs-classification/
 │   ├── needs-ai-decision/
 │   ├── needs-redaction/
+│   ├── needs-merge/            # Cross-base merge packages (see 16_MERGE.md)
 │   └── excluded-sensitive/
 │
 ├── interactions/               # Feedback loop (NOT indexed directly)
 │   ├── sessions/               # Dialog folders with timestamps
 │   ├── insights/               # Extracted patterns
 │   └── meta-reviews/           # Periodic analysis
+│
+├── sync/                       # Cross-base import/export (NOT indexed)
+│   ├── inbox/                  # Drop bundles from the other machine here
+│   ├── outbox/                 # Bundles this base produced
+│   ├── applied/                # Bundles already imported
+│   ├── backups/                # Pre-import snapshots
+│   └── reports/                # Merge reports
 │
 ├── setup/                      # Seed instructions (NOT indexed)
 └── .repomix/
@@ -266,7 +278,25 @@ language_policy:
 entities:
   # Described by the user via examples/ or manually
   # see examples/*.yml
+
+sync:
+  # Only matters if the user runs this base on more than one machine.
+  label: "work-laptop"          # {{KB_LABEL}} — how this base identifies itself
+  export:
+    sections: ["knowledge", "assets-index", "interactions", "meta", "config", "log"]
+    with_assets: false
+  import:
+    strategy: "safe"
+    similarity_threshold: 0.85
+    backup: true
+    move_applied: true
 ```
+
+> **`{{KB_LABEL}}`** — ask only when the user says they work from several machines
+> (e.g. a studio laptop and a work laptop). It must be **different in each
+> deployment**: it is stamped onto every imported page as `merged_from:` and is
+> what makes a merge traceable. When there is only one machine, set it to the
+> same value as `knowledge_base.name`. See `16_MERGE.md`.
 
 ---
 

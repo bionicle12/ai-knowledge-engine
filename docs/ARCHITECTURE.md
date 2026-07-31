@@ -29,7 +29,7 @@ ai-knowledge-engine/
 │
 ├── knowledge-base/               ← Full Mode (canonical EN)
 │   ├── README.md                 ← Reading order & principles
-│   ├── 00_OVERVIEW.md … 15_MEDIA_PROCESSING.md
+│   ├── 00_OVERVIEW.md … 16_MERGE.md
 │   ├── templates/                ← Files to copy & parameterize
 │   │   ├── kb.config.yml.template
 │   │   ├── repomix.config.json.template
@@ -41,6 +41,8 @@ ai-knowledge-engine/
 │   │   ├── kb_ingest.py, kb_stt.py, kb_ocr.py
 │   │   ├── kb_reindex.py, kb_route.py
 │   │   │                           ← orchestration + deterministic navigation
+│   │   ├── kb_export.py, kb_import.py
+│   │   │                           ← cross-base merge (16_MERGE.md)
 │   │   ├── kb_lint.py, kb_watch.py, kb_reflect.py, kb_nlp_batch.py
 │   │   ├── kb_populate.py, kb_save_session.py, kb_doctor.py, kb_view.py
 │   │   ├── kb_update.py           ← thin launcher for the central updater
@@ -48,8 +50,10 @@ ai-knowledge-engine/
 │   │   └── tests/
 │   ├── shell/                    ← POSIX wrappers + macOS/Windows launchers
 │   │   ├── reindex.sh, watcher.sh, lint.sh, doctor.sh, finalize.sh
+│   │   ├── export.sh, import.sh
 │   │   ├── reindex.command, watcher-start.command, watcher-stop.command
-│   │   └── reindex.bat, watcher-start.bat
+│   │   ├── export.command, import.command
+│   │   └── reindex.bat, watcher-start.bat, export.bat, import.bat
 │   └── examples/                 ← Role templates (*.yml)
 │
 ├── quick-start/                  ← Lite Mode
@@ -90,8 +94,9 @@ Agent flow:
 14. **`13_AUTORUN.md`** — `kb_watch.py`, `kb_reflect.py`, `kb_nlp_batch.py`, `shell/watcher.sh`; install git hook
 15. **`14_INITIAL_POPULATION.md`** — generate role-specific `DATA_PLACEMENT_EXAMPLES.md`
 16. **`15_MEDIA_PROCESSING.md`** — STT/OCR/archives (`kb_stt.py`, `kb_ocr.py`, `requirements-media.txt`)
-17. **Run `kb_doctor.py`** — smoke-test the deployment
-18. **Run `finalize.sh`** — flatten into the project root
+17. **`16_MERGE.md`** — cross-base merge (`kb_export.py`, `kb_import.py`, `shell/export.sh`, `shell/import.sh`); only needed when the base runs on more than one machine
+18. **Run `kb_doctor.py`** — smoke-test the deployment
+19. **Run `finalize.sh`** — flatten into the project root
 
 ## Key invariants
 
@@ -100,7 +105,8 @@ Agent flow:
 - **Mode-aware behavior** is configured via `kb.config.yml.mode_profiles`. Reference scripts read this and branch accordingly.
 - **Lifecycle** (`permanent` / `evolving` / `temporal`) is the cross-cutting concept that both `kb_lint.py` and `kb_reflect.py` must respect identically.
 - **Reference scripts must be idempotent** — re-running on already-processed inputs is safe.
-- **Privacy:** never index `raw/`, `assets/`, `review/`, `interactions/` — only `knowledge/**` and `assets-index/**`.
+- **Privacy:** never index `raw/`, `assets/`, `review/`, `interactions/`, `sync/` — only `knowledge/**` and `assets-index/**`.
+- **Merges never overwrite silently.** `kb_import.py` applies only what is provably safe (new pages, identical content, non-destructive metadata merges, fast-forwards of untouched pages) and backs up everything it touches; anything ambiguous goes to `review/needs-merge/` for the agent's `!merge`.
 
 ## Versioning model
 

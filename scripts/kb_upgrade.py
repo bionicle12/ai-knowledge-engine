@@ -49,6 +49,8 @@ VERSION_FILE = REPO_ROOT / "VERSION"
 SCRIPT_FILES = (
     "kb_common.py",
     "kb_doctor.py",
+    "kb_export.py",
+    "kb_import.py",
     "kb_ingest.py",
     "kb_lint.py",
     "kb_nlp_batch.py",
@@ -69,6 +71,8 @@ SHELL_FILES = (
     "watcher.sh",
     "lint.sh",
     "doctor.sh",
+    "export.sh",
+    "import.sh",
 )
 
 VIEW_BLOCK_BEGIN = "<!-- AI-KE:VIEW:BEGIN — managed by kb_upgrade.py -->"

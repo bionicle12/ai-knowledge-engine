@@ -15,14 +15,18 @@ What it does per base:
   3. Adds a `media:` section to kb.config.yml if missing (STT/OCR/archives).
   4. Bumps `instructions_version` to the repo VERSION.
   5. Refreshes reindex.bat (now delegates to kb_reindex.py on Windows).
+  6. Installs the cross-base sync layer (16_MERGE.md): shell/export.sh,
+     shell/import.sh, the double-click launchers, the sync/ workspace and a
+     `sync:` section in kb.config.yml.
 
 Usage:
   python3 scripts/sync_deployed_bases.py <target-root> [--dry-run]
-  python3 scripts/sync_deployed_bases.py            # defaults to the path below
+  KB_SYNC_TARGET=/path/to/bases python3 scripts/sync_deployed_bases.py
 """
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -33,7 +37,9 @@ SRC_TEMPLATES = REPO_ROOT / "knowledge-base" / "templates"
 SRC_SHELL = REPO_ROOT / "knowledge-base" / "shell"
 VERSION_FILE = REPO_ROOT / "VERSION"
 
-DEFAULT_TARGET = Path(r"C:\OSPanel\domains\main\brain-my-ai")
+# The target is machine-specific, so there is no hardcoded default: pass it as
+# an argument or export KB_SYNC_TARGET.
+ENV_TARGET_VAR = "KB_SYNC_TARGET"
 
 MEDIA_BLOCK = """\
 # Media processing — transcription (STT), OCR, archive unpacking.
@@ -161,12 +167,115 @@ def patch_config(base: Path, version: str, *, dry_run: bool) -> list[str]:
     return notes
 
 
+SYNC_SHELL_FILES = ("export.sh", "import.sh")
+SYNC_LAUNCHERS = ("export.command", "import.command", "export.bat", "import.bat")
+SYNC_DIRS = ("inbox", "outbox", "applied", "backups", "reports")
+
+SYNC_BLOCK = """\
+# Cross-base import/export — merging two deployments of this base
+# (see 16_MERGE.md). Added by sync_deployed_bases; set a distinct `label`
+# on every machine before the first export.
+sync:
+  label: "{label}"
+  export:
+    sections: ["knowledge", "assets-index", "interactions", "meta", "config", "log"]
+    with_assets: false
+  import:
+    strategy: "safe"
+    similarity_threshold: 0.85
+    backup: true
+    move_applied: true
+
+"""
+
+
+def sync_merge_layer(base: Path, *, dry_run: bool) -> list[str]:
+    """Install the export/import wrappers, launchers and sync/ workspace."""
+    notes: list[str] = []
+
+    shell_dir = base / "shell"
+    for fname in SYNC_SHELL_FILES:
+        src = SRC_SHELL / fname
+        if not src.is_file():
+            continue
+        dst = shell_dir / fname
+        if dst.is_file() and dst.read_bytes() == src.read_bytes():
+            continue
+        action = "update" if dst.is_file() else "add"
+        if not dry_run:
+            shell_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            dst.chmod(0o755)
+        notes.append(f"  shell/{fname}: {action}")
+
+    # Launchers live at the base root after finalize.sh promoted them there.
+    for fname in SYNC_LAUNCHERS:
+        src = SRC_SHELL / fname
+        if not src.is_file():
+            continue
+        dst = base / fname
+        if dst.is_file() and dst.read_bytes() == src.read_bytes():
+            continue
+        action = "update" if dst.is_file() else "add"
+        if not dry_run:
+            shutil.copy2(src, dst)
+            if fname.endswith(".command"):
+                dst.chmod(0o755)
+        notes.append(f"  {fname}: {action}")
+
+    sync_root = base / "sync"
+    if not sync_root.is_dir():
+        if not dry_run:
+            for sub in SYNC_DIRS:
+                (sync_root / sub).mkdir(parents=True, exist_ok=True)
+        notes.append("  sync/: created (inbox, outbox, applied, backups, reports)")
+
+    queue = base / "review" / "needs-merge"
+    if (base / "review").is_dir() and not queue.is_dir():
+        if not dry_run:
+            queue.mkdir(parents=True, exist_ok=True)
+        notes.append("  review/needs-merge/: created")
+
+    return notes
+
+
+def patch_sync_config(base: Path, *, dry_run: bool) -> list[str]:
+    """Add a `sync:` section to kb.config.yml if it has none."""
+    cfg = base / "kb.config.yml"
+    if not cfg.is_file():
+        return []
+    text = cfg.read_text(encoding="utf-8")
+    if "\nsync:" in ("\n" + text) or text.startswith("sync:"):
+        return []
+
+    # Default the label to the base folder name — recognisable, and distinct
+    # per machine as long as the folders differ. The user should confirm it.
+    block = SYNC_BLOCK.format(label=base.name)
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    inserted = False
+    for line in lines:
+        if not inserted and line.startswith("autorun:"):
+            out.append(block)
+            inserted = True
+        out.append(line)
+    if not inserted:
+        if not text.endswith("\n"):
+            out.append("\n")
+        out.append("\n" + block)
+    if not dry_run:
+        cfg.write_text("".join(out), encoding="utf-8")
+    return [f'  kb.config.yml: added sync: section (label: "{base.name}" — confirm it)']
+
+
 def sync_base(base: Path, version: str, *, dry_run: bool) -> None:
     print(f"\n=== {base.name} ===")
     notes: list[str] = []
     notes += sync_scripts(base, dry_run=dry_run)
     notes += sync_requirements_media(base, dry_run=dry_run)
     notes += sync_reindex_bat(base, dry_run=dry_run)
+    notes += sync_merge_layer(base, dry_run=dry_run)
+    notes += patch_sync_config(base, dry_run=dry_run)
     notes += patch_config(base, version, dry_run=dry_run)
     if notes:
         for n in notes:
@@ -177,12 +286,25 @@ def sync_base(base: Path, version: str, *, dry_run: bool) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Sync deployed knowledge bases to the latest engine")
-    parser.add_argument("target", nargs="?", type=Path, default=DEFAULT_TARGET,
-                        help="Folder containing one or more deployed bases")
+    parser.add_argument("target", nargs="?", type=Path, default=None,
+                        help="Folder containing one or more deployed bases "
+                             f"(or set ${ENV_TARGET_VAR})")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
-    target: Path = args.target
+    target: Path | None = args.target
+    if target is None:
+        env_target = os.environ.get(ENV_TARGET_VAR, "").strip()
+        if not env_target:
+            print(
+                "target folder required: pass it as an argument or set "
+                f"${ENV_TARGET_VAR}\n"
+                "  python3 scripts/sync_deployed_bases.py /path/to/deployed-bases",
+                file=sys.stderr,
+            )
+            return 2
+        target = Path(env_target)
+
     if not target.is_dir():
         print(f"target not found: {target}", file=sys.stderr)
         return 2

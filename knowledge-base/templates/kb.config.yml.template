@@ -68,6 +68,21 @@ media:
     enabled: true
     max_files: 200                                     # safety cap when unpacking
 
+# Cross-base import/export — merging two deployments of this base
+# (see 16_MERGE.md). Used by scripts/kb_export.py and scripts/kb_import.py.
+sync:
+  # Name this base carries into the other one. Make it recognisable —
+  # it ends up in `merged_from:` on every imported page.
+  label: "{{KB_LABEL}}"                                # e.g. "studio-laptop"
+  export:
+    sections: ["knowledge", "assets-index", "interactions", "meta", "config", "log"]
+    with_assets: false                                 # binary originals stay home by default
+  import:
+    strategy: "safe"                                   # safe | prefer-incoming | prefer-local
+    similarity_threshold: 0.85                         # ≥ → flagged as a merge candidate
+    backup: true                                       # snapshot every touched file first
+    move_applied: true                                 # bundle → sync/applied/ after import
+
 # Auto-run behavior (see 13_AUTORUN.md)
 autorun:
   watch_enabled: true

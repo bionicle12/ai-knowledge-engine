@@ -18,6 +18,52 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+### Added
+- **Cross-base merge — running one knowledge base on several machines.**
+  Two deployments of the same base can now exchange knowledge without either
+  side losing work. See `knowledge-base/16_MERGE.md`.
+  - `scripts/kb_export.py` — packs the transferable layer (`knowledge/`,
+    `assets-index/`, `interactions/`, provenance metadata, role/entities
+    snapshot, `log.md`) into a zip bundle with a manifest carrying per-page
+    content fingerprints. `raw/`, `processed/`, `review/` and `sync/` never
+    travel; binary `assets/` are opt-in via `--with-assets`. Supports
+    `--since`, `--only`, `--skip`, `--label` and `--dry-run`.
+  - `scripts/kb_import.py` — merges a bundle. Adds pages that are new, skips
+    identical ones, merges richer metadata non-destructively, recognises the
+    same content under a different filename, fast-forwards pages that were
+    imported earlier and never edited locally, and routes anything changed on
+    both sides to `review/needs-merge/` with a unified diff. Pages that overlap
+    ≥85% with an existing page are added *and* flagged as merge candidates.
+    Every modified file is snapshotted to `sync/backups/` first; zip-slip
+    members are refused; re-importing the same bundle is a no-op.
+  - `!merge` agent command — resolves the queued packages, audits the merged
+    pages for contradictions, cross-links the imported knowledge, refreshes
+    routing, lints and reindexes. `!export` / `!import` wrap the scripts.
+  - `sync/` workspace (`inbox`, `outbox`, `applied`, `backups`, `reports`) and
+    the `review/needs-merge/` queue, both excluded from the index and git.
+  - `sync:` section in `kb.config.yml` (label, export sections, import
+    strategy, similarity threshold, backup and move-applied switches). CLI
+    flags override it.
+  - Wrappers `shell/export.sh` / `shell/import.sh`, plus double-click launchers
+    `export.command` / `import.command` (macOS) and `export.bat` /
+    `import.bat` (Windows).
+  - `kb_common`: content fingerprints over the page **body** (frontmatter is
+    bookkeeping and merges instead of conflicting), `stable_metadata()`,
+    `ensure_sync_dirs()`, `sync_dir()`, `timestamp_slug()`.
+  - `kb_doctor` reports sync readiness: missing scripts, missing workspace,
+    bundles waiting in `sync/inbox/`, unresolved packages in
+    `review/needs-merge/`.
+  - `sync_deployed_bases.py` installs the whole layer into already-finalized
+    bases — wrappers, double-click launchers, `sync/` workspace,
+    `review/needs-merge/`, and a `sync:` config section whose `label` defaults
+    to the base folder name so two bases never share one identity.
+
+### Fixed
+- `scripts/sync_deployed_bases.py` no longer defaults to a hardcoded personal
+  Windows path. The target folder is now a required argument or `$KB_SYNC_TARGET`.
+- `export.command` / `import.command` survive a non-tty run (`clear` and the
+  closing `read` no longer turn a successful run into a failure).
+
 ## [0.11.0] - 2026-07-26
 
 ### Added

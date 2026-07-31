@@ -35,6 +35,7 @@ The agent must read modules **strictly in this order**:
 | 13 | `13_AUTORUN.md` | File watcher, git hooks, cron — automatic processing |
 | 14 | `14_INITIAL_POPULATION.md` | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` |
 | 15 | `15_MEDIA_PROCESSING.md` | Transcription (STT), OCR, archives — out-of-the-box, all platforms |
+| 16 | `16_MERGE.md` | Cross-base import/export: merge two deployments without losing knowledge |
 
 Role configurations: `examples/`.
 Templates ready for copy + parameterization: `templates/`.

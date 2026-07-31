@@ -30,6 +30,9 @@ After the agent has read `AGENTS.md`, these commands work:
 | `!audit` | Full AI review of the base — contradictions, gaps, merge candidates | ~50–100K tokens |
 | `!review` | Process the `review/` queue: pick up files routed for AI judgment, extract knowledge, ask for input where needed | ~5–30K tokens |
 | `!populate` | Re-generate `DATA_PLACEMENT_EXAMPLES.md` (when you've changed your role YAML) | ~50 tokens |
+| `!export` | Pack this base into a bundle for another machine | ~100 tokens |
+| `!import` | Merge bundles waiting in `sync/inbox/` | ~200 tokens |
+| `!merge` | Finish an import: resolve conflicts, check contradictions, cross-link the new knowledge | ~5–40K tokens |
 | `!super` | Toggle operating mode: default ↔ super | 0 tokens |
 | `!super on` / `!super off` | Force a mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |
@@ -58,6 +61,24 @@ If you didn't run the watcher and want to process accumulated raw files now:
 - **Linux:** `./shell/reindex.sh`
 - **Windows:** double-click `reindex.bat`
 
+## Using this base on two computers
+
+If you deployed this base on more than one machine, keep them in sync instead of
+copying folders around:
+
+1. **On the machine with new knowledge** — double-click `export.command`
+   (macOS) / `export.bat` (Windows), or run `./shell/export.sh`. A `.zip` appears
+   in `sync/outbox/`.
+2. **Move that file** to the other machine's `sync/inbox/` folder.
+3. **There** — double-click `import.command` / `import.bat`, or run
+   `./shell/import.sh`.
+4. **In the AI chat** — say `!merge`.
+
+Nothing gets overwritten: new pages are added, identical ones are skipped, and
+anything you changed on **both** machines is queued with a diff for the agent to
+merge. Every touched file is backed up to `sync/backups/` first. Do it in both
+directions and both machines end up with everything.
+
 ## What goes where
 
 See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was generated for **{{PRIMARY_ROLE}}**.
@@ -72,6 +93,7 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 | Generated `DATA_PLACEMENT_EXAMPLES.md` doesn't fit me | Edit `examples/<role>.yml`, then say `!populate`. |
 | Watcher won't pick up files | Check `./shell/watcher.sh --status`. Make sure files are in `raw/<sub>/unsorted/`, not just `raw/`. |
 | Need a smoke test of the install | Run `./shell/doctor.sh` (or `python3 scripts/kb_doctor.py`). |
+| Imported a bundle and something is "waiting" | Say `!merge` in chat — pages changed on both machines are queued in `review/needs-merge/`. |
 | Want to browse the knowledge base visually | Say `!view`; use `!view status` for the URL or `!view stop` to stop it. |
 
 ## Where to find more
@@ -79,7 +101,7 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 - `AGENTS.md` — full instructions for the AI
 - `KNOWLEDGE_STRUCTURE.md` — what every folder is for
 - `DATA_PLACEMENT_EXAMPLES.md` — your personalized "what to drop where"
-- `00_OVERVIEW.md` … `14_INITIAL_POPULATION.md` — original deployment instructions (kept for reference)
+- `00_OVERVIEW.md` … `16_MERGE.md` — original deployment instructions (kept for reference)
 - `kb.config.yml` — your configuration
 
 ## One-line summary
