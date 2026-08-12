@@ -40,7 +40,6 @@ import json
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterable
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -138,29 +137,62 @@ def _relative_to_root(p: Path, root: Path) -> str:
         return str(p)
 
 
+@dataclass
+class PageData:
+    """One knowledge page, read and parsed exactly once per lint run."""
+
+    path: Path
+    meta: dict
+    body: str
+    text: str
+    wikilinks: list[str] = field(default_factory=list)
+
+
+def _load_pages(root: Path, report: LintReport) -> list[PageData]:
+    """Read every knowledge page once and cache (meta, body, wikilinks).
+
+    A file that cannot be read or parsed becomes a single ``unreadable``
+    error instead of crashing the whole run, and is excluded from the
+    per-page checks (they could only misreport on garbage anyway).
+    """
+    out: list[PageData] = []
+    for p in _knowledge_pages(root):
+        try:
+            text = p.read_text(encoding="utf-8-sig")
+            meta, body = kbc.parse_frontmatter(text)
+        except Exception as e:  # noqa: BLE001
+            report.issues.append(
+                LintIssue(
+                    check="unreadable",
+                    severity="error",
+                    path=_relative_to_root(p, root),
+                    message=f"failed to read/parse: {e}",
+                )
+            )
+            continue
+        out.append(
+            PageData(
+                path=p,
+                meta=meta,
+                body=body,
+                text=text,
+                wikilinks=[t.strip() for t in kbc.extract_wikilinks(text)],
+            )
+        )
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Individual checks
 # ---------------------------------------------------------------------------
 
 
 def _check_frontmatter(
-    pages: list[Path], root: Path, *, fix: bool, report: LintReport
+    pages: list[PageData], root: Path, *, fix: bool, report: LintReport
 ) -> None:
     today_iso = _today().isoformat()
-    for p in pages:
-        try:
-            meta, body = kbc.read_frontmatter_file(p)
-        except Exception as e:  # noqa: BLE001
-            report.issues.append(
-                LintIssue(
-                    check="frontmatter",
-                    severity="error",
-                    path=_relative_to_root(p, root),
-                    message=f"failed to parse: {e}",
-                )
-            )
-            continue
-
+    for page in pages:
+        p, meta, body = page.path, page.meta, page.body
         missing = [f for f in REQUIRED_FRONTMATTER_FIELDS if f not in meta]
         invalid_lifecycle = (
             "lifecycle" in meta and meta["lifecycle"] not in VALID_LIFECYCLES
@@ -217,11 +249,11 @@ def _check_frontmatter(
 
 
 def _check_stale(
-    pages: list[Path], root: Path, *, threshold_days: int, report: LintReport
+    pages: list[PageData], root: Path, *, threshold_days: int, report: LintReport
 ) -> None:
     today = _today()
-    for p in pages:
-        meta, _ = kbc.read_frontmatter_file(p)
+    for page in pages:
+        p, meta = page.path, page.meta
         if meta.get("lifecycle") == "permanent":
             continue
         verified = _parse_date(meta.get("last_verified") or meta.get("extracted_at"))
@@ -239,14 +271,12 @@ def _check_stale(
             )
 
 
-def _check_broken_links(pages: list[Path], root: Path, report: LintReport) -> None:
+def _check_broken_links(pages: list[PageData], root: Path, report: LintReport) -> None:
     knowledge = root / "knowledge"
     slugs = kbc.scan_knowledge_slugs(knowledge)
-    for p in pages:
-        text = p.read_text(encoding="utf-8")
-        targets = kbc.extract_wikilinks(text)
-        for target in targets:
-            target = target.strip()
+    for page in pages:
+        p = page.path
+        for target in page.wikilinks:
             if "/" in target:
                 # explicit path: knowledge/path/slug
                 candidate = knowledge / f"{target}.md"
@@ -271,27 +301,35 @@ def _check_broken_links(pages: list[Path], root: Path, report: LintReport) -> No
                     )
 
 
-def _check_orphans(pages: list[Path], root: Path, report: LintReport) -> None:
-    # Page is orphan if no other page wikilinks to its slug or its rel-path
-    knowledge = root / "knowledge"
+def _orphan_paths(pages: list[PageData], knowledge: Path) -> set[Path]:
+    """Pages with no inbound wikilink from any *other* page.
+
+    routing/ pages and routing-table.md are entry points and never counted.
+    Single source of truth for both the orphan check and the metrics, so the
+    two never drift apart again.
+    """
     incoming: dict[str, set[Path]] = {}
-    for p in pages:
-        text = p.read_text(encoding="utf-8")
-        for target in kbc.extract_wikilinks(text):
-            incoming.setdefault(target.strip(), set()).add(p)
-    for p in pages:
-        slug = p.stem
-        rel_no_ext = kbc.posix_relpath(p, knowledge, without_suffix=True)
-        sources = incoming.get(slug, set()) | incoming.get(rel_no_ext, set())
-        sources_excluding_self = sources - {p}
-        if sources_excluding_self:
-            continue
-        # Skip routing-table.md and routing/ pages (they are entry points)
+    for page in pages:
+        for target in page.wikilinks:
+            incoming.setdefault(target, set()).add(page.path)
+    orphans: set[Path] = set()
+    for page in pages:
+        p = page.path
         rel = p.relative_to(knowledge)
         if rel.parts and rel.parts[0] == "routing":
             continue
         if rel.name == "routing-table.md":
             continue
+        rel_no_ext = kbc.posix_relpath(p, knowledge, without_suffix=True)
+        sources = incoming.get(p.stem, set()) | incoming.get(rel_no_ext, set())
+        if not (sources - {p}):
+            orphans.add(p)
+    return orphans
+
+
+def _check_orphans(pages: list[PageData], root: Path, report: LintReport) -> None:
+    knowledge = root / "knowledge"
+    for p in sorted(_orphan_paths(pages, knowledge)):
         report.issues.append(
             LintIssue(
                 check="orphan",
@@ -302,9 +340,9 @@ def _check_orphans(pages: list[Path], root: Path, report: LintReport) -> None:
         )
 
 
-def _check_source_hash(pages: list[Path], root: Path, report: LintReport) -> None:
-    for p in pages:
-        meta, _ = kbc.read_frontmatter_file(p)
+def _check_source_hash(pages: list[PageData], root: Path, report: LintReport) -> None:
+    for page in pages:
+        p, meta = page.path, page.meta
         if meta.get("lifecycle") == "permanent":
             continue
         recorded = meta.get("source_hash")
@@ -337,10 +375,10 @@ def _check_source_hash(pages: list[Path], root: Path, report: LintReport) -> Non
             )
 
 
-def _check_duplicate_slugs(pages: list[Path], root: Path, report: LintReport) -> None:
+def _check_duplicate_slugs(pages: list[PageData], root: Path, report: LintReport) -> None:
     by_slug: dict[str, list[Path]] = {}
-    for p in pages:
-        by_slug.setdefault(p.stem, []).append(p)
+    for page in pages:
+        by_slug.setdefault(page.path.stem, []).append(page.path)
     for slug, owners in by_slug.items():
         if len(owners) > 1:
             owners_str = ", ".join(_relative_to_root(o, root) for o in owners)
@@ -374,10 +412,12 @@ def _check_empty_categories(root: Path, report: LintReport) -> None:
             )
 
 
-def _check_superseded(pages: list[Path], root: Path, report: LintReport) -> None:
+def _check_superseded(pages: list[PageData], root: Path, report: LintReport) -> None:
     knowledge = root / "knowledge"
-    for p in pages:
-        meta, _ = kbc.read_frontmatter_file(p)
+    meta_by_path = {page.path: page.meta for page in pages}
+    slugs: dict[str, list[Path]] | None = None
+    for page in pages:
+        p, meta = page.path, page.meta
         target = meta.get("supersedes")
         if not target:
             continue
@@ -385,13 +425,16 @@ def _check_superseded(pages: list[Path], root: Path, report: LintReport) -> None
         if "/" in target:
             replaced = knowledge / f"{target}.md"
         else:
-            slugs = kbc.scan_knowledge_slugs(knowledge)
+            if slugs is None:
+                slugs = kbc.scan_knowledge_slugs(knowledge)
             candidates = slugs.get(target, [])
             replaced = candidates[0] if candidates else None
         if replaced is None or not replaced.exists():
             continue  # nothing to verify
         # Replaced should be in _archive/ (unless it's permanent)
-        replaced_meta, _ = kbc.read_frontmatter_file(replaced)
+        replaced_meta = meta_by_path.get(replaced)
+        if replaced_meta is None:
+            replaced_meta, _ = kbc.read_frontmatter_file(replaced)
         if replaced_meta.get("lifecycle") == "permanent":
             continue
         rel = replaced.relative_to(knowledge)
@@ -430,11 +473,11 @@ def _check_domain_overflow(root: Path, report: LintReport, threshold: int) -> No
             )
 
 
-def _check_expired_temporal(pages: list[Path], root: Path, report: LintReport) -> None:
+def _check_expired_temporal(pages: list[PageData], root: Path, report: LintReport) -> None:
     today = _today()
     knowledge = root / "knowledge"
-    for p in pages:
-        meta, _ = kbc.read_frontmatter_file(p)
+    for page in pages:
+        p, meta = page.path, page.meta
         if meta.get("lifecycle") != "temporal":
             continue
         valid_until = _parse_date(meta.get("valid_until"))
@@ -458,10 +501,10 @@ def _check_expired_temporal(pages: list[Path], root: Path, report: LintReport) -
 
 
 def _check_annotation_overflow(
-    pages: list[Path], root: Path, report: LintReport, threshold: int
+    pages: list[PageData], root: Path, report: LintReport, threshold: int
 ) -> None:
-    for p in pages:
-        meta, _ = kbc.read_frontmatter_file(p)
+    for page in pages:
+        p, meta = page.path, page.meta
         ann = meta.get("context_annotations") or []
         if isinstance(ann, list) and len(ann) > threshold:
             report.issues.append(
@@ -482,7 +525,7 @@ def _check_annotation_overflow(
 # ---------------------------------------------------------------------------
 
 
-def _compute_metrics(pages: list[Path], root: Path) -> dict:
+def _compute_metrics(pages: list[PageData], root: Path) -> dict:
     """Aggregate health metrics for the knowledge base.
 
     Returns a dict with:
@@ -524,19 +567,15 @@ def _compute_metrics(pages: list[Path], root: Path) -> dict:
     today = _today()
     importances: list[int] = []
     importance_dist = {"1-2": 0, "3-4": 0, "5-6": 0, "7-8": 0, "9-10": 0}
-    incoming: dict[str, set[Path]] = {}
     total_wikilinks = 0
     counts_per_subfolder: dict[str, int] = {}
 
-    # Pre-pass: collect inbound wikilinks
-    for p in pages:
-        text = p.read_text(encoding="utf-8")
-        for tgt in kbc.extract_wikilinks(text):
-            incoming.setdefault(tgt.strip(), set()).add(p)
-        total_wikilinks += len(kbc.extract_wikilinks(text))
+    # Pre-pass: outbound link volume
+    for page in pages:
+        total_wikilinks += len(page.wikilinks)
 
-    for p in pages:
-        meta, _ = kbc.read_frontmatter_file(p)
+    for page in pages:
+        p, meta = page.path, page.meta
 
         # Subfolder
         rel = p.relative_to(knowledge)
@@ -600,19 +639,8 @@ def _compute_metrics(pages: list[Path], root: Path) -> dict:
         metrics["importance"]["median"] = importances_sorted[len(importances_sorted) // 2]
         metrics["importance"]["distribution"] = importance_dist
 
-    # Orphan rate
-    orphans = 0
-    for p in pages:
-        slug = p.stem
-        rel = p.relative_to(knowledge)
-        rel_no_ext = kbc.posix_relpath(rel, without_suffix=True)
-        if rel.parts and rel.parts[0] == "routing":
-            continue
-        if rel.name == "routing-table.md":
-            continue
-        sources = incoming.get(slug, set()) | incoming.get(rel_no_ext, set())
-        if not (sources - {p}):
-            orphans += 1
+    # Orphan rate — same rules as the orphan check (see _orphan_paths)
+    orphans = len(_orphan_paths(pages, knowledge))
     metrics["orphan_rate"] = round(orphans / len(pages), 3) if pages else 0.0
 
     # Wikilink density
@@ -622,7 +650,10 @@ def _compute_metrics(pages: list[Path], root: Path) -> dict:
     metrics["entity_coverage"] = round(metrics["entity_coverage"] / len(pages), 3)
 
     # Routing
-    routing_pages = [p for p in pages if p.relative_to(knowledge).parts[0:1] == ("routing",)]
+    routing_pages = [
+        page.path for page in pages
+        if page.path.relative_to(knowledge).parts[0:1] == ("routing",)
+    ]
     metrics["routing"]["pages"] = len(routing_pages)
     if routing_pages:
         depths = [
@@ -632,12 +663,13 @@ def _compute_metrics(pages: list[Path], root: Path) -> dict:
 
     # Insight ratio
     insights = sum(
-        1 for p in pages
-        if p.relative_to(knowledge).parts[0:1] == ("insights",)
+        1 for page in pages
+        if page.path.relative_to(knowledge).parts[0:1] == ("insights",)
     )
     base = sum(
-        1 for p in pages
-        if p.relative_to(knowledge).parts[0:1] in (("domain",), ("playbooks",), ("insights",))
+        1 for page in pages
+        if page.path.relative_to(knowledge).parts[0:1]
+        in (("domain",), ("playbooks",), ("insights",))
     )
     metrics["insight_ratio"] = round(insights / base, 3) if base else 0.0
 
@@ -660,8 +692,10 @@ def run_lint(
     annotation_overflow: int = DEFAULT_ANNOTATION_OVERFLOW,
     metrics: bool = False,
 ) -> LintReport:
-    pages = _knowledge_pages(root)
-    report = LintReport(root=str(root), pages_scanned=len(pages))
+    report = LintReport(root=str(root))
+    pages = _load_pages(root, report)
+    unreadable = sum(1 for i in report.issues if i.check == "unreadable")
+    report.pages_scanned = len(pages) + unreadable
 
     def enabled(name: str) -> bool:
         if only and name not in only:

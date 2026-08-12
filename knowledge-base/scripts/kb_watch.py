@@ -19,7 +19,9 @@ import argparse
 import signal
 import subprocess
 import sys
+import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -106,16 +108,36 @@ def watch_with_watchdog(
     except ImportError:
         return -1  # signal caller to use polling fallback
 
+    # pending_raw is written from watchdog's dispatch thread and read from the
+    # main loop — every access goes through the lock.
+    lock = threading.Lock()
     pending_raw: dict[str, float] = {}
     pending_knowledge: list[float] = [0.0]
 
+    def _is_unsorted(path: str) -> bool:
+        return "/unsorted/" in path or "\\unsorted\\" in path
+
     class RawHandler(FileSystemEventHandler):
+        def _touch(self, path: str) -> None:
+            if not path or not _is_unsorted(path):
+                return
+            with lock:
+                pending_raw[path] = time.time()
+
         def on_created(self, event):
-            if event.is_directory:
-                return
-            if "/unsorted/" not in event.src_path and "\\unsorted\\" not in event.src_path:
-                return
-            pending_raw[event.src_path] = time.time()
+            if not event.is_directory:
+                self._touch(event.src_path)
+
+        def on_modified(self, event):
+            # A file still being copied keeps emitting modified events; refresh
+            # the timestamp so the debounce window restarts and we never ingest
+            # a half-copied file.
+            if not event.is_directory:
+                self._touch(event.src_path)
+
+        def on_moved(self, event):
+            if not event.is_directory:
+                self._touch(getattr(event, "dest_path", ""))
 
     class KnowledgeHandler(FileSystemEventHandler):
         def on_modified(self, event):
@@ -136,14 +158,18 @@ def watch_with_watchdog(
     try:
         while _running:
             now = time.time()
-            ready = [p for p, t in pending_raw.items() if now - t > debounce_raw]
+            with lock:
+                ready = [p for p, t in pending_raw.items() if now - t > debounce_raw]
+                for p in ready:
+                    del pending_raw[p]
+            ingested = False
             for p in ready:
-                del pending_raw[p]
                 path = Path(p)
                 if path.exists():
                     _run_ingest_for(root, path, verbose=verbose)
-                    if do_reindex:
-                        _run_reindex(root, verbose=verbose)
+                    ingested = True
+            if ingested and do_reindex:
+                _run_reindex(root, verbose=verbose)
             if (
                 pending_knowledge[0]
                 and now - pending_knowledge[0] > debounce_knowledge
@@ -159,6 +185,52 @@ def watch_with_watchdog(
     return 0
 
 
+@dataclass
+class _PollEntry:
+    """Tracking state for one file seen by the polling watcher."""
+
+    mtime: float
+    size: int
+    stable_since: float  # wall-clock moment this exact (mtime, size) was first seen
+    processed: bool = False
+
+
+def _poll_once(
+    root: Path,
+    seen: dict[str, _PollEntry],
+    now: float,
+    debounce_raw: float,
+) -> list[Path]:
+    """One polling pass: update tracking state, return files ready to ingest.
+
+    A file is ready when its ``(mtime, size)`` has stayed unchanged for at
+    least ``debounce_raw`` seconds of observation — measured against our own
+    clock, not the file's mtime, so clock skew on network shares cannot stall
+    or rush the debounce. Files already handed to ingest are skipped until
+    they change again: kb_ingest normally moves them out of ``unsorted/``, and
+    one that stays behind failed and must not retry in a tight loop.
+    """
+    ready: list[Path] = []
+    for p in (root / "raw").rglob("unsorted/*"):
+        if not p.is_file():
+            continue
+        key = str(p.resolve())
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        entry = seen.get(key)
+        if entry is None or (entry.mtime, entry.size) != (st.st_mtime, st.st_size):
+            seen[key] = _PollEntry(st.st_mtime, st.st_size, now)
+            continue
+        if entry.processed:
+            continue
+        if now - entry.stable_since >= debounce_raw:
+            entry.processed = True
+            ready.append(p)
+    return ready
+
+
 def watch_polling(
     root: Path,
     *,
@@ -168,23 +240,16 @@ def watch_polling(
 ) -> int:
     """Simple polling fallback when watchdog is not installed."""
     print(f"[watch] (polling fallback) watching {root}")
-    seen: dict[str, float] = {}
+    seen: dict[str, _PollEntry] = {}
     while _running:
-        for p in (root / "raw").rglob("unsorted/*"):
-            if not p.is_file():
-                continue
-            key = str(p.resolve())
-            mtime = p.stat().st_mtime
-            if seen.get(key) == mtime:
-                continue
-            # Wait for file to be stable
-            if time.time() - mtime < debounce_raw:
-                seen[key] = mtime
-                continue
+        ready = _poll_once(root, seen, time.time(), debounce_raw)
+        for p in ready:
             _run_ingest_for(root, p, verbose=verbose)
-            if do_reindex:
-                _run_reindex(root, verbose=verbose)
-            seen[key] = -1.0  # processed
+        if ready and do_reindex:
+            _run_reindex(root, verbose=verbose)
+        # Drop tracking for files ingest moved away so the map stays small.
+        for key in [k for k, e in seen.items() if e.processed and not Path(k).exists()]:
+            del seen[key]
         time.sleep(2.0)
     return 0
 

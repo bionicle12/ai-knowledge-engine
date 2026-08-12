@@ -77,6 +77,52 @@ def test_ingest_simple_md(kb_root: Path):
     assert "ingest |" in log_text
 
 
+def test_ingest_failure_keeps_original_in_unsorted(kb_root: Path, monkeypatch):
+    """A crash mid-pipeline must not strand a half-ingested file."""
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    src = kb_root / "raw" / "reference" / "unsorted" / "keep-me.md"
+    src.write_text("# body\n", encoding="utf-8")
+    cfg = kbc.load_config(kb_root)
+
+    def boom(*args, **kwargs):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(kb_ingest, "_upsert_assets_index", boom)
+    with pytest.raises(OSError):
+        kb_ingest.process_one(src, root=kb_root, cfg=cfg, nlp_enabled=False)
+    # Original still in place, no orphaned asset copy left behind
+    assert src.exists()
+    assert list((kb_root / "assets" / "documents").glob("*")) == []
+
+    # Once the fault is gone, the same file ingests cleanly
+    monkeypatch.undo()
+    result = kb_ingest.process_one(src, root=kb_root, cfg=cfg, nlp_enabled=False)
+    assert result.success
+    assert not src.exists()
+    assert len(list((kb_root / "assets" / "documents").glob("*"))) == 1
+
+
+def test_upsert_assets_index_heading_prefix_not_lost(kb_root: Path):
+    """A new block whose heading is a prefix of an existing one must be appended."""
+    kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
+    idx = kb_root / "assets-index" / "documents.md"
+    idx.write_text(
+        "# Documents\n\n## 2026-08-13__foo-bar\n\n- Type: documents\n"
+        "- Original: `assets/documents/2026-08-13__foo-bar.md`\n"
+        "- Converted: none yet\n- Description: existing\n",
+        encoding="utf-8",
+    )
+    asset = kb_root / "assets" / "documents" / "2026-08-13__foo.md"
+    asset.parent.mkdir(parents=True, exist_ok=True)
+    asset.write_text("# t\n", encoding="utf-8")
+
+    kb_ingest._upsert_assets_index(kb_root, "documents", asset, None)
+
+    text = idx.read_text(encoding="utf-8")
+    assert "## 2026-08-13__foo-bar" in text  # old block intact
+    assert "\n## 2026-08-13__foo\n" in text  # new block appended, not dropped
+
+
 def test_ingest_idempotent(kb_root: Path):
     kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
     src = kb_root / "raw" / "documents" / "unsorted" / "doc.md"

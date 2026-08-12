@@ -263,7 +263,7 @@ def _route_log_line(result: IngestResult) -> str:
 
 def _convert_passthrough(src: Path) -> str:
     """Copy text content as-is."""
-    return src.read_text(encoding="utf-8", errors="replace")
+    return src.read_text(encoding="utf-8-sig", errors="replace")
 
 
 def _convert_docx(src: Path) -> str:
@@ -735,7 +735,9 @@ def process_one(
         result.routed_to = "dry-run"
         return result
 
-    # Move original to assets/
+    # Copy the original into assets/ first; the file in unsorted/ is removed
+    # only after the whole pipeline (conversion, metadata, index, log) has
+    # succeeded, so a failure part-way never strands a half-ingested file.
     asset_target.parent.mkdir(parents=True, exist_ok=True)
     if asset_target.exists():
         # Same hash already there → skip
@@ -749,178 +751,38 @@ def process_one(
         asset_target = asset_target.with_name(
             f"{asset_target.stem}__{suffix}{asset_target.suffix}"
         )
-    shutil.move(str(src), str(asset_target))
+    shutil.copy2(str(src), str(asset_target))
     result.asset_path = str(asset_target.relative_to(root))
 
-    # Convert
-    md_text: str | None = None
-    processed_subdir = "markdown"
-    transcript_meta: dict = {}
-    archive_count: int | None = None
     try:
-        if strategy == "stt":
-            md_text, processed_subdir, transcript_meta = _run_stt(asset_target, cfg)
-        elif strategy == "ocr":
-            md_text, processed_subdir = _run_ocr(asset_target, cfg)
-        elif strategy == "archive":
-            md_text, processed_subdir, archive_count = _run_archive(
-                asset_target, root, cfg
-            )
-        else:
-            md_text, processed_subdir = _convert(strategy, asset_target)
-    except RuntimeError as e:
-        # Optional dep missing, backend unavailable, or conversion failed
-        result.review_reason = f"conversion unavailable: {e}"
-
-    processed_path: Path | None = None
-    if md_text is not None:
-        processed_path = (
-            root / "processed" / processed_subdir / f"{asset_target.stem}.md"
+        _pipeline_tail(
+            root=root,
+            cfg=cfg,
+            asset=asset_target,
+            result=result,
+            nlp_enabled=nlp_enabled,
+            ext=ext,
+            asset_type=asset_type,
+            strategy=strategy,
+            source_hash=source_hash,
+            original_filename=src.name,
+            operation="ingest",
         )
-        processed_path.parent.mkdir(parents=True, exist_ok=True)
-        processed_path.write_text(md_text, encoding="utf-8")
-        result.processed_path = str(processed_path.relative_to(root))
-
-    # NLP
-    nlp_meta: dict = {}
-    if nlp_enabled and cfg.nlp_enabled and md_text:
+    except BaseException:
+        # Roll the copy back so a re-run still finds the original in unsorted/.
         try:
-            nlp_meta = nlp_enrich(md_text, cfg, knowledge_dir=root / "knowledge")
-            nlp_path = (
-                root / "processed" / "nlp-meta" / f"{asset_target.stem}.yml"
-            )
-            nlp_path.parent.mkdir(parents=True, exist_ok=True)
-            import yaml  # type: ignore[import-untyped]
-
-            nlp_path.write_text(
-                yaml.safe_dump(nlp_meta, allow_unicode=True, sort_keys=False),
-                encoding="utf-8",
-            )
-            result.nlp_meta_path = str(nlp_path.relative_to(root))
-        except Exception as e:  # noqa: BLE001
-            logger.debug("NLP enrichment skipped for %s: %s", asset_target.name, e)
-
-    complexity = nlp_meta.get("complexity") if nlp_meta else (
-        estimate_complexity(md_text or "")
-    )
-    result.complexity = float(complexity or 0.0)
-
-    # Detect long reference books (PDFs/EPUBs/DOCX with >25k words)
-    long_book = _looks_like_long_book(ext=ext, processed_text=md_text)
-
-    # Routing
-    if md_text is None:
-        # Cannot auto-process → review
-        review_dir = root / "review" / "needs-ai-decision"
-        review_pkg = review_dir / f"{asset_target.stem}.md"
-        review_pkg.parent.mkdir(parents=True, exist_ok=True)
-        review_pkg.write_text(
-            _build_review_package(
-                asset_path=result.asset_path,
-                processed_path=None,
-                nlp_meta=nlp_meta,
-                reason=result.review_reason or "no automatic conversion available",
-                long_book_hint=long_book,
-            ),
-            encoding="utf-8",
+            asset_target.unlink()
+        except OSError:
+            pass
+        raise
+    try:
+        src.unlink()
+    except OSError as e:
+        logger.warning(
+            "ingested %s but could not remove the original from unsorted/: %s",
+            src.name,
+            e,
         )
-        result.routed_to = "review/needs-ai-decision/"
-    elif result.complexity >= cfg.complexity_threshold or long_book:
-        review_dir = root / "review" / "needs-ai-decision"
-        review_pkg = review_dir / f"{asset_target.stem}.md"
-        review_pkg.parent.mkdir(parents=True, exist_ok=True)
-        if long_book:
-            reason = "looks like a long-form reference book (>=25k words)"
-            result.review_reason = reason
-        else:
-            reason = (
-                f"complexity {result.complexity:.2f} >= threshold "
-                f"{cfg.complexity_threshold}"
-            )
-            result.review_reason = (
-                f"complexity {result.complexity:.2f} >= {cfg.complexity_threshold}"
-            )
-        review_pkg.write_text(
-            _build_review_package(
-                asset_path=result.asset_path,
-                processed_path=result.processed_path,
-                nlp_meta=nlp_meta,
-                reason=reason,
-                long_book_hint=long_book,
-            ),
-            encoding="utf-8",
-        )
-        result.routed_to = "review/needs-ai-decision/"
-    else:
-        result.routed_to = "processed/"
-
-    # Metadata
-    metadata_path = (
-        root / "processed" / "extracted-metadata" / f"{asset_target.stem}.yml"
-    )
-    metadata_path.parent.mkdir(parents=True, exist_ok=True)
-    today = _dt.date.today().isoformat()
-    metadata = {
-        "original_filename": src.name,
-        "stable_filename": asset_target.name,
-        "asset_path": result.asset_path,
-        "processed_path": result.processed_path,
-        "source_hash": source_hash,
-        "file_type": ext.lstrip("."),
-        "asset_type": asset_type,
-        "strategy": strategy,
-        "processing_date": kbc.now_iso(),
-        "extracted_at": today,
-        "valid_from": today,
-        "lifecycle": "evolving",
-        "confidence": "medium",
-        "complexity": result.complexity,
-        "is_surprise": True,
-        "surprise_engine": "python",
-        "long_book_hint": long_book,
-        "needs_ai_review": result.routed_to.startswith("review/"),
-        "review_reason": result.review_reason,
-        "nlp_meta_path": result.nlp_meta_path,
-    }
-    if transcript_meta:
-        metadata.update(transcript_meta)
-    if archive_count is not None:
-        metadata["archive_extracted_files"] = archive_count
-    import yaml  # type: ignore[import-untyped]
-
-    metadata_path.write_text(
-        yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
-    result.metadata_path = str(metadata_path.relative_to(root))
-
-    # Update assets-index/<type>.md
-    _upsert_assets_index(root, asset_type, asset_target, processed_path)
-
-    # Log
-    kbc.append_log(
-        operation="ingest",
-        title=f"{asset_target.name}",
-        details=[
-            f"Source hash: {source_hash}",
-            f"Asset: {result.asset_path}",
-            f"Processed: {result.processed_path or NO_VALUE_PLACEHOLDER}",
-            f"NLP meta: {result.nlp_meta_path or NO_VALUE_PLACEHOLDER}",
-            f"Complexity: {result.complexity:.2f}",
-            *(
-                [f"Transcribed: {transcript_meta.get('stt_backend')} "
-                 f"({transcript_meta.get('stt_language')}, "
-                 f"{transcript_meta.get('stt_segments')} segments)"]
-                if transcript_meta else []
-            ),
-            *(
-                [f"Archive: unpacked {archive_count} file(s) into raw/unsorted/"]
-                if archive_count is not None else []
-            ),
-            _route_log_line(result),
-        ],
-        root=root,
-    )
     return result
 
 
@@ -1063,7 +925,7 @@ def _upsert_assets_index(
     text = index_file.read_text(encoding="utf-8")
     pattern = rf"\n{re.escape(heading)}\n(?:.*?)(?=\n## |\Z)"
 
-    if heading in text:
+    if re.search(pattern, text, flags=re.S):
         updated = re.sub(pattern, lambda _: "\n" + block_text, text, flags=re.S)
         index_file.write_text(updated, encoding="utf-8")
         return
@@ -1074,51 +936,43 @@ def _upsert_assets_index(
         fh.write("\n" + block_text)
 
 
-def reprocess_asset(
-    src: Path,
+def _pipeline_tail(
     *,
     root: Path,
     cfg: kbc.KbConfig,
-    nlp_enabled: bool = True,
-    dry_run: bool = False,
-) -> IngestResult:
-    """Re-run conversion, metadata, and review routing for an existing asset."""
-    rel = src.relative_to(root) if src.is_absolute() and src.is_relative_to(root) else src
-    result = IngestResult(source=str(rel), asset_path=str(rel))
+    asset: Path,
+    result: IngestResult,
+    nlp_enabled: bool,
+    ext: str,
+    asset_type: str,
+    strategy: str,
+    source_hash: str,
+    original_filename: str,
+    operation: str,
+) -> None:
+    """Shared pipeline stage: convert → NLP → route → metadata → index → log.
 
-    ext = _file_ext(src)
-    asset_type = _detect_asset_type(ext)
-    strategy = _detect_strategy(ext)
-    stem = src.stem
-
-    try:
-        source_hash = kbc.compute_source_hash(src)
-    except Exception as e:  # noqa: BLE001
-        result.success = False
-        result.error = f"hashing failed: {e}"
-        return result
-    result.source_hash = source_hash
-
-    if dry_run:
-        result.routed_to = "dry-run"
-        return result
-
+    Both process_one (fresh ingest) and reprocess_asset funnel through here;
+    ``asset`` is the file already living under assets/.
+    """
     md_text: str | None = None
     processed_subdir = "markdown"
     transcript_meta: dict = {}
     archive_count: int | None = None
     try:
         if strategy == "stt":
-            md_text, processed_subdir, transcript_meta = _run_stt(src, cfg)
+            md_text, processed_subdir, transcript_meta = _run_stt(asset, cfg)
         elif strategy == "ocr":
-            md_text, processed_subdir = _run_ocr(src, cfg)
+            md_text, processed_subdir = _run_ocr(asset, cfg)
         elif strategy == "archive":
-            md_text, processed_subdir, archive_count = _run_archive(src, root, cfg)
+            md_text, processed_subdir, archive_count = _run_archive(asset, root, cfg)
         else:
-            md_text, processed_subdir = _convert(strategy, src)
+            md_text, processed_subdir = _convert(strategy, asset)
     except RuntimeError as e:
+        # Optional dep missing, backend unavailable, or conversion failed
         result.review_reason = f"conversion unavailable: {e}"
 
+    stem = asset.stem
     processed_path: Path | None = None
     if md_text is not None:
         processed_path = root / "processed" / processed_subdir / f"{stem}.md"
@@ -1140,14 +994,20 @@ def reprocess_asset(
             )
             result.nlp_meta_path = str(nlp_path.relative_to(root))
         except Exception as e:  # noqa: BLE001
-            logger.debug("NLP enrichment skipped for %s: %s", src.name, e)
+            logger.debug("NLP enrichment skipped for %s: %s", asset.name, e)
 
-    complexity = nlp_meta.get("complexity") if nlp_meta else estimate_complexity(md_text or "")
+    complexity = nlp_meta.get("complexity") if nlp_meta else (
+        estimate_complexity(md_text or "")
+    )
     result.complexity = float(complexity or 0.0)
+
+    # Detect long reference books (PDFs/EPUBs/DOCX with >25k words)
     long_book = _looks_like_long_book(ext=ext, processed_text=md_text)
 
+    # Routing
     review_pkg = root / "review" / "needs-ai-decision" / f"{stem}.md"
     if md_text is None:
+        # Cannot auto-process → review
         review_pkg.parent.mkdir(parents=True, exist_ok=True)
         review_pkg.write_text(
             _build_review_package(
@@ -1190,23 +1050,13 @@ def reprocess_asset(
         result.routed_to = "processed/"
         result.review_reason = ""
 
+    # Metadata
     metadata_path = root / "processed" / "extracted-metadata" / f"{stem}.yml"
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     today = _dt.date.today().isoformat()
-
-    original_filename = src.name
-    if metadata_path.exists():
-        try:
-            import yaml  # type: ignore[import-untyped]
-
-            previous = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
-            original_filename = previous.get("original_filename", original_filename)
-        except Exception:  # noqa: BLE001
-            pass
-
     metadata = {
         "original_filename": original_filename,
-        "stable_filename": src.name,
+        "stable_filename": asset.name,
         "asset_path": result.asset_path,
         "processed_path": result.processed_path,
         "source_hash": source_hash,
@@ -1238,11 +1088,13 @@ def reprocess_asset(
     )
     result.metadata_path = str(metadata_path.relative_to(root))
 
-    _upsert_assets_index(root, asset_type, src, processed_path)
+    # Update assets-index/<type>.md
+    _upsert_assets_index(root, asset_type, asset, processed_path)
 
+    # Log
     kbc.append_log(
-        operation="reprocess",
-        title=f"{src.name}",
+        operation=operation,
+        title=f"{asset.name}",
         details=[
             f"Source hash: {source_hash}",
             f"Asset: {result.asset_path}",
@@ -1262,6 +1114,63 @@ def reprocess_asset(
             _route_log_line(result),
         ],
         root=root,
+    )
+
+
+def reprocess_asset(
+    src: Path,
+    *,
+    root: Path,
+    cfg: kbc.KbConfig,
+    nlp_enabled: bool = True,
+    dry_run: bool = False,
+) -> IngestResult:
+    """Re-run conversion, metadata, and review routing for an existing asset."""
+    rel = src.relative_to(root) if src.is_absolute() and src.is_relative_to(root) else src
+    result = IngestResult(source=str(rel), asset_path=str(rel))
+
+    ext = _file_ext(src)
+    asset_type = _detect_asset_type(ext)
+    strategy = _detect_strategy(ext)
+    stem = src.stem
+
+    try:
+        source_hash = kbc.compute_source_hash(src)
+    except Exception as e:  # noqa: BLE001
+        result.success = False
+        result.error = f"hashing failed: {e}"
+        return result
+    result.source_hash = source_hash
+
+    if dry_run:
+        result.routed_to = "dry-run"
+        return result
+
+    # Keep the original upload name recorded at ingest time (the asset itself
+    # already carries the stable filename).
+    original_filename = src.name
+    metadata_path = root / "processed" / "extracted-metadata" / f"{stem}.yml"
+    if metadata_path.exists():
+        try:
+            import yaml  # type: ignore[import-untyped]
+
+            previous = yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
+            original_filename = previous.get("original_filename", original_filename)
+        except Exception:  # noqa: BLE001
+            pass
+
+    _pipeline_tail(
+        root=root,
+        cfg=cfg,
+        asset=src,
+        result=result,
+        nlp_enabled=nlp_enabled,
+        ext=ext,
+        asset_type=asset_type,
+        strategy=strategy,
+        source_hash=source_hash,
+        original_filename=original_filename,
+        operation="reprocess",
     )
     return result
 
@@ -1294,14 +1203,34 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     root = args.root or kbc.find_kb_root()
-    cfg = kbc.load_config(root)
 
-    _ensure_kb_dirs(root)
     if args.init_dirs:
+        _ensure_kb_dirs(root)
         print(f"Directory structure ensured under {root}")
         return 0
 
+    # Without a config the fallback root is just the current directory;
+    # scaffolding forty folders there would silently litter the wrong place.
+    if not (root / "kb.config.yml").is_file():
+        kbc.print_err(
+            f"❌ No kb.config.yml found under {root}. Run from a deployed "
+            "knowledge base (or pass --root), or use --init-dirs to scaffold "
+            "a new structure first."
+        )
+        return 2
+
+    cfg = kbc.load_config(root)
+    _ensure_kb_dirs(root)
+
     if args.paths:
+        missing = [p for p in args.paths if not p.exists()]
+        if missing:
+            for p in missing:
+                kbc.print_err(f"❌ Not found: {p}")
+            return 2
+        skipped_dirs = [p for p in args.paths if p.is_dir()]
+        for p in skipped_dirs:
+            kbc.print_err(f"⚠️  Skipping directory (pass files, not folders): {p}")
         files = [p for p in args.paths if p.is_file()]
     else:
         files = _files_in_unsorted(root)

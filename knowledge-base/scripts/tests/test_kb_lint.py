@@ -401,3 +401,35 @@ def test_metrics_text_output_includes_section(kb_root: Path):
     assert "Health metrics" in text
     assert "Lifecycle distribution" in text
     assert "Importance" in text
+
+
+# ---------------------------------------------------------------------------
+# robustness: unreadable files must not crash the run
+# ---------------------------------------------------------------------------
+
+
+def test_unreadable_file_reported_not_crashing(kb_root: Path):
+    _make_page(kb_root / "knowledge", "domain/good.md")
+    bad = kb_root / "knowledge" / "domain" / "garbage.md"
+    bad.write_bytes(b"\xff\xfe\x00\x01 not valid utf-8 \xf0\x28\x8c\x28")
+
+    report = kb_lint.run_lint(kb_root)
+
+    unreadable = [i for i in report.issues if i.check == "unreadable"]
+    assert len(unreadable) == 1
+    assert "garbage.md" in unreadable[0].path
+    assert report.pages_scanned == 2  # broken file still counted as scanned
+
+
+def test_bom_page_parses_cleanly(kb_root: Path):
+    p = kb_root / "knowledge" / "domain" / "bom.md"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    content = (
+        "---\nsource: raw/x.md\nextracted_at: 2026-08-01\n"
+        "tags: [t]\nlifecycle: evolving\n---\n# T\n\nbody\n"
+    )
+    p.write_text(content, encoding="utf-8-sig")
+
+    report = kb_lint.run_lint(kb_root, only={"frontmatter"})
+
+    assert not report.issues  # BOM must not hide the frontmatter

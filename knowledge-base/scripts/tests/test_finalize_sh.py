@@ -6,6 +6,7 @@ to project root, then both setup/ and knowledge-base/ removed.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,13 +16,41 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 FINALIZE_SH = REPO_ROOT / "knowledge-base" / "shell" / "finalize.sh"
 
 
+def _bash_can_see_repo() -> bool:
+    """True when a usable bash is on PATH and it understands Windows paths.
+
+    On Windows, PATH may resolve `bash` to WSL, which cannot see C:/ paths
+    directly — these integration tests would fail for environment reasons.
+    """
+    try:
+        result = subprocess.run(
+            ["bash", "-c", f"test -f '{FINALIZE_SH.as_posix()}'"],
+            capture_output=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+pytestmark = pytest.mark.skipif(
+    not _bash_can_see_repo(),
+    reason="requires a bash that can access the repository path (e.g. Git Bash)",
+)
+
+
 def _stage_project(root: Path, *, valid: bool = True) -> Path:
     """Create a fake deployed project layout."""
     setup = root / "setup" / "shell"
     setup.mkdir(parents=True)
     (root / "setup" / "scripts").mkdir(parents=True, exist_ok=True)
-    # Symlink real finalize.sh — script runs as if it were inside the project
-    (setup / "finalize.sh").symlink_to(FINALIZE_SH)
+    # Symlink real finalize.sh — script runs as if it were inside the project.
+    # Windows needs Developer Mode / admin rights for symlinks; a copy behaves
+    # identically for the script, so fall back to that.
+    try:
+        (setup / "finalize.sh").symlink_to(FINALIZE_SH)
+    except OSError:
+        shutil.copy2(FINALIZE_SH, setup / "finalize.sh")
 
     kb = root / "knowledge-base"
     kb.mkdir()
@@ -97,7 +126,10 @@ def test_finalize_dry_run_changes_nothing(tmp_path: Path):
 def test_finalize_refuses_when_kb_missing(tmp_path: Path):
     setup = tmp_path / "setup" / "shell"
     setup.mkdir(parents=True)
-    (setup / "finalize.sh").symlink_to(FINALIZE_SH)
+    try:
+        (setup / "finalize.sh").symlink_to(FINALIZE_SH)
+    except OSError:
+        shutil.copy2(FINALIZE_SH, setup / "finalize.sh")
     # No knowledge-base/ created
     result = _run_finalize(tmp_path)
     assert result.returncode == 1

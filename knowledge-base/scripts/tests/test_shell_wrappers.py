@@ -17,6 +17,29 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 SHELL_DIR = REPO_ROOT / "knowledge-base" / "shell"
 
 
+def _bash_can_see_repo() -> bool:
+    """True when a usable bash is on PATH and it understands Windows paths.
+
+    On Windows, PATH may resolve `bash` to WSL, which cannot see C:/ paths
+    directly — these integration tests would fail for environment reasons.
+    """
+    try:
+        result = subprocess.run(
+            ["bash", "-c", f"test -d '{SHELL_DIR.as_posix()}'"],
+            capture_output=True,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+pytestmark = pytest.mark.skipif(
+    not _bash_can_see_repo(),
+    reason="requires a bash that can access the repository path (e.g. Git Bash)",
+)
+
+
 def _setup_project(root: Path, *, with_scripts: bool = True) -> None:
     """Stage a deployed project layout at `root`."""
     (root / "shell").mkdir(parents=True, exist_ok=True)
@@ -71,10 +94,11 @@ def test_watcher_sh_resolves_project_root_from_shell_dir(tmp_path: Path):
 
 def test_watcher_sh_called_from_outside_project_still_works(tmp_path: Path):
     _setup_project(tmp_path)
-    # Run from /tmp, not from the project — sh script must still resolve correctly
+    # Run from outside the project — sh script must still resolve correctly
+    # (tmp_path.parent instead of /tmp: the latter is not a valid cwd on Windows)
     result = subprocess.run(
         ["bash", str(tmp_path / "shell" / "watcher.sh"), "--status"],
-        cwd="/tmp",
+        cwd=str(tmp_path.parent),
         capture_output=True,
         text=True,
         timeout=10,
@@ -93,9 +117,10 @@ def test_watcher_sh_reports_project_root_when_kb_watch_missing(tmp_path: Path):
         timeout=10,
     )
     assert result.returncode == 2
-    # Error should be helpful — point at the actual searched location
+    # Error should be helpful — point at the actual searched location.
+    # Git Bash prints POSIX-style paths on Windows, so compare a normalized tail.
     assert "kb_watch.py not found" in result.stdout
-    assert str(tmp_path / "scripts") in result.stdout
+    assert f"{tmp_path.name}/scripts" in result.stdout.replace("\\", "/")
 
 
 def test_lint_sh_resolves_project_root(tmp_path: Path):
@@ -187,7 +212,8 @@ def test_watcher_start_command_from_shell_dir(tmp_path: Path):
         f"Launcher failed:\nstdout={result.stdout}\nstderr={result.stderr}"
     )
     assert "watcher ok" in result.stdout
-    assert str(tmp_path) in result.stdout
+    # tmp_path.name survives Git Bash's POSIX-style path rewriting on Windows
+    assert tmp_path.name in result.stdout
     assert "kb_watch.py not found" not in result.stdout
 
 
@@ -240,7 +266,8 @@ def test_export_command_launcher(tmp_path: Path):
         f"Launcher failed:\nstdout={result.stdout}\nstderr={result.stderr}"
     )
     assert "export ok" in result.stdout
-    assert str(tmp_path) in result.stdout
+    # tmp_path.name survives Git Bash's POSIX-style path rewriting on Windows
+    assert tmp_path.name in result.stdout
 
 
 def test_import_command_launcher_explains_pending_conflicts(tmp_path: Path):

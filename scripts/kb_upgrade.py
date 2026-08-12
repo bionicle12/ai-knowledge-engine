@@ -135,7 +135,9 @@ def file_at_commit(repo_path: Path, commit: str) -> bytes | None:
     """Read `repo_path` (relative to repo root) at `commit` via git, or None."""
     if not commit or commit in ("unknown", "missing", "unparseable"):
         return None
-    rel = str(repo_path.relative_to(REPO_ROOT))
+    # git show expects forward slashes; str() would produce backslashes on
+    # Windows and silently miss every path.
+    rel = repo_path.relative_to(REPO_ROOT).as_posix()
     try:
         result = subprocess.run(
             ["git", "show", f"v{commit}:{rel}"],
@@ -500,8 +502,11 @@ def main(argv: list[str] | None = None) -> int:
     targets = parser.add_mutually_exclusive_group()
     targets.add_argument(
         "--kb-root",
+        "--root",
+        dest="kb_root",
         type=Path,
-        help="Deployed KB root (default: current directory)",
+        help="Deployed KB root (default: current directory); --root is "
+        "accepted as an alias for consistency with the other scripts",
     )
     targets.add_argument(
         "--all-root",

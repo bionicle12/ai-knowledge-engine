@@ -164,7 +164,10 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
         node = records[page_id]
         node_inbound = sorted(inbound[page_id])
         node_outbound = sorted(outbound[page_id])
-        orphan = not node_inbound
+        # Routing pages and routing-table.md are entry points; kb_lint applies
+        # the same rule, so the two orphan counts stay comparable.
+        entry_point = node["group"] == "routing" or page_id == "routing-table"
+        orphan = not node_inbound and not entry_point
         if orphan:
             orphans.append(page_id)
         nodes.append(
@@ -623,9 +626,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--kb-root",
+        "--root",
+        dest="kb_root",
         type=Path,
         default=None,
-        help="Knowledge-base root (default: discover from current directory)",
+        help="Knowledge-base root (default: discover from current directory); "
+        "--root is accepted as an alias for consistency with the other scripts",
     )
     parser.add_argument(
         "--asset-dir",

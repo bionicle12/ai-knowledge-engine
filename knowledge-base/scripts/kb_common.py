@@ -311,6 +311,9 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?\n)---\s*\n", re.DOTALL)
 
 def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     """Return ``(metadata_dict, body)``. Empty dict if no frontmatter."""
+    # Files saved by Windows editors may start with a UTF-8 BOM; without this
+    # the frontmatter regex silently fails and metadata is treated as empty.
+    text = text.lstrip("﻿")
     m = _FRONTMATTER_RE.match(text)
     if not m:
         return {}, text
@@ -335,7 +338,9 @@ def render_frontmatter(meta: dict[str, Any], body: str) -> str:
 
 
 def read_frontmatter_file(path: Path | str) -> tuple[dict[str, Any], str]:
-    text = Path(path).read_text(encoding="utf-8")
+    # utf-8-sig transparently strips a BOM when present and reads plain
+    # UTF-8 unchanged otherwise.
+    text = Path(path).read_text(encoding="utf-8-sig")
     return parse_frontmatter(text)
 
 
@@ -392,7 +397,7 @@ def content_fingerprint(text: str, prefix_len: int = 16) -> str:
 
 def fingerprint_file(path: Path | str, prefix_len: int = 16) -> str:
     return content_fingerprint(
-        Path(path).read_text(encoding="utf-8", errors="replace"), prefix_len
+        Path(path).read_text(encoding="utf-8-sig", errors="replace"), prefix_len
     )
 
 

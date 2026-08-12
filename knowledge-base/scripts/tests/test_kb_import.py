@@ -554,6 +554,41 @@ def test_zip_slip_members_are_refused(local: Path, tmp_path: Path):
     assert (local / "knowledge/domain/ok.md").is_file()
 
 
+def test_corrupt_manifest_yaml_is_a_clean_error(local: Path, tmp_path: Path):
+    bogus = tmp_path / "corrupt.zip"
+    with zipfile.ZipFile(bogus, "w") as zf:
+        zf.writestr("manifest.yml", "bundle_format: [unclosed\n  ::: not yaml")
+    with pytest.raises(ValueError, match="unreadable manifest.yml"):
+        kb_import.import_bundle(root=local, bundle=bogus)
+    # And through the CLI it is a clean exit 2, not a traceback
+    assert kb_import.main(["--root", str(local), str(bogus)]) == 2
+
+
+def test_bundle_with_too_many_members_is_refused(
+    local: Path, tmp_path: Path, monkeypatch
+):
+    monkeypatch.setattr(kb_import, "MAX_BUNDLE_MEMBERS", 3)
+    fat = tmp_path / "fat.zip"
+    with zipfile.ZipFile(fat, "w") as zf:
+        zf.writestr("manifest.yml", "bundle_format: 1\nsource:\n  label: fat\n")
+        for i in range(5):
+            zf.writestr(f"knowledge/domain/n{i}.md", f"# {i}\n")
+    with pytest.raises(ValueError, match="file limit"):
+        kb_import.import_bundle(root=local, bundle=fat)
+
+
+def test_bundle_exceeding_unpacked_size_is_refused(
+    local: Path, tmp_path: Path, monkeypatch
+):
+    monkeypatch.setattr(kb_import, "MAX_BUNDLE_UNPACKED_BYTES", 1024)
+    bomb = tmp_path / "bomb.zip"
+    with zipfile.ZipFile(bomb, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("manifest.yml", "bundle_format: 1\nsource:\n  label: bomb\n")
+        zf.writestr("knowledge/domain/big.md", "x" * 100_000)
+    with pytest.raises(ValueError, match="zip bomb"):
+        kb_import.import_bundle(root=local, bundle=bomb)
+
+
 def test_unsafe_member_names():
     assert kb_import._is_safe_member("knowledge/x.md")
     assert not kb_import._is_safe_member("../x.md")

@@ -92,6 +92,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):  # pragma: no cover
+            pass
+
     new_commit = head_sha() if args.to_head else None
     new_version = args.to_version or repo_version()
     new_date = args.to_date or _dt.date.today().isoformat()

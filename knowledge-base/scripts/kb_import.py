@@ -139,7 +139,7 @@ def build_local_index(root: Path) -> LocalIndex:
         if not path.is_file():
             continue
         rel = path.relative_to(root).as_posix()
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
         meta, body = kbc.parse_frontmatter(text)
         fp = kbc.content_fingerprint(text)
         idx.by_relpath[rel] = path
@@ -169,7 +169,12 @@ def read_manifest(bundle: Path) -> dict[str, Any]:
     with zipfile.ZipFile(bundle) as zf:
         if MANIFEST_NAME not in zf.namelist():
             raise ValueError(f"{bundle.name}: no {MANIFEST_NAME} — not a kb bundle")
-        data = yaml.safe_load(zf.read(MANIFEST_NAME).decode("utf-8")) or {}
+        try:
+            data = yaml.safe_load(zf.read(MANIFEST_NAME).decode("utf-8")) or {}
+        except (yaml.YAMLError, UnicodeDecodeError) as exc:
+            raise ValueError(
+                f"{bundle.name}: unreadable {MANIFEST_NAME}: {exc}"
+            ) from exc
     fmt = data.get("bundle_format")
     if fmt not in SUPPORTED_BUNDLE_FORMATS:
         raise ValueError(
@@ -179,20 +184,43 @@ def read_manifest(bundle: Path) -> dict[str, Any]:
     return data
 
 
+# Extraction caps: a malicious or accidentally huge bundle must not fill the
+# disk through the temp directory. Sizes are checked against the actual
+# decompressed stream, not the (spoofable) sizes declared in the zip index.
+MAX_BUNDLE_MEMBERS = 20_000
+MAX_BUNDLE_UNPACKED_BYTES = 2 * 1024**3  # 2 GiB
+
+
 def extract_bundle(bundle: Path, dest: Path) -> list[str]:
     """Extract to `dest`, skipping unsafe member paths. Returns skipped names."""
     skipped: list[str] = []
+    total = 0
     with zipfile.ZipFile(bundle) as zf:
-        for member in zf.infolist():
-            if member.is_dir():
-                continue
+        members = [m for m in zf.infolist() if not m.is_dir()]
+        if len(members) > MAX_BUNDLE_MEMBERS:
+            raise ValueError(
+                f"{bundle.name}: {len(members)} members exceed the "
+                f"{MAX_BUNDLE_MEMBERS}-file limit — refusing to extract"
+            )
+        for member in members:
             if not _is_safe_member(member.filename):
                 skipped.append(member.filename)
                 continue
             target = dest / member.filename
             target.parent.mkdir(parents=True, exist_ok=True)
             with zf.open(member) as src, target.open("wb") as dst:
-                shutil.copyfileobj(src, dst)
+                while True:
+                    chunk = src.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_BUNDLE_UNPACKED_BYTES:
+                        raise ValueError(
+                            f"{bundle.name}: unpacked size exceeds "
+                            f"{MAX_BUNDLE_UNPACKED_BYTES} bytes — refusing to "
+                            "extract (zip bomb?)"
+                        )
+                    dst.write(chunk)
     return skipped
 
 
@@ -318,8 +346,8 @@ def _write_conflict_package(
     staged.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(incoming_file, staged)
 
-    local_text = local_path.read_text(encoding="utf-8", errors="replace")
-    incoming_text = incoming_file.read_text(encoding="utf-8", errors="replace")
+    local_text = local_path.read_text(encoding="utf-8-sig", errors="replace")
+    incoming_text = incoming_file.read_text(encoding="utf-8-sig", errors="replace")
     local_meta = idx.meta_of.get(rel, {})
     incoming_meta, _ = kbc.parse_frontmatter(incoming_text)
 
@@ -440,7 +468,7 @@ def merge_knowledge(
         if not incoming_file.is_file():
             continue
         rel = incoming_file.relative_to(staging).as_posix()
-        text = incoming_file.read_text(encoding="utf-8", errors="replace")
+        text = incoming_file.read_text(encoding="utf-8-sig", errors="replace")
         meta, body = kbc.parse_frontmatter(text)
         fp = kbc.content_fingerprint(text)
         target = root / rel
@@ -612,7 +640,7 @@ def merge_assets_index(
         rel = incoming_file.relative_to(staging).as_posix()
         target = root / rel
         incoming_blocks = _parse_asset_blocks(
-            incoming_file.read_text(encoding="utf-8", errors="replace")
+            incoming_file.read_text(encoding="utf-8-sig", errors="replace")
         )
         if not target.is_file():
             if not dry_run:
@@ -621,7 +649,7 @@ def merge_assets_index(
             notes.append(f"{rel}: added ({len(incoming_blocks)} entries)")
             continue
 
-        local_text = target.read_text(encoding="utf-8", errors="replace")
+        local_text = target.read_text(encoding="utf-8-sig", errors="replace")
         local_blocks = _parse_asset_blocks(local_text)
         missing = [h for h in incoming_blocks if h not in local_blocks]
         if not missing:
@@ -1034,7 +1062,7 @@ def main(argv: list[str] | None = None) -> int:
                     **defaults,
                 )
             )
-        except (ValueError, zipfile.BadZipFile) as exc:
+        except (ValueError, zipfile.BadZipFile, OSError) as exc:
             kbc.print_err(f"❌ {exc}")
             failed = True
 

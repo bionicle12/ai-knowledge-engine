@@ -30,6 +30,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 I18N_DIR = REPO_ROOT / "i18n"
 STATUS_FILE = I18N_DIR / "TRANSLATION_STATUS.md"
 
+
+def _enable_utf8_stdout() -> None:
+    """Windows consoles default to a legacy codepage that cannot encode the
+    status emoji; switch to UTF-8 where the runtime allows it."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):  # pragma: no cover
+            pass
+
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
 
@@ -112,13 +122,14 @@ def evaluate(path: Path) -> TranslationStatus:
     rel = path.relative_to(REPO_ROOT)
     parts = rel.parts
     lang = parts[1] if len(parts) > 1 else "?"
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")
     fm = parse_frontmatter(text)
     source_rel = fm.get("translation_of", "")
     source_commit = fm.get("source_commit", "")
     status = TranslationStatus(
         lang=lang,
-        translation_path=str(rel),
+        # as_posix keeps the generated status file identical across OSes
+        translation_path=rel.as_posix(),
         source_path=source_rel,
         source_commit=source_commit,
         translated_at=fm.get("translated_at", ""),
@@ -170,7 +181,7 @@ def find_missing(i18n_dir: Path, statuses: list[TranslationStatus]) -> list[Tran
         }
         for canon in canonical:
             rel = canon.relative_to(REPO_ROOT)
-            if str(rel) in translated_sources:
+            if rel.as_posix() in translated_sources:
                 continue
             expected = REPO_ROOT / "i18n" / lang / rel
             if expected.is_file():
@@ -178,8 +189,8 @@ def find_missing(i18n_dir: Path, statuses: list[TranslationStatus]) -> list[Tran
             out.append(
                 TranslationStatus(
                     lang=lang,
-                    translation_path=str(expected.relative_to(REPO_ROOT)),
-                    source_path=str(rel),
+                    translation_path=expected.relative_to(REPO_ROOT).as_posix(),
+                    source_path=rel.as_posix(),
                     state="missing",
                     note="no translation file present",
                 )
@@ -230,6 +241,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--strict", action="store_true",
                         help="Exit 1 if any file is stale/missing/orphan")
     args = parser.parse_args(argv)
+
+    _enable_utf8_stdout()
 
     if not I18N_DIR.is_dir():
         print(f"[check_translations] i18n/ directory not found at {I18N_DIR}")

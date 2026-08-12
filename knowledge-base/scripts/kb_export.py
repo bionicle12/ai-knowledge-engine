@@ -121,7 +121,7 @@ def collect_knowledge(root: Path, since: _dt.date | None) -> list[BundleFile]:
     out: list[BundleFile] = []
     knowledge = root / "knowledge"
     for path in _iter_markdown(knowledge):
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text = path.read_text(encoding="utf-8-sig", errors="replace")
         meta, body = kbc.parse_frontmatter(text)
         if not _passes_since(path, meta, since):
             continue

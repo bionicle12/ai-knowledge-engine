@@ -35,6 +35,30 @@ def test_parse_frontmatter_invalid_yaml():
     assert meta == {}
 
 
+def test_parse_frontmatter_strips_bom():
+    text = "﻿---\nfoo: bar\n---\nbody\n"
+    meta, body = kbc.parse_frontmatter(text)
+    assert meta == {"foo": "bar"}
+    assert body == "body\n"
+
+
+def test_read_frontmatter_file_with_bom(tmp_path: Path):
+    p = tmp_path / "page.md"
+    p.write_bytes(b"\xef\xbb\xbf---\nfoo: bar\n---\nbody\n")
+    meta, body = kbc.read_frontmatter_file(p)
+    assert meta == {"foo": "bar"}
+    assert body == "body\n"
+
+
+def test_fingerprint_ignores_bom(tmp_path: Path):
+    plain = tmp_path / "plain.md"
+    bom = tmp_path / "bom.md"
+    content = "---\nfoo: bar\n---\n# Title\n\nsame body\n"
+    plain.write_text(content, encoding="utf-8")
+    bom.write_text(content, encoding="utf-8-sig")
+    assert kbc.fingerprint_file(plain) == kbc.fingerprint_file(bom)
+
+
 def test_render_frontmatter_roundtrip():
     meta = {"foo": "bar", "tags": ["a", "b"]}
     body = "hello\n"
