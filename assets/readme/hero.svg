@@ -52,7 +52,7 @@
        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
        font-size="18" font-weight="650">
       <rect width="112" height="38" rx="19" fill="#10243A" stroke="#2B4964"/>
-      <text x="20" y="25" fill="#F3F7FF">v0.11.0</text>
+      <text x="20" y="25" fill="#F3F7FF">v0.12.0</text>
 
       <rect x="126" width="210" height="38" rx="19" fill="#10243A" stroke="#2B4964"/>
       <text x="146" y="25" fill="#F3F7FF">16 instruction modules</text>

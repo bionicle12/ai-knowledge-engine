@@ -18,6 +18,8 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-13
+
 ### Added
 - **Cross-base merge — running one knowledge base on several machines.**
   Two deployments of the same base can now exchange knowledge without either
@@ -58,11 +60,69 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
     `review/needs-merge/`, and a `sync:` config section whose `label` defaults
     to the base folder name so two bases never share one identity.
 
+- Tests for previously untested modules: `kb_watch` polling logic,
+  `kb_doctor --self-test` (pytest wrapper keeps it in the local run now that
+  CI is intentionally off), and `scripts/sync_translations.py`.
+
+### Changed
+- `process_one` and `reprocess_asset` in `kb_ingest.py` share one pipeline
+  tail (convert → NLP → route → metadata → assets-index → log) instead of two
+  drifting copies.
+- `kb_lint.py` reads every page exactly once per run (previously 6–8 times)
+  and caches parsed frontmatter for all checks and metrics.
+- Orphan rules unified: the lint check and `--metrics` use one helper, and the
+  `!view` graph now applies the same rule (`routing/` pages and
+  `routing-table.md` are entry points, never flagged orphan).
+- `--root` is accepted as an alias of `--kb-root` in `kb_view.py` and
+  `kb_upgrade.py`, matching every other script.
+- The test suite is green on Windows: symlink creation falls back to copying,
+  bash-dependent integration tests skip cleanly when no usable bash is on
+  PATH (e.g. WSL from PowerShell), and path assertions tolerate Git Bash's
+  POSIX-style output.
+
 ### Fixed
+- **UTF-8 BOM no longer breaks frontmatter.** All page reads use `utf-8-sig`
+  and `parse_frontmatter` strips a leading BOM, so a file saved by a Windows
+  editor keeps its metadata instead of silently failing lint, producing wrong
+  content fingerprints, and importing as a false conflict.
+- **`kb_watch` polling fallback actually ingests files now.** Previously a
+  file whose mtime stopped changing was skipped forever. Files are ingested
+  once `(mtime, size)` stays stable for the debounce window; a file left
+  behind by a failed ingest is not retried in a tight loop. The watchdog mode
+  got a lock around its pending map (the handler thread mutated it during
+  iteration) and restarts the debounce on modify events, so a large file
+  still being copied is never ingested half-way.
+- **`kb_ingest` no longer strands files on failure.** The original is copied
+  into `assets/` and removed from `unsorted/` only after conversion,
+  metadata, index, and log all succeeded; a mid-pipeline crash rolls the copy
+  back and leaves the original in place for a clean re-run.
+- `kb_ingest`: an assets-index block whose heading is a prefix of an existing
+  heading (`## foo` vs `## foo-bar`) is appended instead of silently lost;
+  explicit paths that do not exist are a clear exit-2 error instead of being
+  silently ignored; running outside a deployed base (no `kb.config.yml`)
+  exits 2 instead of scaffolding forty empty folders into the current
+  directory.
+- `kb_import`: a corrupt `manifest.yml` or a disk error during import is a
+  clean exit-2 message instead of a traceback; bundle extraction refuses more
+  than 20 000 members or 2 GiB unpacked (zip-bomb protection) — measured on
+  the real decompressed stream, not the spoofable declared sizes.
+- `kb_lint`: one unreadable file no longer crashes the whole run — it is
+  reported as a single `unreadable` error and the other checks still execute.
+- `kb_upgrade`: the fast tag-based comparison works on Windows (`git show`
+  needs forward slashes; backslashed paths silently missed every file and
+  forced the slow full-history scan).
+- `scripts/check_translations.py` runs on stock Windows consoles (UTF-8
+  output is enforced; cp1251 could not encode the status emoji) and writes
+  identical `TRANSLATION_STATUS.md` paths on every OS (forward slashes).
 - `scripts/sync_deployed_bases.py` no longer defaults to a hardcoded personal
   Windows path. The target folder is now a required argument or `$KB_SYNC_TARGET`.
 - `export.command` / `import.command` survive a non-tty run (`clear` and the
   closing `read` no longer turn a successful run into a failure).
+
+### Translation impact
+- All `i18n/ru/` translations re-synced with their English sources (several
+  modules had drifted since 0.10.0); `16_MERGE.md` translated for the first
+  time; RU tables of contents now list module 16.
 
 ## [0.11.0] - 2026-07-26
 

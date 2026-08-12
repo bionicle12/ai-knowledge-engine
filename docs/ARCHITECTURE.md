@@ -17,7 +17,7 @@ Why both: instructions alone leave too many decisions to the agent. Implementati
 ```
 ai-knowledge-engine/
 ├── README.md                     ← Project landing (EN); RU → i18n/ru/README.md
-├── VERSION                       ← semver of instructions (e.g., 0.11.0)
+├── VERSION                       ← semver of instructions (e.g., 0.12.0)
 ├── CHANGELOG.md                  ← Keep-a-Changelog format
 ├── LICENSE
 │
@@ -111,7 +111,7 @@ Agent flow:
 ## Versioning model
 
 ```
-ai-knowledge-engine repo:        VERSION = 0.11.0
+ai-knowledge-engine repo:        VERSION = 0.12.0
 └── User's deployed knowledge base
     └── kb.config.yml: instructions_version = 0.9.3
                                       ↑

@@ -242,6 +242,40 @@ The drift checker reads from git history. If you have uncommitted changes in `kn
 
 This is expected. The canonical EN files moved to a new commit, so the recorded `source_commit` in RU frontmatter lags. Update the translations and bump their `source_commit` to the latest commit SHA.
 
+## Cross-base merge (kb_export.py / kb_import.py)
+
+### `kb_import.py` says "No bundle to import"
+
+Bundles are picked up from `sync/inbox/`. Copy the `.zip` produced by the
+other machine's export into `sync/inbox/` (or pass the path explicitly:
+`python3 scripts/kb_import.py path/to/bundle.zip`).
+
+### Import finished with exit code 1 — is that a failure?
+
+No. Exit 1 means the merge worked but some pages changed on both sides:
+they are waiting in `review/needs-merge/` with a unified diff each. Tell the
+agent `!merge` to resolve them. Exit 2 is a real error (unreadable bundle,
+missing manifest, unsupported format).
+
+### "not a kb bundle" / "unreadable manifest.yml"
+
+The zip was not produced by `kb_export.py`, or it was corrupted in transfer.
+Re-export on the source machine and copy the file again. Bundles also refuse
+to unpack when they exceed safety caps (20 000 files / 2 GiB unpacked).
+
+### The same page keeps coming back as a conflict
+
+Both bases keep editing the same file between exchanges. Resolve it once via
+`!merge`, then export from the machine that now holds the merged version and
+import on the other one — the next exchange fast-forwards instead of
+conflicting.
+
+### Where did my previous file go after an import?
+
+Nothing is overwritten silently: every file the import touches is snapshotted
+to `sync/backups/<timestamp>/` first. Applied bundles move to
+`sync/applied/`.
+
 ## General
 
 ### `kb_doctor.py` reports an error but everything seems to work

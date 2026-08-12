@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.11.0-62D8FF?style=flat-square" alt="Version 0.11.0"></a>
+  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.12.0-62D8FF?style=flat-square" alt="Version 0.12.0"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-7EE787?style=flat-square" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/storage-local%20Markdown-8A9BB5?style=flat-square" alt="Local Markdown storage">

@@ -153,6 +153,6 @@ kb_reflect.py decides when to ask the agent for higher-level reflection.
 
 ## Versioning
 
-`VERSION` in the parent repo holds `instructions_version` (e.g., `0.11.0`).
+`VERSION` in the parent repo holds `instructions_version` (e.g., `0.12.0`).
 At deployment, parameterize `kb.config.yml.template` with the current version.
 On a future update, `kb_upgrade.py` (Phase 4) compares versions and refreshes scripts.
