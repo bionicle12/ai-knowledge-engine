@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/README.md
-source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
-source_version: 0.9.3
-translated_at: 2026-06-29
+source_commit: d82f0395afa7e65a0d84b4ba78f99701048f2bfe
+source_version: 0.12.0
+translated_at: 2026-08-13
 translator: ai-assisted
 ---
 
@@ -43,6 +43,7 @@ AI-агент должен читать модули **строго в этом 
 | 13 | `13_AUTORUN.md` | File watcher, git hooks, cron — автоматическая обработка |
 | 14 | `14_INITIAL_POPULATION.md` | Генерация role-specific `DATA_PLACEMENT_EXAMPLES.md` |
 | 15 | `15_MEDIA_PROCESSING.md` | Транскрибация (STT), OCR, архивы — из коробки, на всех платформах |
+| 16 | `16_MERGE.md` | Импорт/экспорт между базами: слияние двух развёртываний без потери знаний |
 
 Конфигурации ролей: `examples/`.
 Готовые шаблоны для копирования и параметризации: `templates/`.

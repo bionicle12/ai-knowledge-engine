@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/02_INIT.md
-source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
-source_version: 0.9.3
-translated_at: 2026-06-29
+source_commit: d82f0395afa7e65a0d84b4ba78f99701048f2bfe
+source_version: 0.12.0
+translated_at: 2026-08-13
 translator: ai-assisted
 ---
 
@@ -10,8 +10,81 @@ translator: ai-assisted
 
 > Этот файл описывает фазу уточнения (вопросы пользователю) и создание структуры проекта.
 >
-> **Reference templates:** `knowledge-base/templates/kb.config.yml.template`, `KNOWLEDGE_STRUCTURE.md.template`, `DATA_PLACEMENT_EXAMPLES.md.template`, `.gitignore.template`. Агент копирует их в корень развёрнутой базы и параметризует плейсхолдеры.
+> **Reference templates:** `knowledge-base/templates/kb.config.yml.template`, `KNOWLEDGE_STRUCTURE.md.template`, `DATA_PLACEMENT_EXAMPLES.md.template`, `START_HERE.md.template`, `.gitignore.template`. Агент копирует их в корень развёрнутой базы и параметризует плейсхолдеры.
 > **Auto-init folders:** структуру можно создать одной командой — `python3 scripts/kb_ingest.py --init-dirs`.
+> **Deployment helper:** `shell/finalize.sh` запускается **в самом конце** (после того как `kb_doctor` прошёл) — «расплющивает» `knowledge-base/` в корень проекта и удаляет `setup/` — см. «Схема развёртывания» ниже.
+
+---
+
+## Схема развёртывания (что где окажется)
+
+Пользователь копирует upstream-папку `knowledge-base/` в корень своего проекта, **переименовав её в `setup/`**, чтобы она не смешивалась с базой, которую построит агент. Начальная раскладка:
+
+```
+my-project/
+└── setup/
+    ├── 00_OVERVIEW.md … 14_INITIAL_POPULATION.md
+    ├── README.md
+    ├── scripts/
+    ├── shell/
+    ├── templates/
+    └── examples/
+```
+
+Агент сначала читает `setup/00_OVERVIEW.md`, затем проходит по модулям. Во время развёртывания база **строится внутри `<project-root>/knowledge-base/`**:
+
+```
+my-project/
+├── setup/                       ← остаётся здесь, исходные инструкции
+└── knowledge-base/              ← агент строит базу здесь
+    ├── AGENTS.md, kb.config.yml, ...
+    ├── scripts/, shell/, templates/, examples/    ← скопированы как есть из setup/
+    ├── raw/, processed/, knowledge/, assets/, ...
+    ├── watcher-start.command, watcher-stop.command
+    ├── reindex.bat, watcher-start.bat
+    └── DATA_PLACEMENT_EXAMPLES.md, START_HERE.md
+```
+
+Когда всё проверено (kb_doctor проходит, START_HERE.md сгенерирован), агент запускает **finalize**:
+
+```bash
+bash setup/shell/finalize.sh
+```
+
+Этот скрипт:
+1. Проверяет, что в развёрнутой базе есть обязательные файлы (`AGENTS.md`, `kb.config.yml`, `scripts/kb_ingest.py`)
+2. **Поднимает** каждый элемент из `knowledge-base/` в корень проекта
+3. Удаляет пустую папку `knowledge-base/`
+4. Удаляет исходную папку `setup/` (флаг `--keep-setup`, чтобы оставить её)
+5. Обновляет executable-биты у файлов `*.sh` / `*.command`
+
+**Финальная раскладка — плоско в корне проекта, без `setup/` и без `knowledge-base/`:**
+
+```
+my-project/
+├── kb.config.yml
+├── AGENTS.md
+├── KNOWLEDGE_STRUCTURE.md
+├── DATA_PLACEMENT_EXAMPLES.md
+├── START_HERE.md
+├── repomix.config.json
+├── requirements.txt
+├── reindex.command, watcher-start.command, watcher-stop.command   (macOS — двойной клик)
+├── export.command, import.command                                  (macOS — синхронизация между базами)
+├── reindex.bat, watcher-start.bat, export.bat, import.bat          (Windows — двойной клик)
+├── shell/        ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh, export.sh, import.sh
+├── scripts/      ← Python-пайплайн
+├── templates/, examples/
+├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, sync/
+├── .repomix/
+└── .venv/
+```
+
+`finalize.sh` автоматически поднимает launcher-ы `*.command` / `*.bat` из `shell/` в корень проекта (чтобы они были видны в Finder/Explorer для двойного клика). Обёртки `*.sh` остаются только в `shell/` — их запуск — это про Linux/CLI.
+
+Если finalize падает (конфликты, отсутствующие файлы), проект остаётся в состоянии до finalize — ничего не «расплющивается» наполовину, пользователь может повторить попытку.
+
+Если по какой-то причине пользователь хочет держать базу в подпапке — можно просто пропустить finalize. Но путь по умолчанию и рекомендуемый — **плоско в корне проекта после финализации**.
 
 ---
 
@@ -97,12 +170,15 @@ knowledge-base/
 ├── repomix.config.json         # Конфиг индексации
 ├── requirements.txt            # Python-зависимости
 ├── reindex.command, watcher-start.command, watcher-stop.command   # macOS launcher-ы
-├── reindex.bat, watcher-start.bat                                 # Windows launcher-ы
+├── export.command, import.command                                 # macOS: синхронизация между базами
+├── reindex.bat, watcher-start.bat, export.bat, import.bat         # Windows launcher-ы
 ├── shell/                    # Linux / CLI wrappers
 │   ├── reindex.sh
 │   ├── watcher.sh
 │   ├── lint.sh
-│   └── doctor.sh
+│   ├── doctor.sh
+│   ├── export.sh
+│   └── import.sh
 │
 ├── scripts/
 │   └── kb_ingest.py            # Пайплайн обработки (см. 03_PIPELINE.md)
@@ -154,12 +230,20 @@ knowledge-base/
 │   ├── needs-classification/
 │   ├── needs-ai-decision/
 │   ├── needs-redaction/
+│   ├── needs-merge/            # Пакеты слияния между базами (см. 16_MERGE.md)
 │   └── excluded-sensitive/
 │
 ├── interactions/               # Feedback loop (НЕ индексируется напрямую)
 │   ├── sessions/               # Папки диалогов с таймстампами
 │   ├── insights/               # Извлечённые паттерны
 │   └── meta-reviews/           # Периодический анализ
+│
+├── sync/                       # Импорт/экспорт между базами (НЕ индексируется)
+│   ├── inbox/                  # Сюда кладут бандлы с другой машины
+│   ├── outbox/                 # Бандлы, созданные этой базой
+│   ├── applied/                # Уже импортированные бандлы
+│   ├── backups/                # Снимки перед импортом
+│   └── reports/                # Отчёты о слиянии
 │
 ├── setup/                      # Seed-инструкции (НЕ индексируется)
 └── .repomix/
@@ -202,7 +286,25 @@ language_policy:
 entities:
   # Описываются пользователем через examples/ или вручную
   # см. examples/*.yml
+
+sync:
+  # Имеет значение, только если пользователь работает с базой более чем на одной машине.
+  label: "work-laptop"          # {{KB_LABEL}} — как эта база себя идентифицирует
+  export:
+    sections: ["knowledge", "assets-index", "interactions", "meta", "config", "log"]
+    with_assets: false
+  import:
+    strategy: "safe"
+    similarity_threshold: 0.85
+    backup: true
+    move_applied: true
 ```
+
+> **`{{KB_LABEL}}`** — спрашивать только тогда, когда пользователь говорит, что работает
+> с нескольких машин (например, студийный и рабочий ноутбуки). Значение должно быть
+> **разным в каждом развёртывании**: оно штампуется на каждую импортированную страницу
+> как `merged_from:` и именно оно делает слияние отслеживаемым. Если машина одна —
+> установить то же значение, что и `knowledge_base.name`. См. `16_MERGE.md`.
 
 ---
 
@@ -254,7 +356,17 @@ supersedes: null
 После создания структуры и конфига агент **обязан** перейти к `14_INITIAL_POPULATION.md`:
 
 1. Прочитать выбранный role-template (`examples/<role>.yml`) и найти секцию `placement_examples:`.
-2. Сгенерировать персонализированный `DATA_PLACEMENT_EXAMPLES.md` — заменить шаблонный скелет, оставшийся от templates/.
-3. Показать пользователю summary с 3-5 quickstart-пунктами, чтобы он сразу мог начать наполнять базу.
+2. **Если роль кастомная (нет в `examples/`)**: сначала создать `examples/<slug>.yml` из `templates/role.yml.template`, пройдя с пользователем по плейсхолдерам. YAML должен существовать на диске **до** наполнения.
+3. Запустить `python3 scripts/kb_populate.py --role <slug> --kb-root knowledge-base` (где `knowledge-base/` — директория развёрнутой базы, которую построил агент) — детерминированная генерация, без LLM-токенов.
+4. (Рекомендуется) Прочитать сгенерированный файл и дописать секцию `## Project notes` с проектными подсказками, которые не помещаются в YAML (~1-2K токенов).
+5. **Сгенерировать `START_HERE.md`**: скопировать `templates/START_HERE.md.template` и параметризовать `{{KB_NAME}}` и `{{PRIMARY_ROLE}}`. Это **первое**, что пользователь читает после развёртывания.
+6. **Запустить `kb_doctor.py`**, чтобы убедиться, что всё подключено правильно.
+7. **Запустить `bash setup/shell/finalize.sh`** — поднимает содержимое `knowledge-base/` в корень проекта, удаляет `setup/` и пустую папку `knowledge-base/`. После этого проект пользователя плоский и аккуратный.
+8. Показать пользователю в чате summary на 3-5 строк, которое:
+   - **Явно говорит**: *«Сначала прочитай `START_HERE.md` и не забывай начинать каждую новую чат-сессию со слов: "Прочитай AGENTS.md и используй его как основную инструкцию".»*
+   - Перечисляет самые практичные quickstart-пункты
+   - Упоминает watcher-launcher, актуальный для ОС пользователя
 
-Если в шаблоне роли нет секции `placement_examples:` — оставить файл из шаблона как есть и предложить пользователю самостоятельно перечислить типы артефактов.
+Если в шаблоне роли нет секции `placement_examples:` — `kb_populate.py` завершится с ошибкой; добавь секцию в YAML и перезапусти.
+
+Если `finalize.sh` отказывается работать (конфликты файлов, отсутствующие обязательные файлы) — НЕ форсировать без согласия пользователя; сначала разобраться в причине.

@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/13_AUTORUN.md
-source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
-source_version: 0.9.3
-translated_at: 2026-06-29
+source_commit: ba0445d4e2f47c138df7354020807616d38a0739
+source_version: 0.12.0
+translated_at: 2026-08-13
 translator: ai-assisted
 ---
 
@@ -501,7 +501,7 @@ fi
 | AI сделал query-writeback | Write page → Reindex | AI-агент |
 | Commit в git | Quick lint + Reindex | git hook |
 | Ежедневно | Full lint (Python) + Reindex | cron |
-| При reindex (>24ч) | Consolidation (lint + NLP batch + reflection indicator) | `reindex.sh` |
+| При reindex (>24ч) | Consolidation (lint + NLP batch + reflection) | `reindex.sh` |
 | При reindex (>7д) | Weekly reflection (LLM insights) | `reindex.sh` |
 
 ---
@@ -531,7 +531,7 @@ autorun:
 - **03_PIPELINE:** watch вызывает ingest при новом файле; surprise filter проверяет дупликаты
 - **05_INDEX:** watch вызывает reindex при изменениях
 - **07_INTERACTION_LOOP:** консолидация проверяет reflection threshold и запускает insights
-- **09_LINT:** watch → quick lint; консолидация → полный lint с compression caps
+- **09_LINT:** watch → quick lint; консолидация → полный lint
 - **10_LOG:** все авто-операции записываются в log.md, включая consolidation
 - **11_PROVENANCE:** консолидация обновляет recency scores и проверяет bi-temporal validity
 - **12_NLP:** watch запускает NLP при ingest; консолидация — batch re-enrichment

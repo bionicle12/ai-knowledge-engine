@@ -1,8 +1,8 @@
 ---
 translation_of: README.md
-source_commit: f2fd134c5214b12105acbf12b1ce88a20491e913
-source_version: 0.10.0
-translated_at: 2026-07-24
+source_commit: d47821780644a3542a8015dc76b2320e532649a8
+source_version: 0.12.0
+translated_at: 2026-08-13
 translator: ai-assisted
 ---
 
@@ -11,7 +11,7 @@ translator: ai-assisted
 </p>
 
 <p align="center">
-  <a href="../../VERSION"><img src="https://img.shields.io/badge/версия-0.11.0-62D8FF?style=flat-square" alt="Версия 0.11.0"></a>
+  <a href="../../VERSION"><img src="https://img.shields.io/badge/версия-0.12.0-62D8FF?style=flat-square" alt="Версия 0.12.0"></a>
   <a href="#требования"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 или новее"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/лицензия-MIT-7EE787?style=flat-square" alt="Лицензия MIT"></a>
   <img src="https://img.shields.io/badge/хранение-локальный%20Markdown-8A9BB5?style=flat-square" alt="Локальное хранение в Markdown">

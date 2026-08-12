@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/00_OVERVIEW.md
-source_commit: 988ed3467928e8c92fce3666a5288016c33d0e57
-source_version: 0.10.0
-translated_at: 2026-07-09
+source_commit: d47821780644a3542a8015dc76b2320e532649a8
+source_version: 0.12.0
+translated_at: 2026-08-13
 translator: ai-assisted
 ---
 
@@ -49,6 +49,7 @@ translator: ai-assisted
 | 13 | `13_AUTORUN.md` | Копируешь `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`; ставишь git hook |
 | 14 | `14_INITIAL_POPULATION.md` | Генерируешь role-specific `DATA_PLACEMENT_EXAMPLES.md` из `examples/<role>.yml` |
 | 15 | `15_MEDIA_PROCESSING.md` | Копируешь `scripts/kb_stt.py`, `scripts/kb_ocr.py`, `templates/requirements-media.txt`; настраиваешь `media:` |
+| 16 | `16_MERGE.md` | Копируешь `scripts/kb_export.py`, `scripts/kb_import.py`, `shell/export.sh`, `shell/import.sh`; настраиваешь `sync:` (нужно только если база работает на нескольких машинах) |
 
 После всех модулей: запусти `bash shell/doctor.sh` (или `python3 scripts/kb_doctor.py`) для финальной проверки.
 
@@ -63,7 +64,7 @@ Layout ДО finalize:
 ```
 {user-project-root}/
 ├── setup/                            ← upstream-инструкции (источник)
-│   ├── 00_OVERVIEW.md … 15_MEDIA_PROCESSING.md
+│   ├── 00_OVERVIEW.md … 16_MERGE.md
 │   ├── README.md
 │   ├── scripts/, shell/, templates/, examples/
 │   └── shell/finalize.sh             ← запуск в конце
@@ -156,6 +157,6 @@ kb_reflect.py решает, когда просить агента о higher-lev
 
 ## Версионирование
 
-`VERSION` в родительском репо хранит `instructions_version` (например, `0.11.0`).
+`VERSION` в родительском репо хранит `instructions_version` (например, `0.12.0`).
 При развёртывании параметризуешь `kb.config.yml.template` текущей версией.
 При будущем обновлении `kb_upgrade.py` сравнит версии и обновит скрипты.

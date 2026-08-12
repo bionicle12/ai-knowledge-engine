@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/07_INTERACTION_LOOP.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
-source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+source_commit: 988ed3467928e8c92fce3666a5288016c33d0e57
+source_version: 0.12.0
+translated_at: 2026-08-13
+translator: ai-assisted
 ---
 
 # 07 — Self-Learning Feedback Loop
@@ -42,7 +42,7 @@ AI-агент **сам** определяет, когда писать session s
 |----------|----------|
 | Накопилось 5-7 содержательных обменов | Пишет summary, продолжает работу |
 | Диалог логически завершён | Пишет финальное summary |
-| Команда `!save` от пользователя | Немедленно пишет summary |
+| Команда `!save` от пользователя | Немедленно пишет summary (агент пишет в `interactions/sessions/`; опциональный CLI: `python3 scripts/kb_save_session.py`) |
 | Пользователь просит не сохранять | Не пишет |
 
 ### Структура в `interactions/sessions/`

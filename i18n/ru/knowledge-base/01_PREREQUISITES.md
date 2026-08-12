@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/01_PREREQUISITES.md
-source_commit: 41b95e18eccb87d255fee3f7c367d1c2e6847849
-source_version: 0.9.3
-translated_at: 2026-06-29
+source_commit: 4dbd06897ededf6c49c1c5f3ead9a299b51638b9
+source_version: 0.12.0
+translated_at: 2026-08-13
 translator: ai-assisted
 ---
 
@@ -63,16 +63,21 @@ pip install -r requirements.txt
 
 ## requirements.txt
 
-Создать в корне базы:
+Скопируй `templates/requirements.txt` из этого репозитория в корень базы. Версии зафиксированы по minor-диапазонам для воспроизводимости:
 
-```txt
-pyyaml>=6.0
-python-slugify>=8.0
-python-docx>=1.1
-python-pptx>=0.6.23
-pypdf>=5.0
-pandas>=2.2
-openpyxl>=3.1
+```text
+pyyaml>=6.0,<7.0
+python-slugify>=8.0,<9.0
+python-frontmatter>=1.1,<2.0
+python-docx>=1.1,<2.0
+python-pptx>=0.6.23,<1.0
+pypdf>=5.0,<6.0
+pandas>=2.2,<3.0
+openpyxl>=3.1,<4.0
+spacy>=3.7,<4.0
+rake-nltk>=1.0,<2.0
+keybert>=0.8,<1.0
+watchdog>=4.0,<5.0
 ```
 
 ## Media: транскрибация (STT) и OCR — из коробки, на всех платформах

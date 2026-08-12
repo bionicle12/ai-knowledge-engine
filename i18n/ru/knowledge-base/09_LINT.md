@@ -1,9 +1,9 @@
 ---
 translation_of: knowledge-base/09_LINT.md
-source_commit: 63ec5652913793e80cf7a899c691d34d88285f8a
-source_version: 0.9.3
-translated_at: 2026-05-17
-translator: human
+source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
+source_version: 0.12.0
+translated_at: 2026-08-13
+translator: ai-assisted
 ---
 
 # 09 — Lint: периодический health-check базы знаний
