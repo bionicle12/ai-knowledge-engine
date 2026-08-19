@@ -75,6 +75,25 @@ def test_audit_persists_reports_into_store(tmp_path, capsys):
     assert suffixes == {".json", ".md"}
 
 
+def test_usage_command_reports_evidence_and_disclosure(tmp_path, capsys):
+    home = setup_home(tmp_path)
+    (home / ".claude" / "projects" / "p1").mkdir(parents=True)
+    (home / ".claude" / "projects" / "p1" / "s.jsonl").write_text(
+        '{"type":"tool_use","name":"Skill","input":{"skill":"relic-skill"}}\n',
+        encoding="utf-8",
+    )
+
+    rc = main(["usage", "--home", str(home), "--json"])
+    assert rc == 0
+    data = json.loads(capsys.readouterr().out)
+
+    by_skill = {e["skill"]: e for e in data["skills"]}
+    assert by_skill["relic-skill"]["level"] == "explicit"
+    assert by_skill["clean-skill"]["level"] == "not-observed"
+    assert any("projects" in p for p in data["scanned"])
+    assert "not-observed" in data["note"]
+
+
 def test_audit_notes_missing_model_guidance(tmp_path, capsys):
     home = setup_home(tmp_path)
     store = tmp_path / "store"

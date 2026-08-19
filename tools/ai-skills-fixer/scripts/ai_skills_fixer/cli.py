@@ -348,6 +348,80 @@ def _cmd_reconcile(args) -> int:
     return 0
 
 
+def _cmd_usage(args) -> int:
+    import os
+
+    from .usage import merge_evidence, scan_claude_usage, scan_codex_usage
+
+    home = Path(args.home) if args.home else Path.home()
+    claude_dir = (
+        Path(os.environ["CLAUDE_CONFIG_DIR"])
+        if os.environ.get("CLAUDE_CONFIG_DIR")
+        else home / ".claude"
+    )
+    codex_dir = (
+        Path(os.environ["CODEX_HOME"])
+        if os.environ.get("CODEX_HOME")
+        else home / ".codex"
+    )
+    scanned = [
+        claude_dir / "projects",
+        codex_dir / "sessions",
+        codex_dir / "archived_sessions",
+    ]
+
+    roots = discover_roots(home=args.home, project_dir=args.project_dir)
+    installed = set()
+    for root in roots:
+        if root.exists:
+            for skill in scan_installed_root(root):
+                if skill.has_skill_md:
+                    installed.add(Path(skill.directory).name)
+
+    evidence = scan_claude_usage(scanned[0], installed)
+    evidence += scan_codex_usage(scanned[1:], installed)
+    merged = merge_evidence(installed, evidence)
+
+    level_counts: dict[str, int] = {}
+    for item in merged:
+        level_counts[item.level] = level_counts.get(item.level, 0) + 1
+
+    payload = {
+        "scanned": [str(p) for p in scanned],
+        "skills": [_as_dict(e) for e in merged],
+        "summary": {"by_level": dict(sorted(level_counts.items()))},
+        "note": (
+            "Aggregate counts only; no prompt content was read into this "
+            "report. A not-observed skill is NOT proven unused — host logs "
+            "are incomplete and non-uniform (spec §14). Path mentions can "
+            "come from per-session catalog listings, so similar counts "
+            "across many skills are baseline noise; only counts well above "
+            "that baseline suggest actual use."
+        ),
+    }
+
+    observed = [e for e in merged if e.level != "not-observed"]
+    observed.sort(key=lambda e: (-LEVEL_ORDER.get(e.level, 0), -e.count))
+    lines = [
+        "scanned logs (offline): " + ", ".join(payload["scanned"]),
+        f"evidence levels: {payload['summary']['by_level']}",
+        "observed skills:",
+    ]
+    for e in observed[:30]:
+        lines.append(
+            f"  {e.level:<9} {e.count:>5}x  {e.skill}"
+            + (f"  (last {e.last_seen})" if e.last_seen else "")
+        )
+    if len(observed) > 30:
+        lines.append(f"  ... and {len(observed) - 30} more (use --json)")
+    lines.append(f"note: {payload['note']}")
+    _emit(payload, args.json, lines)
+    return 0
+
+
+LEVEL_ORDER = {"explicit": 2, "strong": 1}
+
+
 def _cmd_audit(args) -> int:
     from datetime import datetime, timezone
 
@@ -552,6 +626,12 @@ def main(argv: list[str] | None = None) -> int:
     reconcile_p.add_argument("--apply", metavar="PLAN_ID", default=None,
                              help="apply a saved approved plan (checks drift)")
     reconcile_p.set_defaults(handler=_cmd_reconcile)
+
+    usage_p = sub.add_parser("usage", help="advisory usage evidence from host logs")
+    usage_p.add_argument("--home", type=Path, default=None)
+    usage_p.add_argument("--project-dir", type=Path, default=None)
+    _add_store_opts(usage_p)
+    usage_p.set_defaults(handler=_cmd_usage)
 
     audit_p = sub.add_parser("audit", help="deterministic lint + prompt-debt signals")
     audit_p.add_argument("name", nargs="?", default=None,

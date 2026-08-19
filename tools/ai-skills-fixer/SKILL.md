@@ -32,6 +32,11 @@ python3 tools/ai-skills-fixer/scripts/run.py <command> [--json]
   and register; `source refresh [id]` — fetch and record an update
   candidate without touching the worktree.
 - `catalog [id]` — list skills provided by registered sources.
+- `usage` — advisory usage evidence from host session logs (offline,
+  aggregate counts only; not-observed never means unused, and
+  uniform counts across skills are catalog-listing baseline noise).
+- `audit [name]` — structural lint + prompt-debt signals; reports are
+  persisted to `state/reports/` when the store exists.
 - `profile show` / `profile set <skill-id> <state> [--targets ...]` —
   the deterministic write path for profile decisions.
 - `reconcile [--machine-id ID]` — dry-run plan (desired vs installed):

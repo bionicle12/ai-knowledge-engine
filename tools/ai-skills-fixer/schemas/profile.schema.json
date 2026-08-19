@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ai-skills-fixer shared profile",
+  "type": "object",
+  "required": ["schema_version", "skills"],
+  "properties": {
+    "schema_version": {"type": "integer", "enum": [1]},
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "state"],
+        "properties": {
+          "id": {"type": "string"},
+          "state": {
+            "type": "string",
+            "enum": ["enabled", "occasional", "catalog-only", "excluded",
+                     "undecided", "protected"]
+          },
+          "targets": {
+            "type": "array",
+            "items": {"type": "string",
+                      "enum": ["claude", "codex", "cursor", "antigravity"]}
+          }
+        }
+      }
+    },
+    "domains": {"type": "object"}
+  }
+}

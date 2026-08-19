@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ai-skills-fixer reconciliation plan",
+  "type": "object",
+  "required": ["schema_version", "machine", "config_hashes", "sources",
+               "operations", "lock_proposal", "summary", "plan_id",
+               "created_at"],
+  "properties": {
+    "schema_version": {"type": "integer", "enum": [1]},
+    "machine": {"type": "string"},
+    "strategy_default": {"type": "string"},
+    "plan_id": {"type": "string"},
+    "created_at": {"type": "string"},
+    "config_hashes": {
+      "type": "object",
+      "required": ["registry", "profile", "machine"],
+      "additionalProperties": {"type": "string"}
+    },
+    "sources": {"type": "object", "additionalProperties": {"type": "string"}},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["skill_id", "host", "type", "destination",
+                     "precondition", "risk", "approval_required"],
+        "properties": {
+          "skill_id": {"type": "string"},
+          "host": {"type": "string",
+                   "enum": ["claude", "codex", "cursor", "antigravity"]},
+          "type": {"type": "string",
+                   "enum": ["install", "adopt", "review", "quarantine",
+                            "noop"]},
+          "strategy": {"type": ["string", "null"]},
+          "source": {"type": ["string", "null"]},
+          "destination": {"type": "string"},
+          "precondition": {"type": "object"},
+          "backup": {"type": ["string", "null"]},
+          "validation": {"type": ["string", "null"]},
+          "rollback": {"type": ["string", "null"]},
+          "risk": {"type": "string"},
+          "approval_required": {"type": "boolean"}
+        }
+      }
+    },
+    "notes": {"type": "object"},
+    "lock_proposal": {"type": "object"},
+    "summary": {"type": "object"}
+  }
+}

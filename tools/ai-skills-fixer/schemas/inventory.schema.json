@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ai-skills-fixer inventory payload",
+  "type": "object",
+  "required": ["generated_by", "roots", "skills", "duplicates", "findings",
+               "summary"],
+  "properties": {
+    "generated_by": {"type": "string"},
+    "token_note": {"type": "string"},
+    "roots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["host", "path", "kind", "exists", "evidence",
+                     "confidence"],
+        "properties": {
+          "host": {"type": "string"},
+          "path": {"type": "string"},
+          "kind": {"type": "string",
+                   "enum": ["user", "project", "plugin", "system"]},
+          "exists": {"type": "boolean"},
+          "evidence": {"type": "string"},
+          "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+        }
+      }
+    },
+    "sources": {"type": "array"},
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["host", "root_kind", "directory", "path", "entry_type",
+                     "has_skill_md"],
+        "properties": {
+          "host": {"type": "string"},
+          "root_kind": {"type": "string"},
+          "directory": {"type": "string"},
+          "path": {"type": "string"},
+          "real_path": {"type": "string"},
+          "entry_type": {"type": "string", "enum": ["directory", "symlink"]},
+          "has_skill_md": {"type": "boolean"},
+          "name": {"type": ["string", "null"]},
+          "description": {"type": ["string", "null"]},
+          "frontmatter_error": {"type": ["string", "null"]},
+          "content_hash": {"type": ["string", "null"]},
+          "size_bytes": {"type": "integer"},
+          "file_count": {"type": "integer"},
+          "skill_md_chars": {"type": "integer"},
+          "skill_md_words": {"type": "integer"},
+          "token_estimate": {"type": "integer"},
+          "git": {"type": ["object", "null"]},
+          "provenance": {"type": ["object", "null"]}
+        }
+      }
+    },
+    "duplicates": {"type": "object"},
+    "findings": {"type": "array"},
+    "summary": {"type": "object"}
+  }
+}

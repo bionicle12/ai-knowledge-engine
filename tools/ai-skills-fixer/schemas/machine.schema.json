@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ai-skills-fixer machine-local configuration",
+  "type": "object",
+  "required": ["schema_version", "machine_id"],
+  "properties": {
+    "schema_version": {"type": "integer", "enum": [1]},
+    "machine_id": {"type": "string"},
+    "agents": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {"type": "boolean"},
+          "install_path": {"type": "string"},
+          "strategy": {"type": "string"}
+        }
+      }
+    },
+    "profile_overrides": {
+      "type": "object",
+      "properties": {
+        "disable": {"type": "array", "items": {"type": "string"}},
+        "additional_targets": {"type": "object"}
+      }
+    }
+  }
+}
