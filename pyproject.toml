@@ -2,6 +2,7 @@
 testpaths = [
     "knowledge-base/scripts/tests",
     "scripts/tests",
+    "tools/ai-skills-fixer/tests",
 ]
 # importlib mode avoids module-name collisions between nested test directories.
 addopts = "-q --import-mode=importlib"

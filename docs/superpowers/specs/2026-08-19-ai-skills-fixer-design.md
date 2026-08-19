@@ -1,6 +1,6 @@
 # AI Skills Fixer — Design Specification
 
-Status: design approved in discussion; awaiting written-spec review
+Status: revised after written-spec review; ready for implementation planning
 Date: 2026-08-19
 
 ## 1. Purpose
@@ -17,7 +17,7 @@ The tool uses a hybrid architecture:
   prepares plans, and applies exact approved changes;
 - an AI agent interprets those facts, researches current model guidance, asks
   the user about ambiguous needs, and recommends semantic changes;
-- YAML manifests define the desired state shared between machines;
+- YAML manifests define the desired state, portable between machines;
 - machine-local YAML contains only platform-specific paths and overrides.
 
 Python must not decide whether a skill is useful or rewrite skill instructions
@@ -114,14 +114,23 @@ For the current Linux workspace this resolves to:
 ```
 
 The path is calculated from the resolved repository root, not embedded as a
-constant. A command-line option and machine-local configuration may override
-it.
+constant. The store root is resolved in this order:
+
+1. the `--store-root` command-line option;
+2. the `AI_SKILLS_FIXER_STORE_ROOT` environment variable;
+3. the default sibling path above.
+
+Machine-local configuration lives inside the store and therefore cannot
+override the store location.
 
 ### 5.2 Shared intent, local installation details
 
-The logical source registry, desired skill set, and lockfile are shared across
-machines. Operating-system paths, installed clients, link strategy, and
-machine-specific exclusions remain local.
+The source registry and profile formats are portable: the same declarations
+can be copied between machines so that roughly the same skill set is available
+everywhere. Each machine still runs its own store independently — including
+its own generated lockfile — and no Git or network synchronization of the
+store is implemented or assumed. Operating-system paths, installed clients,
+link strategy, and machine-specific exclusions always remain local.
 
 This produces one common skill policy without pretending that Linux, Windows,
 and macOS expose the same filesystem or client capabilities.
@@ -138,6 +147,10 @@ Promotion to an active release requires:
 ```text
 fetch -> diff -> static audit -> semantic audit -> optional eval -> approval -> apply
 ```
+
+Until the Phase 4 agent audit exists, the semantic-audit step is satisfied by
+explicit user review of the diff; the static audit is mandatory from the first
+phase that creates releases.
 
 ### 5.4 Declarative reconciliation
 
@@ -159,10 +172,8 @@ files. Repeated deterministic work is implemented as scripts.
 ```text
 tools/ai-skills-fixer/
 ├── SKILL.md
-├── agents/
-│   └── openai.yaml
 ├── scripts/
-│   ├── ai_skills_fixer.py
+│   ├── run.py
 │   └── ai_skills_fixer/
 │       ├── cli.py
 │       ├── discovery.py
@@ -187,6 +198,7 @@ tools/ai-skills-fixer/
 │       ├── codex.md
 │       ├── claude-code.md
 │       ├── cursor.md
+│       ├── antigravity.md
 │       └── generic-agent-skills.md
 ├── schemas/
 │   ├── repositories.schema.json
@@ -209,13 +221,22 @@ tools/ai-skills-fixer/
 No auxiliary README is required inside the skill package. `SKILL.md` is the
 agent entry point; project documentation remains under `docs/`.
 
+`run.py` is a thin launcher for the `ai_skills_fixer` package and is
+deliberately not named after it: a module and a package with the same name in
+one directory shadow each other. The package also runs as
+`python -m ai_skills_fixer` when `scripts/` is on the path. The repository
+`pyproject.toml` must add `tools/ai-skills-fixer/tests` to `testpaths`.
+
+`init` offers to register the tool's own `SKILL.md` with each detected client
+using the same installation strategies the tool applies to managed skills; the
+fixer must not assume it is already discoverable by any client.
+
 ### 6.2 Managed skill store
 
 ```text
 skill-repositories/
 ├── registry/
-│   ├── repositories.yml
-│   └── skills.lock.yml
+│   └── repositories.yml
 ├── profiles/
 │   └── default.yml
 ├── machines/
@@ -224,18 +245,21 @@ skill-repositories/
 ├── releases/
 ├── local/
 └── state/
+    ├── skills.lock.yml
     ├── inventories/
+    ├── candidates/
+    ├── model-guidance/
     ├── plans/
     ├── reports/
     ├── backups/
     └── evaluations/
 ```
 
-The store may itself be initialized as a private Git repository for syncing
-`registry/` and `profiles/`. The tool must not initialize or push that Git
-repository without an explicit user request.
-
-Recommended ignored paths are:
+The store is machine-local and is not tracked in Git. Reusing
+`registry/repositories.yml` or `profiles/` on another machine is a manual
+copy. If the user ever chooses to version the store, the tool must not
+initialize or push that Git repository without an explicit user request, and
+these generated or machine-specific paths must stay ignored:
 
 ```text
 sources/
@@ -243,6 +267,53 @@ releases/
 state/
 machines/*.local.yml
 ```
+
+The generated lockfile lives under `state/`, so ignoring `state/` already
+keeps it out of any versioning.
+
+### 6.3 Store artifact conventions
+
+Content hash. The hash of a skill artifact is the SHA-256 of a canonical
+manifest: one `<relative-path>\n<file-sha256>\n` entry per file under the
+skill directory (excluding any `.git`), entries sorted bytewise, paths using
+forward slashes, file contents hashed byte-exact; a symlink contributes its
+literal target string instead of file contents. The same algorithm runs over
+source checkouts and installed artifacts, so provenance matching is
+byte-defensible on every platform.
+
+Releases. A release is a materialized snapshot at
+`releases/<source-id>/<skill-path>/<commit12>-<hash12>/`, where `<commit12>`
+is the first twelve hex digits of the resolved commit and `<hash12>` the
+first twelve of the content hash. Release directories are immutable by
+policy: created once, never edited, removed only by `rollback` or an
+approved plan.
+
+Formats and identifiers. Human-edited configuration is YAML; generated
+machine artifacts (inventories, plans, apply records, audit findings) are
+JSON with sorted keys and stable list ordering. The plan ID is derived from
+the SHA-256 of the canonical plan content, so unchanged inputs reproduce the
+same plan ID; the creation timestamp is metadata outside the hashed content.
+An apply record is stored as
+`state/plans/<plan-id>.apply-<utc-timestamp>.json`, and that filename is the
+apply ID. Backups mirror the destination structure under
+`state/backups/<apply-id>/`. Reports are written twice: Markdown for people
+and a JSON twin for agents. All timestamps are UTC ISO 8601.
+
+### 6.4 Implementation constraints
+
+- Python 3.10 or newer (developed on 3.12); all path handling goes through
+  `pathlib` with explicit separator and case rules.
+- Runtime dependencies are the standard library plus PyYAML. When
+  `jsonschema` is importable, schemas are enforced with it; otherwise a
+  built-in structural validator checks required keys and types so the tool
+  still runs on a bare interpreter.
+- Git operations use the system `git` executable (2.30 or newer) through
+  `subprocess` with fixed argument lists. Clone and fetch during
+  `source add` and `source refresh` are the tool's only network activity.
+- Frontmatter parsing is tolerant: `---`-delimited YAML, UTF-8 with optional
+  BOM, LF or CRLF line endings.
+- Nothing nondeterministic enters hashed content: no wall-clock values,
+  environment data, or unsorted collections.
 
 ## 7. Configuration model
 
@@ -281,6 +352,18 @@ A collection may declare several roots. Discovery must still validate that a
 candidate directory contains a readable `SKILL.md` rather than trusting the
 layout declaration blindly.
 
+Skill identity is path-based:
+
+- for a `collection` source, the skill ID is `<source-id>:<skill-path>`, where
+  `<skill-path>` is the skill directory path relative to its declared root
+  (for example `antigravity-awesome:backend-architect` for
+  `skills/backend-architect` under the root `skills`);
+- when several roots are declared, resolved relative paths must be unique
+  across all roots; a collision is a catalog error and stops processing;
+- for a `single` source, the skill ID is the bare `<source-id>`;
+- the frontmatter `name` is display metadata only and never acts as identity;
+  a name/folder mismatch is a lint finding, not an identity change.
+
 ### 7.2 Shared profile
 
 `profiles/default.yml` declares the desired logical set:
@@ -315,14 +398,27 @@ Supported logical states are:
 - `undecided`: requires profile review;
 - `protected`: do not disable automatically.
 
+`occasional` maps to host capabilities deterministically: when the host
+supports a disabled configuration entry or another documented low-noise
+exposure, the reconciler uses it; otherwise the skill stays catalog-only —
+its pinned release remains in the store and can be used by explicit path —
+and the plan records that fallback. The reconciler must never silently
+promote `occasional` to full `enabled` exposure.
+
+Canonical target identifiers for the first release are `claude`, `codex`,
+`cursor`, and `antigravity`. Host adapters own this list; an unknown target
+in a profile is a validation error, never silently ignored.
+
 ### 7.3 Machine-local configuration
 
-`machines/<machine-id>.local.yml` contains runtime details only:
+`machines/<machine-id>.local.yml` contains runtime details only. The machine
+ID defaults to the sanitized lowercase hostname; `init` creates the file, and
+a `--machine-id` option or environment override may replace the default. The
+store location is never configured here (section 5.1).
 
 ```yaml
 schema_version: 1
 machine_id: linux-desktop
-store_root: auto
 
 agents:
   codex:
@@ -345,8 +441,9 @@ they do not silently edit the shared base profile.
 
 ### 7.4 Generated lockfile
 
-`registry/skills.lock.yml` is generated and should not be hand-edited. For each
-selected skill it records:
+`state/skills.lock.yml` is generated per machine and should not be
+hand-edited or copied between machines; it lives under `state/` precisely
+because it is machine-local. For each selected skill it records:
 
 - source ID and URL;
 - requested ref;
@@ -361,10 +458,11 @@ selected skill it records:
 Changing a requested ref does not update the lockfile until the candidate has
 been resolved and approved.
 
-`source refresh` only fetches metadata and prepares an update candidate. When a
-requested ref changes, `reconcile` includes the resulting lockfile and release
-changes in its dry-run plan; only applying that exact approved plan promotes the
-candidate.
+`source refresh` only fetches metadata and prepares an update candidate.
+Candidate records live under `state/candidates/`; fetched content stays in
+`sources/`. When a requested ref changes, `reconcile` includes the resulting
+lockfile and release changes in its dry-run plan; only applying that exact
+approved plan promotes the candidate.
 
 ## 8. Cross-platform host discovery
 
@@ -495,6 +593,16 @@ The available decisions are:
 - compare with similar skills;
 - undecided.
 
+Decisions map to profile states directly: use frequently → `enabled`, use
+occasionally → `occasional`, keep only in the catalog → `catalog-only`,
+exclude → `excluded`, undecided → `undecided`. "Compare with similar skills"
+defers the decision: the skill stays `undecided` until the comparison is
+presented and one of the other decisions is taken.
+
+Category-level answers are persisted in `profiles/default.yml` under a
+`domains:` map together with the answer date, so later sessions re-ask only
+missing or expired categories instead of repeating the questionnaire.
+
 ## 11. Skill audit model
 
 The audit produces evidence and recommendations, not an automatic verdict.
@@ -572,9 +680,11 @@ keep current upstream
 ```
 
 Local adaptations live under `skill-repositories/local/`. Their portable
-`SKILL.md` remains minimal. A sidecar metadata file records the original URL,
-commit, path, license, reason for adaptation, audit findings, and validated
-model profiles.
+`SKILL.md` remains minimal. A sidecar `adaptation.yml` beside (not inside)
+the skill directory records the original URL, commit, path, license, reason
+for adaptation, audit findings, and validated model profiles; keeping it
+outside the skill directory leaves the installable artifact byte-identical
+to the adapted content.
 
 ## 13. Model guidance lifecycle
 
@@ -651,8 +761,8 @@ through controlled A/B traces rather than inferred from file size.
 
 ## 16. Evaluation design
 
-Evaluation is optional in the MVP and enabled first for a small set of retained,
-high-value, or suspicious skills.
+Evaluation is post-MVP (Phase 5). When introduced, it is enabled first for a
+small set of retained, high-value, or suspicious skills.
 
 Each skill may have two suites:
 
@@ -708,7 +818,8 @@ ai-skills-fixer source add <url>
 ai-skills-fixer source refresh [source-id]
 ai-skills-fixer catalog [source-id]
 ai-skills-fixer inventory
-ai-skills-fixer profile
+ai-skills-fixer profile show
+ai-skills-fixer profile set <skill-id> <state> [--targets ...]
 ai-skills-fixer audit [skill-id]
 ai-skills-fixer reconcile
 ai-skills-fixer reconcile --apply <plan-id>
@@ -718,6 +829,27 @@ ai-skills-fixer eval <skill-id>
 
 `reconcile` is a dry run. Applying requires an immutable saved plan ID so the
 applier cannot silently use a newly recomputed target set.
+
+Each `reconcile --apply` run receives its own apply ID that references the
+plan ID; both are recorded under `state/plans/`, and `rollback` takes the
+apply ID. A single advisory lock inside `state/` prevents two mutating runs
+from operating on one store concurrently; the second run fails fast with a
+clear message.
+
+Every command accepts `--json` for machine-readable output; the default is
+human-readable text. Exit codes are part of the contract: `0` success, `2`
+safe stop on a section 19 condition, `3` plan drift or a failed
+precondition, `1` any other error.
+
+`source add` clones the repository into `sources/`, scans for `SKILL.md`
+directories, proposes a layout entry, and writes it to the registry only
+after the user confirms. `profile set` is the deterministic write path for
+questionnaire decisions: the agent conducts the dialogue, but every recorded
+decision goes through this command so profile edits are validated and
+logged. `audit` runs only the deterministic layers — structural checks and
+prompt-debt detectors — and writes findings to `state/reports/`; semantic
+classification and recommendations remain agent work built on those
+findings.
 
 Natural-language workflow:
 
@@ -836,9 +968,15 @@ with exact manual recovery steps.
 - unverified model guidance produces bounded uncertainty;
 - user rejection leaves installed state unchanged.
 
+Path fixtures do not substitute for execution on a real Windows machine:
+junction, symlink-privilege, and long-path behavior must be exercised there
+before the tool is declared cross-platform.
+
 ## 22. Delivery phases
 
-### Phase 1: Read-only inventory MVP
+The MVP comprises Phases 1 through 4. Phases 5 and 6 are post-MVP.
+
+### Phase 1: Read-only inventory
 
 Support Codex, Claude Code, Cursor, and Antigravity first. Deliver platform and
 host discovery, inventory, provenance matching, duplicate detection, structural
@@ -890,7 +1028,7 @@ registry or shared profile format.
 
 ## 23. MVP acceptance criteria
 
-The MVP is complete when all of the following are true:
+The MVP (Phases 1–4) is complete when all of the following are true:
 
 1. It runs from the repository on Linux and passes Windows/macOS path fixtures.
 2. It resolves the default sibling `skill-repositories` path without a hardcoded
@@ -916,7 +1054,12 @@ The MVP is complete when all of the following are true:
 
 - The managed store is a sibling of `ai-knowledge-engine`, not a global folder
   directly under `~/www`.
-- The default profile is shared across Linux, Windows, and macOS.
+- The store is machine-local and is not synchronized through Git; registry and
+  profile declarations are copied between machines manually when needed.
+- The lockfile is generated per machine and never merged between machines.
+- A skill is identified by its source ID plus its directory path relative to
+  the declared root; frontmatter names are metadata only.
+- The machine identifier defaults to the sanitized lowercase hostname.
 - Machine-local overrides handle paths, hosts, strategies, and exceptions.
 - Repositories are cloned into `sources/`; registry YAML stores declarations,
   not repository contents.
@@ -929,6 +1072,10 @@ The MVP is complete when all of the following are true:
   from observed need.
 
 ## 25. References used for the design
+
+All URLs below were recorded on 2026-08-19 and count as `unverified` in the
+sense of section 13: before any audit relies on them, the guidance cache must
+re-fetch each source and store its own retrieval date and summary.
 
 - OpenAI skill authoring and Codex discovery documentation:
   <https://learn.chatgpt.com/docs/build-skills>
