@@ -1,6 +1,6 @@
 ---
 name: ai-skills-fixer
-description: Use when inventorying, auditing, or curating installed AI agent skills across Claude Code, Codex, Cursor, and Antigravity — detects copies and their provenance, duplicate names, structural lint issues, and token cost; manages a declarative store with source registry, profile, and dry-run reconciliation plans. Never modifies installed skills (apply arrives in Phase 3).
+description: Use when inventorying, auditing, or curating installed AI agent skills across Claude Code, Codex, Cursor, and Antigravity — detects copies and their provenance, duplicate names, structural lint issues, and token cost; manages a declarative store with source registry, profile, dry-run reconciliation plans, drift-checked apply, and rollback. Never mutates installed skills without an explicitly approved plan ID.
 ---
 
 # AI Skills Fixer
@@ -37,9 +37,16 @@ python3 tools/ai-skills-fixer/scripts/run.py <command> [--json]
 - `reconcile [--machine-id ID]` — dry-run plan (desired vs installed):
   install/adopt/review/quarantine/noop operations with preconditions,
   deterministic content-hash plan ID, and a lockfile proposal, saved
-  under `state/plans/`. Nothing is applied.
+  under `state/plans/`. Nothing is applied without `--apply`.
+- `reconcile --apply <plan-id>` — apply a saved approved plan. Checks
+  config-hash and source-commit drift first, re-checks every op's
+  precondition, backs up replaced content under `state/backups/`,
+  validates after each install, and auto-rolls-back completed ops on
+  partial failure. Requires explicit user approval of the exact plan.
+- `rollback <apply-id>` — restore the pre-apply state byte-identically
+  from the apply record and backups.
 - Exit codes: `0` success, `2` safe stop (validation/§19 condition),
-  `1` any other error.
+  `3` plan drift or failed precondition, `1` any other error.
 
 ## Interpreting the output
 

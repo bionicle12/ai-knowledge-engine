@@ -14,9 +14,12 @@ from pathlib import Path
 from . import __version__
 from .discovery import discover_roots
 from .gitops import GitError
+from .installer import DriftError, apply_plan
 from .inventory import find_duplicates, match_provenance, scan_installed_root
 from .linting import lint_skill_dir
 from .planner import ValidationError, build_plan, load_profile, set_profile_state
+from .rollback import RollbackError, rollback_apply
+from .store import LockError
 from .sources import (
     CatalogError,
     add_source,
@@ -309,6 +312,19 @@ def _cmd_profile_set(args) -> int:
 
 def _cmd_reconcile(args) -> int:
     store = resolve_store_root(args.store_root)
+
+    if args.apply:
+        record = apply_plan(store, args.apply)
+        lines = [f"applied plan {record['plan_id']} as {record['apply_id']}"]
+        for result in record["operations"]:
+            lines.append(
+                f"  [{result['status']:<22}] {result['type']} "
+                f"{result['skill_id']} -> {result['host']}"
+            )
+        lines.append(f"rollback with: rollback {record['apply_id']}")
+        _emit(record, args.json, lines)
+        return 0
+
     machine = args.machine_id or machine_id()
     plan = build_plan(store, machine, home=args.home, project_dir=args.project_dir)
 
@@ -324,10 +340,23 @@ def _cmd_reconcile(args) -> int:
     for skill_id, note in plan["notes"]["occasional_fallbacks"].items():
         lines.append(f"  note: {skill_id}: {note}")
     lines.append(
-        "apply is not implemented in Phase 2; nothing was changed "
-        f"(plan saved under state/plans/{plan['plan_id']}.json)"
+        "dry run only; nothing was changed. Apply with: "
+        f"reconcile --apply {plan['plan_id']}"
     )
     _emit(plan, args.json, lines)
+    return 0
+
+
+def _cmd_rollback(args) -> int:
+    store = resolve_store_root(args.store_root)
+    record = rollback_apply(store, args.apply_id)
+    lines = [f"rolled back {record['apply_id']} at {record['rolled_back_at']}"]
+    for result in record["operations"]:
+        lines.append(
+            f"  [{result['status']:<22}] {result['type']} "
+            f"{result['skill_id']} -> {result['host']}"
+        )
+    _emit(record, args.json, lines)
     return 0
 
 
@@ -404,13 +433,23 @@ def main(argv: list[str] | None = None) -> int:
     reconcile_p.add_argument("--machine-id", default=None)
     reconcile_p.add_argument("--home", type=Path, default=None)
     reconcile_p.add_argument("--project-dir", type=Path, default=None)
+    reconcile_p.add_argument("--apply", metavar="PLAN_ID", default=None,
+                             help="apply a saved approved plan (checks drift)")
     reconcile_p.set_defaults(handler=_cmd_reconcile)
+
+    rollback_p = sub.add_parser("rollback", help="roll back an applied plan")
+    rollback_p.add_argument("apply_id")
+    _add_store_opts(rollback_p)
+    rollback_p.set_defaults(handler=_cmd_rollback)
 
     args = parser.parse_args(argv)
 
     try:
         return args.handler(args)
-    except (CatalogError, ValidationError) as exc:
+    except DriftError as exc:
+        print(f"drift: {exc}", file=sys.stderr)
+        return 3
+    except (CatalogError, ValidationError, LockError, RollbackError) as exc:
         print(f"safe stop: {exc}", file=sys.stderr)
         return 2
     except GitError as exc:

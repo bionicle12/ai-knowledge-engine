@@ -15,6 +15,10 @@ from typing import Mapping
 
 import yaml
 
+class LockError(Exception):
+    """Another mutating run holds the store lock."""
+
+
 STORE_ROOT_ENV = "AI_SKILLS_FIXER_STORE_ROOT"
 MACHINE_ID_ENV = "AI_SKILLS_FIXER_MACHINE_ID"
 DEFAULT_STORE_NAME = "skill-repositories"
@@ -34,6 +38,28 @@ STORE_DIRS = [
     "state/backups",
     "state/evaluations",
 ]
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def store_lock(store_root: Path):
+    """Single advisory lock; the second mutating run fails fast (spec §17)."""
+    lock = Path(store_root) / "state" / ".lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        raise LockError(
+            f"another mutating run holds {lock}; remove the file if it is stale"
+        ) from None
+    try:
+        os.write(fd, str(os.getpid()).encode("ascii"))
+        os.close(fd)
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def repo_root_from_here() -> Path:
