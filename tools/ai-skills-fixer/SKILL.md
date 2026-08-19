@@ -64,7 +64,23 @@ python3 tools/ai-skills-fixer/scripts/run.py <command> [--json]
 
 ## Workflow for the agent
 
-1. Run `inventory --json` with every locally cloned source repo.
-2. Summarize per-host counts, provenance breakdown, duplicates, and lint
-   errors for the user — lead with what they would act on.
-3. Recommendations only; there is nothing to apply in Phase 1.
+1. Run `inventory --json` with every locally cloned source repo;
+   summarize per-host counts, provenance breakdown, duplicates, and
+   lint errors — lead with what the user would act on. Interpret
+   provenance per [references/provenance.md](references/provenance.md).
+2. To fill or revise the profile, run the adaptive questionnaire from
+   [references/questionnaire.md](references/questionnaire.md): category
+   questions first, then batched per-skill decision cards; record every
+   decision via `profile set`.
+3. `audit [--json]` produces deterministic evidence: structural lint,
+   prompt-debt signals, cross-skill boilerplate, and model-guidance
+   cache status. Classify instructions per
+   [references/audit-rubric.md](references/audit-rubric.md); claims
+   that the current model "already does this" require a fresh cache
+   entry per [references/model-guidance.md](references/model-guidance.md).
+4. `reconcile` → present the exact plan → apply only after the user
+   approves that plan ID (`reconcile --apply <plan-id>`), then verify.
+   `rollback <apply-id>` restores the previous state.
+5. Host specifics (paths, capabilities, telemetry) live under
+   [references/hosts/](references/hosts/). Local adaptations pass all
+   six §12 gates or are not proposed at all.

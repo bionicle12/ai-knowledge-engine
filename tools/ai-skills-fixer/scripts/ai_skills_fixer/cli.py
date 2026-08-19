@@ -13,10 +13,11 @@ from pathlib import Path
 
 from . import __version__
 from .discovery import discover_roots
+from .frontmatter import read_skill_file
 from .gitops import GitError
 from .installer import DriftError, apply_plan
 from .inventory import find_duplicates, match_provenance, scan_installed_root
-from .linting import lint_skill_dir
+from .linting import cross_skill_duplicates, debt_signals, lint_skill_dir
 from .planner import ValidationError, build_plan, load_profile, set_profile_state
 from .rollback import RollbackError, rollback_apply
 from .store import LockError
@@ -347,6 +348,121 @@ def _cmd_reconcile(args) -> int:
     return 0
 
 
+def _cmd_audit(args) -> int:
+    from datetime import datetime, timezone
+
+    import yaml
+
+    roots = discover_roots(home=args.home, project_dir=args.project_dir)
+    skills = []
+    for root in roots:
+        if root.exists:
+            skills.extend(scan_installed_root(root))
+    skills = [s for s in skills if s.has_skill_md]
+    if args.name:
+        skills = [
+            s for s in skills
+            if Path(s.directory).name == args.name or s.name == args.name
+        ]
+
+    audited = []
+    bodies_by_basename: dict[str, str] = {}
+    signal_counts: dict[str, int] = {}
+    lint_counts: dict[str, int] = {}
+    for skill in sorted(skills, key=lambda s: (s.host, s.directory)):
+        doc = read_skill_file(skill.path / "SKILL.md")
+        signals = debt_signals(doc.body)
+        lint = lint_skill_dir(skill.path)
+        for sig in signals:
+            signal_counts[sig.signal] = signal_counts.get(sig.signal, 0) + 1
+        for finding in lint:
+            lint_counts[finding.severity] = lint_counts.get(finding.severity, 0) + 1
+        basename = Path(skill.directory).name
+        bodies_by_basename.setdefault(basename, doc.body)
+        audited.append({
+            "skill": basename,
+            "host": skill.host,
+            "root_kind": skill.root_kind,
+            "path": str(skill.path),
+            "lint": [_as_dict(f) for f in lint],
+            "debt_signals": [_as_dict(s) for s in signals],
+        })
+
+    shared = cross_skill_duplicates(bodies_by_basename)
+
+    store = resolve_store_root(args.store_root)
+    guidance_dir = store / "state" / "model-guidance"
+    entries = []
+    if guidance_dir.is_dir():
+        for path in sorted(guidance_dir.glob("*.yml")):
+            try:
+                data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            except (OSError, yaml.YAMLError):
+                data = {}
+            entries.append({
+                "model": data.get("model") or path.stem,
+                "retrieved_at": data.get("retrieved_at"),
+                "expires_after_days": data.get("expires_after_days"),
+            })
+    model_guidance = {
+        "entries": entries,
+        "note": (
+            "cached guidance found; verify expiry before model-specific work"
+            if entries else
+            "no cached model guidance; research official sources and record "
+            "them under state/model-guidance/ before any model-specific "
+            "rewrite (spec §13)"
+        ),
+    }
+
+    payload = {
+        "generated_by": f"ai-skills-fixer {__version__}",
+        "skills": audited,
+        "cross_skill_duplicates": shared,
+        "model_guidance": model_guidance,
+        "summary": {
+            "skills_audited": len(audited),
+            "signals_by_type": dict(sorted(signal_counts.items())),
+            "lint_by_severity": dict(sorted(lint_counts.items())),
+            "shared_paragraphs": len(shared),
+        },
+    }
+
+    reports_dir = store / "state" / "reports"
+    if reports_dir.is_dir():
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        (reports_dir / f"audit-{stamp}.json").write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        md_lines = [
+            f"# Skill audit {stamp}", "",
+            f"Skills audited: {payload['summary']['skills_audited']}",
+            f"Signals: {payload['summary']['signals_by_type']}",
+            f"Lint: {payload['summary']['lint_by_severity']}",
+            f"Shared paragraphs across skills: {len(shared)}", "",
+            "Deterministic evidence only; classification per §11.2 is agent "
+            "work (see references/audit-rubric.md).",
+        ]
+        (reports_dir / f"audit-{stamp}.md").write_text(
+            "\n".join(md_lines), encoding="utf-8"
+        )
+
+    top = sorted(audited, key=lambda s: -len(s["debt_signals"]))[:10]
+    lines = [
+        f"audited {len(audited)} skills",
+        f"signals: {payload['summary']['signals_by_type'] or 'none'}",
+        f"lint: {payload['summary']['lint_by_severity'] or 'clean'}",
+        f"paragraphs shared across skills: {len(shared)}",
+        "top skills by signal count:",
+    ]
+    for s in top:
+        lines.append(f"  {len(s['debt_signals']):>4}  {s['host']}:{s['skill']}")
+    lines.append(f"note: {model_guidance['note']}")
+    _emit(payload, args.json, lines)
+    return 0
+
+
 def _cmd_rollback(args) -> int:
     store = resolve_store_root(args.store_root)
     record = rollback_apply(store, args.apply_id)
@@ -436,6 +552,14 @@ def main(argv: list[str] | None = None) -> int:
     reconcile_p.add_argument("--apply", metavar="PLAN_ID", default=None,
                              help="apply a saved approved plan (checks drift)")
     reconcile_p.set_defaults(handler=_cmd_reconcile)
+
+    audit_p = sub.add_parser("audit", help="deterministic lint + prompt-debt signals")
+    audit_p.add_argument("name", nargs="?", default=None,
+                         help="audit only this skill (folder or frontmatter name)")
+    audit_p.add_argument("--home", type=Path, default=None)
+    audit_p.add_argument("--project-dir", type=Path, default=None)
+    _add_store_opts(audit_p)
+    audit_p.set_defaults(handler=_cmd_audit)
 
     rollback_p = sub.add_parser("rollback", help="roll back an applied plan")
     rollback_p.add_argument("apply_id")
