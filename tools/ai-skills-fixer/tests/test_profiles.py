@@ -82,6 +82,34 @@ def test_set_profile_state_appends_and_updates(store):
     assert skills[0].state == "excluded"
 
 
+def test_set_profile_state_preserves_domains_map(store):
+    (store / "profiles" / "default.yml").write_text(
+        yaml.safe_dump({
+            "schema_version": 1,
+            "skills": [],
+            "domains": {"backend": {"answer": "frequent", "date": "2026-08-19"}},
+        }),
+        encoding="utf-8",
+    )
+    set_profile_state(store, "awesome:foo", "enabled", targets=["claude"])
+    data = yaml.safe_load((store / "profiles" / "default.yml").read_text())
+    assert data["domains"]["backend"]["answer"] == "frequent"
+    assert data["skills"][0]["id"] == "awesome:foo"
+
+
+def test_set_profile_domain_records_answer_with_date(store):
+    from ai_skills_fixer.planner import set_profile_domain
+
+    set_profile_domain(store, "seo-marketing", "excluded")
+    data = yaml.safe_load((store / "profiles" / "default.yml").read_text())
+    entry = data["domains"]["seo-marketing"]
+    assert entry["answer"] == "excluded"
+    assert entry["date"]
+
+    with pytest.raises(ValidationError):
+        set_profile_domain(store, "backend", "sometimes")
+
+
 def test_set_profile_state_rejects_bad_input(store):
     with pytest.raises(ValidationError):
         set_profile_state(store, "awesome:foo", "sometimes")

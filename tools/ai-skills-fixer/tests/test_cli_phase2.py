@@ -76,6 +76,23 @@ def test_reconcile_unknown_skill_is_safe_stop(tmp_path, capsys):
     assert rc == 2
 
 
+def test_profile_domain_command_records_answer(tmp_path, capsys):
+    import yaml
+
+    store = tmp_path / "store"
+    base = ["--store-root", str(store)]
+    main(["init", *base, "--machine-id", "m1"])
+    capsys.readouterr()
+
+    rc = main(["profile", "domain", "seo-marketing", "excluded", *base])
+    assert rc == 0
+    data = yaml.safe_load((store / "profiles" / "default.yml").read_text())
+    assert data["domains"]["seo-marketing"]["answer"] == "excluded"
+
+    rc = main(["profile", "domain", "backend", "sometimes", *base])
+    assert rc == 2
+
+
 def test_source_refresh_reports_candidate(tmp_path, capsys):
     store = tmp_path / "store"
     origin = tmp_path / "origin-repo"

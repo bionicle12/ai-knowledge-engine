@@ -102,23 +102,57 @@ def load_profile(store_root: Path, name: str = "default") -> list[ProfileSkill]:
     return skills
 
 
+DOMAIN_ANSWERS = {"frequent", "occasional", "interested", "excluded", "unsure"}
+
+
 def save_profile(
     store_root: Path, skills: list[ProfileSkill], name: str = "default"
 ) -> None:
-    data = {
-        "schema_version": 1,
-        "skills": [
-            {
-                "id": s.skill_id,
-                "state": s.state,
-                **({"targets": s.targets} if s.targets else {}),
-            }
-            for s in skills
-        ],
-    }
-    _profile_path(store_root, name).write_text(
+    path = _profile_path(store_root, name)
+    try:
+        existing = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        existing = {}
+    if not isinstance(existing, dict):
+        existing = {}
+    data = dict(existing)  # preserve domains and any future top-level keys
+    data["schema_version"] = 1
+    data["skills"] = [
+        {
+            "id": s.skill_id,
+            "state": s.state,
+            **({"targets": s.targets} if s.targets else {}),
+        }
+        for s in skills
+    ]
+    path.write_text(
         yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
     )
+
+
+def set_profile_domain(
+    store_root: Path, category: str, answer: str, name: str = "default"
+) -> dict:
+    """Record a category-level questionnaire answer with its date (§10)."""
+    from datetime import datetime, timezone
+
+    if answer not in DOMAIN_ANSWERS:
+        raise ValidationError(
+            f"unknown domain answer {answer!r}; valid: "
+            f"{', '.join(sorted(DOMAIN_ANSWERS))}"
+        )
+    path = _profile_path(store_root, name)
+    data = _read_yaml(path, "profile")
+    domains = data.get("domains") or {}
+    domains[category] = {
+        "answer": answer,
+        "date": datetime.now(timezone.utc).date().isoformat(),
+    }
+    data["domains"] = domains
+    path.write_text(
+        yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8"
+    )
+    return domains[category]
 
 
 def set_profile_state(

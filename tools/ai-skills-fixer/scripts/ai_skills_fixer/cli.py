@@ -18,7 +18,13 @@ from .gitops import GitError
 from .installer import DriftError, apply_plan
 from .inventory import find_duplicates, match_provenance, scan_installed_root
 from .linting import cross_skill_duplicates, debt_signals, lint_skill_dir
-from .planner import ValidationError, build_plan, load_profile, set_profile_state
+from .planner import (
+    ValidationError,
+    build_plan,
+    load_profile,
+    set_profile_domain,
+    set_profile_state,
+)
 from .rollback import RollbackError, rollback_apply
 from .store import LockError
 from .sources import (
@@ -307,6 +313,17 @@ def _cmd_profile_set(args) -> int:
         args.json,
         [f"{entry.skill_id}: {entry.state}"
          + (f" -> {', '.join(entry.targets)}" if entry.targets else "")],
+    )
+    return 0
+
+
+def _cmd_profile_domain(args) -> int:
+    store = resolve_store_root(args.store_root)
+    entry = set_profile_domain(store, args.category, args.answer)
+    _emit(
+        {"category": args.category, **entry},
+        args.json,
+        [f"domain {args.category}: {entry['answer']} (recorded {entry['date']})"],
     )
     return 0
 
@@ -617,6 +634,11 @@ def main(argv: list[str] | None = None) -> int:
     set_p.add_argument("--targets", nargs="*", default=None)
     _add_store_opts(set_p)
     set_p.set_defaults(handler=_cmd_profile_set)
+    domain_p = psub.add_parser("domain")
+    domain_p.add_argument("category")
+    domain_p.add_argument("answer")
+    _add_store_opts(domain_p)
+    domain_p.set_defaults(handler=_cmd_profile_domain)
 
     reconcile_p = sub.add_parser("reconcile", help="dry-run reconciliation plan")
     _add_store_opts(reconcile_p)
