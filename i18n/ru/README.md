@@ -527,8 +527,7 @@ python -m pytest
 ## Поддержать автора
 
 Если вы хотите помочь мне выжить в этом мире — загляните на
-[github.com/bionicle12](https://github.com/bionicle12/): буду рад гифтам
-на ИИ-подписки, подробности в приветственном README профиля.
+[github.com/bionicle12](https://github.com/bionicle12/).
 
 ## Лицензия
 

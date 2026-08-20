@@ -513,8 +513,7 @@ Contributions are welcome, especially new role blueprints, clearer instruction m
 ## Support the author
 
 If you would like to help me survive in this world — visit
-[github.com/bionicle12](https://github.com/bionicle12/): gift AI
-subscriptions are welcome, details in the profile README.
+[github.com/bionicle12](https://github.com/bionicle12/).
 
 ## License
 
