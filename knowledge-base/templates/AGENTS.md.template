@@ -26,8 +26,9 @@ If the user issues a `!`-command before that opening line, gently say: *"Read AG
 
 ## Context
 
-- Repomix index: `.repomix/output.xml`
-- Config: `kb.config.yml`
+- Repomix packs: `.repomix/*.xml`, fresh sizes in `.repomix/PACKS_STATUS.md`
+- Routing map: `knowledge/routing-table.md`
+- Config: `kb.config.yml` (`index:` section controls the packs)
 - Structure: `KNOWLEDGE_STRUCTURE.md`
 - Placement examples: `DATA_PLACEMENT_EXAMPLES.md`
 
@@ -42,8 +43,23 @@ If the user issues a `!`-command before that opening line, gently say: *"Read AG
 
 ## How to use
 
-- Read `.repomix/output.xml` for broad context before strategy, analysis, or planning
-- Read specific `knowledge/` files before targeted updates
+<!-- AI-KE:INDEX:BEGIN — managed by kb_upgrade.py -->
+### Index loading rules
+
+- **Never read a full-base index dump.** The base is packed into semantic
+  packs (`.repomix/*.xml`); load the `core` pack plus AT MOST ONE domain pack
+  per task (two only when the task genuinely spans two domains).
+- Route first: `knowledge/routing-table.md` → pick the pack in
+  `.repomix/PACKS_STATUS.md` → load it. Library/reference packs — only when
+  the task is about that material.
+- For targeted edits read the specific `knowledge/` files directly, not packs.
+- **If you lose the thread mid-session** (you no longer remember the base
+  layout, mix up sources, or answers degrade in a long chat): stop, re-read
+  `knowledge/routing-table.md` and `.repomix/PACKS_STATUS.md` (both tiny),
+  then reload only the one pack the current question needs. Do not re-read
+  everything you already saw.
+<!-- AI-KE:INDEX:END -->
+
 - Process `review/needs-ai-decision/` — the queue of materials awaiting semantic analysis
 - Useful conclusions from review → clean Markdown in `knowledge/`
 - Update `assets-index/` when describing a binary asset

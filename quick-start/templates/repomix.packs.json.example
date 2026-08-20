@@ -1,0 +1,32 @@
+{
+  "$comment": "FORMAT reference only — NOT a splitting recipe. Domain names, globs and sizes here are placeholders: the init agent must MEASURE the actual project (repomix --token-count-tree) and invent a split that fits ITS stack and ITS task semantics (a Symfony backend, a Laravel app, a WordPress site and a JS monorepo all cut differently — see INIT_GUIDE.md Phase 3). Committed to git; read by scripts/update-repomix-index.sh and by AI agents choosing what to load. 'watch' lists the source roots used for the skip-if-fresh check. 'approx_tokens' is a snapshot from the last init/reinit — fresh numbers live in .repomix/PACKS_STATUS.md.",
+  "version": 1,
+  "window_profile": "256k",
+  "pack_token_ceiling": 80000,
+  "packs": [
+    {
+      "name": "catalog",
+      "output": ".repomix/catalog.xml",
+      "config": ".repomix/configs/catalog.json",
+      "watch": ["<src-root>", "<tests-root>"],
+      "when_to_load": "Always first: directory map + file inventory, no code bodies.",
+      "approx_tokens": 9000
+    },
+    {
+      "name": "<domain-a>",
+      "output": ".repomix/<domain-a>.xml",
+      "config": ".repomix/configs/<domain-a>.json",
+      "watch": ["<src-root>/<domain-a-paths>", "<tests-root>/<domain-a-paths>"],
+      "when_to_load": "<which user tasks need this domain; its tests live here too>",
+      "approx_tokens": 70000
+    },
+    {
+      "name": "platform",
+      "output": ".repomix/platform.xml",
+      "config": ".repomix/configs/platform.json",
+      "watch": ["<config-root>", "<glue-paths>"],
+      "when_to_load": "Merged small domains (<15K each): config, glue, admin, one-offs.",
+      "approx_tokens": 30000
+    }
+  ]
+}

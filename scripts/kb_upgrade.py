@@ -7,7 +7,10 @@ source repo's `VERSION`, then optionally syncs:
   * Reference Python scripts (`scripts/kb_*.py`)
   * Local graph viewer assets (`scripts/kb_viewer/**`)
   * Shell wrappers under `shell/`
-  * A small managed `!view` command block in `AGENTS.md`
+  * Small managed blocks in `AGENTS.md`: `!view` commands and pack-index
+    loading rules (with the mid-session context-recovery anchor)
+  * An additive `index:` section in `kb.config.yml` (switches the base from
+    the monolithic output.xml to pack-based indexing, see 05_INDEX.md)
 
 User customizations are detected via SHA-256 comparison: if the deployed file's
 hash matches the previous-version hash in the repo, it's a clean copy and is
@@ -89,6 +92,60 @@ graph with AI:
 - `!view status` → run the same command with `--status`.
 - `!view stop` → run the same command with `--stop`.
 {VIEW_BLOCK_END}"""
+
+# Pack-index loading rules + mid-session context-recovery anchor. Must stay
+# byte-identical to the block in templates/AGENTS.md.template so freshly
+# deployed bases read as up_to_date.
+INDEX_BLOCK_BEGIN = "<!-- AI-KE:INDEX:BEGIN — managed by kb_upgrade.py -->"
+INDEX_BLOCK_END = "<!-- AI-KE:INDEX:END -->"
+INDEX_BLOCK = f"""\
+{INDEX_BLOCK_BEGIN}
+### Index loading rules
+
+- **Never read a full-base index dump.** The base is packed into semantic
+  packs (`.repomix/*.xml`); load the `core` pack plus AT MOST ONE domain pack
+  per task (two only when the task genuinely spans two domains).
+- Route first: `knowledge/routing-table.md` → pick the pack in
+  `.repomix/PACKS_STATUS.md` → load it. Library/reference packs — only when
+  the task is about that material.
+- For targeted edits read the specific `knowledge/` files directly, not packs.
+- **If you lose the thread mid-session** (you no longer remember the base
+  layout, mix up sources, or answers degrade in a long chat): stop, re-read
+  `knowledge/routing-table.md` and `.repomix/PACKS_STATUS.md` (both tiny),
+  then reload only the one pack the current question needs. Do not re-read
+  everything you already saw.
+{INDEX_BLOCK_END}"""
+
+# AGENTS.md is a LIVE, user-owned file: agents legitimately evolve it while
+# working in the base. A managed block is auto-replaced ONLY when its deployed
+# text matches a known reference version (current or one listed below).
+# Anything else means someone improved it locally -> we never stomp it;
+# instead we write a `.new` sidecar and ask the user's AI agent to merge.
+#
+# DISCIPLINE: whenever VIEW_BLOCK / INDEX_BLOCK text changes, append the
+# previous version to the matching *_PREVIOUS tuple, or every cleanly deployed
+# old block will be flagged for AI merge instead of auto-updating (safe, but
+# noisy).
+VIEW_BLOCK_PREVIOUS: tuple[str, ...] = ()
+INDEX_BLOCK_PREVIOUS: tuple[str, ...] = ()
+
+AI_MERGE_PROMPT = (
+    "Compare AGENTS.md with {sidecar}: integrate the improvements from the new "
+    "reference block into the corresponding managed section of AGENTS.md "
+    "WITHOUT losing any local customizations, then delete {sidecar}."
+)
+
+# Additive kb.config.yml patch: switches an upgraded base to pack mode.
+# See knowledge-base/05_INDEX.md and templates/kb.config.yml.template.
+INDEX_YAML_BLOCK = """\
+# Pack-based index (added by kb_upgrade.py, see 05_INDEX.md). One monolithic
+# output.xml stops fitting a context window as the base grows; packs keep
+# every load under a ceiling. compress stays false: wording is the payload.
+index:
+  enabled: true
+  window_profile: "256k"            # 256k (ceiling 80K) | 200k (60K) | 1m (150K)
+  packs: auto
+"""
 
 _HISTORY_MATCH_CACHE: dict[tuple[str, str], bool] = {}
 
@@ -346,52 +403,141 @@ def write_diff_text(plans: list[UpgradePlan]) -> str:
     return "\n\n".join(chunks)
 
 
-def managed_view_block_state(agents_file: Path) -> str:
+def _managed_block_state(agents_file: Path, begin: str, end: str, block: str) -> str:
     if not agents_file.is_file():
         return "missing_file"
     text = agents_file.read_text(encoding="utf-8")
-    has_begin = VIEW_BLOCK_BEGIN in text
-    has_end = VIEW_BLOCK_END in text
+    has_begin = begin in text
+    has_end = end in text
     if has_begin != has_end:
         return "malformed"
     if not has_begin:
         return "missing"
-    start = text.index(VIEW_BLOCK_BEGIN)
-    end = text.index(VIEW_BLOCK_END, start) + len(VIEW_BLOCK_END)
-    return "up_to_date" if text[start:end] == VIEW_BLOCK else "outdated"
+    start = text.index(begin)
+    stop = text.index(end, start) + len(end)
+    return "up_to_date" if text[start:stop] == block else "outdated"
 
 
-def update_managed_view_block(agents_file: Path, *, dry_run: bool) -> str:
-    state = managed_view_block_state(agents_file)
+def _norm_block(text: str) -> str:
+    return text.replace("\r\n", "\n").strip()
+
+
+def _write_block_sidecar(
+    agents_file: Path, label: str, block: str, *, dry_run: bool
+) -> Path:
+    sidecar = agents_file.with_name(f"{agents_file.name}.{label}-block.new")
+    if not dry_run:
+        sidecar.write_text(f"{block}\n", encoding="utf-8")
+    return sidecar
+
+
+def _update_managed_block(
+    agents_file: Path,
+    begin: str,
+    end: str,
+    block: str,
+    *,
+    label: str,
+    previous: tuple[str, ...] = (),
+    dry_run: bool,
+) -> str:
+    state = _managed_block_state(agents_file, begin, end, block)
     if state == "up_to_date":
         return "skipped (up to date)"
     if state == "malformed":
-        return "manual review required (managed markers are incomplete)"
-    if dry_run:
-        if state == "missing_file":
-            return "would create"
-        if state == "missing":
-            return "would append"
-        return "would update"
-
-    if state == "missing_file":
-        agents_file.write_text(f"{VIEW_BLOCK}\n", encoding="utf-8")
-        return "created"
-    text = agents_file.read_text(encoding="utf-8")
-    if state == "missing":
-        separator = "\n" if text.endswith("\n") else "\n\n"
+        # Markers damaged during live editing: never guess — hand the fresh
+        # reference block to the user's AI agent for a semantic merge.
+        sidecar = _write_block_sidecar(agents_file, label, block, dry_run=dry_run)
+        return f"AI merge required (markers damaged) → {sidecar.name}"
+    if state == "outdated":
+        text = agents_file.read_text(encoding="utf-8")
+        start = text.index(begin)
+        stop = text.index(end, start) + len(end)
+        deployed_block = text[start:stop]
+        known = {_norm_block(v) for v in previous}
+        if _norm_block(deployed_block) not in known:
+            # The block was customized while working in the base — replacing
+            # it would destroy those improvements. AI merge instead.
+            sidecar = _write_block_sidecar(
+                agents_file, label, block, dry_run=dry_run
+            )
+            return f"AI merge required (local edits kept) → {sidecar.name}"
+        if dry_run:
+            return "would update"
         agents_file.write_text(
-            f"{text}{separator}{VIEW_BLOCK}\n",
+            f"{text[:start]}{block}{text[stop:]}",
             encoding="utf-8",
         )
-        return "appended"
-    start = text.index(VIEW_BLOCK_BEGIN)
-    end = text.index(VIEW_BLOCK_END, start) + len(VIEW_BLOCK_END)
-    agents_file.write_text(
-        f"{text[:start]}{VIEW_BLOCK}{text[end:]}",
-        encoding="utf-8",
+        return "updated"
+    if dry_run:
+        return "would create" if state == "missing_file" else "would append"
+    if state == "missing_file":
+        agents_file.write_text(f"{block}\n", encoding="utf-8")
+        return "created"
+    text = agents_file.read_text(encoding="utf-8")
+    separator = "\n" if text.endswith("\n") else "\n\n"
+    agents_file.write_text(f"{text}{separator}{block}\n", encoding="utf-8")
+    return "appended"
+
+
+def managed_view_block_state(agents_file: Path) -> str:
+    return _managed_block_state(agents_file, VIEW_BLOCK_BEGIN, VIEW_BLOCK_END, VIEW_BLOCK)
+
+
+def update_managed_view_block(agents_file: Path, *, dry_run: bool) -> str:
+    return _update_managed_block(
+        agents_file,
+        VIEW_BLOCK_BEGIN,
+        VIEW_BLOCK_END,
+        VIEW_BLOCK,
+        label="view",
+        previous=VIEW_BLOCK_PREVIOUS,
+        dry_run=dry_run,
     )
-    return "updated"
+
+
+def managed_index_block_state(agents_file: Path) -> str:
+    return _managed_block_state(
+        agents_file, INDEX_BLOCK_BEGIN, INDEX_BLOCK_END, INDEX_BLOCK
+    )
+
+
+def update_managed_index_block(agents_file: Path, *, dry_run: bool) -> str:
+    return _update_managed_block(
+        agents_file,
+        INDEX_BLOCK_BEGIN,
+        INDEX_BLOCK_END,
+        INDEX_BLOCK,
+        label="index",
+        previous=INDEX_BLOCK_PREVIOUS,
+        dry_run=dry_run,
+    )
+
+
+def kb_config_index_state(kb_root: Path) -> str:
+    cfg_file = kb_root / "kb.config.yml"
+    if not cfg_file.is_file():
+        return "missing_file"
+    for line in cfg_file.read_text(encoding="utf-8").splitlines():
+        if line.startswith("index:"):
+            return "present"
+    return "missing"
+
+
+def ensure_index_section(kb_root: Path, *, dry_run: bool) -> str:
+    """Additively append the `index:` pack config to kb.config.yml."""
+    state = kb_config_index_state(kb_root)
+    if state == "present":
+        return "skipped (present)"
+    if state == "missing_file":
+        return "skipped (no kb.config.yml)"
+    if dry_run:
+        return "would append"
+    cfg_file = kb_root / "kb.config.yml"
+    text = cfg_file.read_text(encoding="utf-8")
+    separator = "\n" if text.endswith("\n") else "\n\n"
+    cfg_file.write_text(f"{text}{separator}{INDEX_YAML_BLOCK}", encoding="utf-8")
+    return "appended"
 
 
 def discover_kb_roots(parent: Path) -> list[Path]:
@@ -460,12 +606,38 @@ def upgrade_one(kb_root: Path, args: argparse.Namespace) -> int:
             changed = True
         print(f"{plan.name:<46} {plan.state:<20} {action}")
 
+    ai_merge_sidecars: list[str] = []
+
     view_action = update_managed_view_block(agents_file, dry_run=args.dry_run)
     print(f"{'AGENTS.md (!view block)':<46} {view_block_state:<20} {view_action}")
     if view_block_state not in ("up_to_date",):
         changed = True
-    if view_block_state == "malformed":
+    if view_action.startswith("AI merge required"):
         customized += 1
+        ai_merge_sidecars.append(view_action.rsplit("→ ", 1)[-1])
+
+    index_block_state = managed_index_block_state(agents_file)
+    index_action = update_managed_index_block(agents_file, dry_run=args.dry_run)
+    print(f"{'AGENTS.md (index block)':<46} {index_block_state:<20} {index_action}")
+    if index_block_state not in ("up_to_date",):
+        changed = True
+    if index_action.startswith("AI merge required"):
+        customized += 1
+        ai_merge_sidecars.append(index_action.rsplit("→ ", 1)[-1])
+
+    if ai_merge_sidecars:
+        print(
+            "\nAGENTS.md has local improvements in managed blocks — they were "
+            "NOT overwritten.\nAsk your AI agent to merge, e.g.:"
+        )
+        for sidecar in ai_merge_sidecars:
+            print(f'  "{AI_MERGE_PROMPT.format(sidecar=sidecar)}"')
+
+    index_cfg_state = kb_config_index_state(kb_root)
+    index_cfg_action = ensure_index_section(kb_root, dry_run=args.dry_run)
+    print(f"{'kb.config.yml (index: section)':<46} {index_cfg_state:<20} {index_cfg_action}")
+    if index_cfg_state == "missing":
+        changed = True
 
     if args.diff and customized:
         print("\n=== Diffs ===\n")

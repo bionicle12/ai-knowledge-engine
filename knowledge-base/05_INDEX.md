@@ -12,105 +12,107 @@
 The Repomix index contains **only**:
 - `knowledge/**/*.md` — extracted knowledge
 - `assets-index/**/*.md` — descriptions of binary files
-- Meta files: `AGENTS.md`, `README.md`, `KNOWLEDGE_STRUCTURE.md`, `kb.config.yml`
+- Meta files: `README.md`, `KNOWLEDGE_STRUCTURE.md`, `kb.config.yml`
 
-**Not indexed:** `raw/`, `processed/`, `assets/`, `review/`, `interactions/`, `setup/`, `scripts/`.
+**Not indexed:** `raw/`, `processed/`, `assets/`, `review/`, `interactions/`, `setup/`, `scripts/`, **and `AGENTS.md`** — it is already loaded into every session's system prompt; indexing it charges its tokens twice.
 
 ---
 
-## repomix.config.json
+## Principle: packs, not a monolith
 
-```json
-{
-  "$schema": "https://repomix.com/schemas/latest/schema.json",
-  "output": {
-    "filePath": ".repomix/output.xml",
-    "style": "xml",
-    "compress": false,
-    "removeComments": false,
-    "removeEmptyLines": false,
-    "showLineNumbers": false,
-    "fileSummary": true,
-    "directoryStructure": true,
-    "topFilesLength": 20,
-    "headerText": "Local non-code knowledge base. Read AGENTS.md before use."
-  },
-  "include": [
-    "AGENTS.md",
-    "README.md",
-    "KNOWLEDGE_STRUCTURE.md",
-    "DATA_PLACEMENT_EXAMPLES.md",
-    "kb.config.yml",
-    "knowledge/**/*.md",
-    "assets-index/**/*.md"
-  ],
-  "ignore": {
-    "useGitignore": true,
-    "useDefaultPatterns": true,
-    "customPatterns": [
-      "raw/**",
-      "processed/**",
-      "assets/**",
-      "review/**",
-      "interactions/**",
-      "setup/**",
-      "scripts/**",
-      ".repomix/**",
-      ".venv/**",
-      "__pycache__/**",
-      "log.md",
-      "log-archive/**",
-      "lint-report.md",
-      "**/*.pdf", "**/*.docx", "**/*.pptx", "**/*.xlsx",
-      "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp", "**/*.gif",
-      "**/*.mp3", "**/*.wav", "**/*.mp4", "**/*.mov",
-      "**/*.zip", "**/*.tar.gz", "**/*.rar"
-    ]
-  },
-  "security": {
-    "enableSecurityCheck": true
-  },
-  "tokenCount": {
-    "encoding": "o200k_base"
-  }
-}
-```
+A single `.repomix/output.xml` stops working the moment the base grows: a
+base with a library of reference books easily passes 150–250K tokens, which
+no longer fits a 256K context window *before the session even starts*, and
+"read the index for broad context" turns into context poisoning. Long chats
+then degrade — the model visibly "loses the thread".
 
-`compress: false` — for textual knowledge, exact wording and nuance matter.
+So the index is built as **semantic packs**, each under a token ceiling:
+
+| Window profile | Pack ceiling |
+|---------------|-------------|
+| `256k` (default) | 80K |
+| `200k` | 60K |
+| `1m` | 150K |
+
+- `core.xml` — author profile, principles, voice, routing tables, meta files.
+  Small by design; always safe to load.
+- One pack per `knowledge/` section (`domain.xml`, `insights.xml`, …).
+- A section **over the ceiling is split by subfolder automatically**:
+  `knowledge/library/craft/` → `library-craft.xml`, and so on. A reference
+  library never shares a pack with working knowledge — book packs load only
+  when the task is about them.
+- Sections under ~15K merge into a shared `aux.xml` (routing between twenty
+  micro-files is as bad as one giant file).
+- `.repomix/PACKS_STATUS.md` — auto-generated table of packs with fresh token
+  estimates; agents read it instead of hardcoded numbers.
+
+The agent's loading rule (already in the AGENTS.md template): route via
+`knowledge/routing-table.md`, then load `core` plus **at most one** domain
+pack per task.
+
+Configuration lives in the `index:` section of `kb.config.yml`
+(see `templates/kb.config.yml.template`): `window_profile`, optional
+`pack_token_ceiling` / `merge_below_tokens` overrides, and `packs: auto`
+(recommended) or an explicit pack list. `kb_reindex.py` plans the packs,
+generates `.repomix/configs/<pack>.json` from the base `repomix.config.json`,
+builds only stale packs (mtime-based skip), and **warns when a pack exceeds
+the ceiling** — that is the signal to sub-split further (deeper subfolders,
+or an explicit `packs:` list).
+
+Bases deployed before pack mode keep working: without an `index:` section
+`kb_reindex.py` builds the old monolithic `output.xml` and prints a loud
+warning once it crosses ~150K tokens, telling you to enable packs.
+
+---
+
+## Why `compress: false` is non-negotiable here
+
+For **code**, Tree-sitter compression is a fair trade: structure survives,
+method bodies go — an agent can re-read real sources for details.
+
+For a **knowledge base the text IS the payload**: wording, nuance, full
+paragraphs of extracted knowledge. Compression would amputate exactly what
+the base exists to preserve. Therefore every KB pack keeps
+`compress: false, removeComments: false` — and the size problem is solved by
+**splitting harder** (packs, subfolder splits), never by compressing.
+
+---
+
+## repomix.config.json (base config)
+
+In pack mode this file is the **base config**: `kb_reindex.py` inherits its
+`ignore` / `security` / `tokenCount` / output options into every generated
+`.repomix/configs/<pack>.json`, overriding only the per-pack `include`,
+`filePath`, and header. Its own `include`/`filePath` are used directly only in
+legacy (no `index:` section) mode.
+
+See `templates/repomix.config.json.template` for the full reference copy. Key
+points, in either mode:
+
+- `compress: false`, `removeComments: false` — see the section above.
+- `ignore.customPatterns` excludes `raw/`, `processed/`, `assets/`, `review/`,
+  `interactions/`, `setup/`, `scripts/`, `.repomix/`, logs, and all binary
+  formats.
+- `tokenCount.encoding: o200k_base`.
+- Legacy `include` lists `AGENTS.md` for historical reasons; pack mode drops
+  it (already in the system prompt).
 
 ---
 
 ## shell/reindex.sh
 
-```bash
-#!/bin/bash
-set -e
-cd "$(dirname "$0")"
+The reference script `knowledge-base/shell/reindex.sh` (copied into the
+deployed base) runs: ingest → routing → quick lint → throttled consolidation →
+**`kb_reindex.py --index-only`**, which builds the packs (or the legacy
+monolith when packs are not configured). Windows uses `shell/reindex.bat`,
+which delegates to the same `kb_reindex.py` — identical behavior, no Git Bash
+required.
 
-PYTHON="python3"
-if [ -f ".venv/bin/python" ]; then
-  PYTHON=".venv/bin/python"
-fi
-
-echo "Running ingest pipeline..."
-$PYTHON scripts/kb_ingest.py
-
-echo "Quick lint..."
-$PYTHON scripts/kb_lint.py --quick || true
-
-echo "Generating Repomix index..."
-repomix
-
-# Append to log
-echo "" >> log.md
-echo "## [$(date -Iseconds)] reindex | Auto reindex" >> log.md
-echo "- Output: .repomix/output.xml" >> log.md
-
-echo "Done: .repomix/output.xml"
-```
+Manual index-only rebuilds:
 
 ```bash
-chmod +x shell/reindex.sh
+python3 scripts/kb_reindex.py --index-only            # only stale packs
+python3 scripts/kb_reindex.py --index-only --force    # everything
 ```
 
 ---

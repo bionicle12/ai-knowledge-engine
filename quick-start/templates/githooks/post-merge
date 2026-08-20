@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fires after `git pull` / `git merge`: teammates' changes must reach the index.
+root=$(git rev-parse --show-toplevel)
+exec "$root/scripts/update-repomix-index.sh" --background

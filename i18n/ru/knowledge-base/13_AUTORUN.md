@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/13_AUTORUN.md
 source_commit: ba0445d4e2f47c138df7354020807616d38a0739
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.13.0
+translated_at: 2026-08-20
 translator: ai-assisted
 ---
 
@@ -251,29 +251,42 @@ systemctl --user status kb-watch
 
 Для баз, которые под git-контролем.
 
-### post-commit hook
+Выстраданные правила хуков (каждое — реальная продакшн-поломка):
+
+1. Одного `post-commit` мало: `git push` его никогда не вызывает, а
+   pull/merge/rebase меняют файлы без локального коммита. Ставь также
+   `post-merge` и `post-rewrite` (и `pre-push`, если индекс должен быть свеж
+   перед каждым push).
+2. Git-GUI и IDE запускают хуки с голым `PATH` — молчаливый
+   `command -v repomix || exit` превращает хук в no-op на месяцы.
+   Делегируй в `kb_reindex.py`: Python сам находит repomix и *сообщает*,
+   когда его нет, вместо молчаливого пропуска.
+3. Обычный фоновый `... &` убивается SIGHUP при выходе хука — используй
+   `nohup` и перенаправляй вывод в лог, никогда в `/dev/null` (проглоченные
+   ошибки — вот как индексы молча протухают).
+4. Хуки никогда не должны блокировать git: всегда `exit 0`.
+5. `.git/hooks/` не версионируется. Держи исходники хуков в репозитории и
+   документируй установку одной командой после clone.
+
+### post-commit / post-merge / post-rewrite hook
 
 ```bash
 #!/bin/sh
-# .git/hooks/post-commit
-
-# Если изменены файлы в knowledge/ или knowledge-base/ → reindex
-changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
-
-if echo "$changed_files" | grep -q "^knowledge/"; then
-  echo "[hook] Knowledge files changed, reindexing..."
-  ./shell/reindex.sh > /dev/null 2>&1 &
-
-  # Quick lint
-  if [ -f "scripts/kb_lint.py" ]; then
-    python3 scripts/kb_lint.py --quick > /dev/null 2>&1 &
-  fi
-fi
+# .git/hooks/post-commit  (идентично для post-merge и post-rewrite)
+root=$(git rev-parse --show-toplevel)
+cd "$root" || exit 0
+PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python
+mkdir -p .repomix
+nohup "$PY" scripts/kb_reindex.py --quick >> .repomix/update.log 2>&1 </dev/null &
+exit 0
 ```
 
 ```bash
-chmod +x .git/hooks/post-commit
+chmod +x .git/hooks/post-commit .git/hooks/post-merge .git/hooks/post-rewrite
 ```
+
+На Windows git выполняет эти `.sh`-хуки через встроенный Git Bash —
+дополнительная настройка не нужна.
 
 ### pre-commit hook (опционально)
 

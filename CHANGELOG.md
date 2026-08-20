@@ -18,6 +18,84 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-20
+
+### Added
+- **Pack-based context index — the fix for "the index outgrew the context
+  window".** A monolithic `.repomix/output.xml` on a real project reached
+  ~258K tokens and stopped fitting a 256K window before the session even
+  started; agents instructed to "read the index" were poisoning their own
+  context. Both modes now build **semantic packs**, each under a per-profile
+  token ceiling (256k window → 80K/pack, 200k → 60K, 1m → 150K), and agents
+  load the routing map plus at most ONE domain pack per task.
+  - **Knowledge bases:** new `index:` section in `kb.config.yml`
+    (`window_profile`, `packs: auto` or an explicit list). `kb_reindex.py`
+    plans the packs (core = profile/principles/voice/routing + meta; one pack
+    per `knowledge/` section; sections over the ceiling **auto-split by
+    subfolder** — `knowledge/library/craft/` → `library-craft.xml`; sections
+    under ~15K merge into `aux`), generates `.repomix/configs/<pack>.json`
+    from the base `repomix.config.json`, rebuilds only stale packs
+    (mtime-based, config-content-aware), writes `.repomix/PACKS_STATUS.md`
+    with fresh token estimates, and warns on any pack over the ceiling.
+    `--index-only` / `--force` flags added; `shell/reindex.sh` and
+    `reindex.bat` delegate index generation to it. `compress: false` remains
+    the law for knowledge bases — wording is the payload; size is solved by
+    splitting, never by compressing. Without an `index:` section the legacy
+    monolith still builds, now with a loud warning above ~150K tokens.
+  - **Quick start (code projects):** `INIT_GUIDE.md` rewritten (v2) around
+    three modes — `init` (measure with `--token-count-tree`, cut domains by
+    task semantics with tests embedded in their domain's pack, show the user
+    the pack table before writing configs), `update` (rebuild only stale
+    packs), `reinit` (migrate a monolith to packs with backup and diff).
+    Ready-made user prompts for all three modes, in English and Russian, at
+    the top of the guide. New `quick-start/templates/`: `repomix.packs.json`
+    manifest example, catalog (`files: false`) and domain pack configs, and
+    an AGENTS.md section template with loading rules and a mid-session
+    context-recovery anchor.
+- **Hardened cross-platform index auto-update** (`quick-start/templates/`):
+  `scripts/update-repomix-index.sh` bootstraps PATH for git-hook environments
+  (nvm, `~/.local/bin`, Homebrew, nvm-windows/`%APPDATA%\npm`), falls back to
+  `npx --yes repomix`, holds a `flock` where available, skips fresh packs,
+  survives SIGHUP via `nohup` in `--background` mode, logs to
+  `.repomix/update.log`, and always exits 0 so git is never blocked.
+  `.githooks/` now covers `post-commit`, `pre-push` (synchronous, stdin
+  detached from git's refs), `post-merge`, `post-rewrite`;
+  `install-git-hooks.sh` copies them without touching `git config` and backs
+  up foreign hooks. `.bat` wrappers cover manual Windows runs; hooks run
+  through Git Bash on Windows automatically. `13_AUTORUN.md` documents the
+  same hardened hook pattern for knowledge bases.
+- New example role `balabanov-director` — screenwriting for gritty auteur
+  films (see `knowledge-base/examples/balabanov-director.yml`).
+- **Context-recovery anchor in AGENTS.md** (new managed block
+  `AI-KE:INDEX`): when a long chat degrades and the model "loses the thread",
+  the instruction is to re-read the tiny routing table and
+  `.repomix/PACKS_STATUS.md` and reload only the needed pack — never to
+  re-read everything already seen.
+
+### Changed
+- `AGENTS.md` is no longer indexed by Repomix in pack mode (it is already in
+  the system prompt — indexing it charged its tokens twice), and the
+  "read `.repomix/output.xml` for broad context" instruction is removed from
+  all templates and docs (`05_INDEX.md`, `06_AGENTS_TEMPLATE.md`,
+  `AGENTS.md.template`, quick-start guide) in favor of the pack loading rules.
+- `kb_upgrade.py` now also maintains the `AI-KE:INDEX` managed block in
+  deployed `AGENTS.md` files and additively appends the `index:` section to
+  deployed `kb.config.yml` (existing sections are never touched), so
+  already-deployed bases migrate to pack indexing on a normal upgrade run.
+- **AGENTS.md updates are AI-mediated.** `AGENTS.md` is a live file that
+  agents evolve while working in a base, and blind block replacement during
+  upgrades was destroying those edits. `kb_upgrade.py` now auto-replaces a
+  managed block only when its deployed text matches a known reference version;
+  a locally customized block (or damaged markers) leaves `AGENTS.md`
+  untouched, writes the fresh reference to a `.new` sidecar
+  (`AGENTS.md.index-block.new`), blocks the version bump, and prints a
+  ready-to-paste prompt asking the base's AI agent to merge the improvements
+  without losing local changes. `--force` does not override this. The
+  quick-start guide gets the same rule for its update/reinit modes: AGENTS.md
+  is merged in place with a diff shown, never regenerated from the template.
+  See the new "AGENTS.md is merged by an AI agent" section in
+  `docs/UPGRADING.md`.
+
 ## [0.12.0] - 2026-08-13
 
 ### Added

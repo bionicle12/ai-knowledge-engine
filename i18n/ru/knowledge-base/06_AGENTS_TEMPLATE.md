@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/06_AGENTS_TEMPLATE.md
 source_commit: 9935743b96cd1ce99e52e6c84df2d18721ef6fa4
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.13.0
+translated_at: 2026-08-20
 translator: ai-assisted
 ---
 
@@ -11,6 +11,14 @@ translator: ai-assisted
 > AI-агент должен создать `AGENTS.md` в корне базы на основе этого шаблона, адаптировав под роль и сущности пользователя.
 >
 > **Reference template:** `knowledge-base/templates/AGENTS.md.template` — содержит готовую структуру с плейсхолдерами `{{KB_NAME}}`, `{{PRIMARY_ROLE}}`, `{{PRIMARY_LANGUAGE}}`, `{{KB_INSTRUCTIONS_VERSION}}`. Агент копирует и параметризует его, а не пишет с нуля.
+>
+> **Принадлежность после развёртывания:** `AGENTS.md` принадлежит базе, а не
+> движку. Агенты дорабатывают его в процессе работы; обновления
+> (`kb_upgrade.py`) поддерживают только managed-блоки `AI-KE:*` и **никогда не
+> перезаписывают блок с локальными правками** — вместо этого пишут
+> `.new`-файл рядом и просят ИИ-агента сделать merge (см.
+> `docs/UPGRADING.md`). Ни один скрипт не имеет права заменить этот файл
+> целиком.
 
 ---
 
@@ -26,8 +34,9 @@ translator: ai-assisted
 
 ## Контекст
 
-- Repomix-индекс: `.repomix/output.xml`
-- Конфиг: `kb.config.yml`
+- Repomix-пакеты: `.repomix/*.xml`, свежие размеры в `.repomix/PACKS_STATUS.md`
+- Карта маршрутизации: `knowledge/routing-table.md`
+- Конфиг: `kb.config.yml` (секция `index:` управляет пакетами)
 - Структура: `KNOWLEDGE_STRUCTURE.md`
 - Примеры размещения: `DATA_PLACEMENT_EXAMPLES.md`
 
@@ -42,8 +51,16 @@ translator: ai-assisted
 
 ## Как использовать
 
-- Читай `.repomix/output.xml` для широкого контекста перед стратегией, анализом или планированием
+- **Никогда не читай дамп всей базы целиком.** База упакована в семантические
+  пакеты (`.repomix/*.xml`); грузи пакет `core` плюс МАКСИМУМ ОДИН доменный
+  пакет на задачу (маршрутизация: `knowledge/routing-table.md` →
+  `.repomix/PACKS_STATUS.md`). Библиотечные/справочные пакеты — только когда
+  задача про этот материал.
 - Читай конкретные файлы `knowledge/` перед точечными обновлениями
+- **Потерял нить посреди сессии?** Перечитай `knowledge/routing-table.md` и
+  `.repomix/PACKS_STATUS.md` (оба крошечные), затем догрузи только тот один
+  пакет, который нужен текущему вопросу — никогда не перечитывай всё, что уже
+  видел.
 - Обрабатывай `review/needs-ai-decision/` — это очередь материалов для смыслового анализа
 - Полезные выводы из review → чистый markdown в `knowledge/`
 - Обновляй `assets-index/` когда описываешь бинарный ассет

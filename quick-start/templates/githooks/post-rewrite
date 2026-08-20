@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fires after `git rebase` / `git commit --amend`.
+root=$(git rev-parse --show-toplevel)
+exec "$root/scripts/update-repomix-index.sh" --background

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "$comment": "Catalog pack: metadata only (files:false) — directory tree + file inventory without code bodies. Target size: 5-15K tokens. This is the routing map an agent reads FIRST. The include roots below are placeholders — point them at the directories that matter in THIS project.",
+  "output": {
+    "filePath": ".repomix/catalog.xml",
+    "style": "xml",
+    "files": false,
+    "compress": true,
+    "removeComments": true,
+    "removeEmptyLines": true,
+    "showLineNumbers": false,
+    "fileSummary": false,
+    "directoryStructure": true,
+    "includeFullDirectoryStructure": true,
+    "topFilesLength": 25,
+    "headerText": "CATALOG: directory map only, no code. Pick ONE domain pack from repomix.packs.json / AGENTS.md before reading further.",
+    "git": { "sortByChanges": true, "sortByChangesMaxCommits": 50 }
+  },
+  "include": ["<src-root>/**", "<config-root>/**", "<tests-root>/**"],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": ["**/vendor/**", "**/node_modules/**", "**/var/**", ".repomix/**", "AGENTS.md", "CLAUDE.md"]
+  },
+  "security": { "enableSecurityCheck": true },
+  "tokenCount": { "encoding": "o200k_base" }
+}

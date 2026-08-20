@@ -10,10 +10,9 @@
     "fileSummary": true,
     "directoryStructure": true,
     "topFilesLength": 20,
-    "headerText": "Local non-code knowledge base. Read AGENTS.md before use."
+    "headerText": "Local non-code knowledge base. Base config: pack configs in .repomix/configs/ inherit ignore/security from here (see 05_INDEX.md). AGENTS.md is deliberately not indexed — it is already in the system prompt."
   },
   "include": [
-    "AGENTS.md",
     "README.md",
     "KNOWLEDGE_STRUCTURE.md",
     "DATA_PLACEMENT_EXAMPLES.md",

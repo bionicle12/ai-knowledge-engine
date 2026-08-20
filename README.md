@@ -40,7 +40,7 @@ The visual above is the actual storage model, not a conceptual cloud architectur
 |---|---|---|
 | Start here | [`quick-start/`](quick-start/) | [`knowledge-base/`](knowledge-base/) |
 | Best for | Giving an agent a reliable project map | Building a long-lived personal or team knowledge system |
-| You get | Stack-aware indexing, secret checks, token controls, optional Git hook | Raw-first ingest, NLP, provenance, review queues, reflection, linting, watchers |
+| You get | Domain-pack indexing with token ceilings, secret checks, hardened Git hooks (commit/push/pull) | Raw-first ingest, NLP, provenance, review queues, reflection, linting, watchers |
 | Typical setup | About 5 minutes | About 30 minutes |
 | Runtime | Repomix + Node.js | Python pipeline + an indexer; Repomix is the included default |
 
@@ -93,10 +93,10 @@ cp -R ai-knowledge-engine/quick-start /path/to/your-project/docs/ai-init
 Then tell your agent:
 
 ```text
-Read docs/ai-init/INIT_GUIDE.md and set up context indexing for this project.
+Read docs/ai-init/INIT_GUIDE.md and initialize the Repomix pack index in this project (mode: init). Show me the proposed pack table before writing any configs.
 ```
 
-The guide has the agent inspect the stack, define safe include/exclude patterns, enable Repomix security checks, and generate the first context snapshot.
+The guide has the agent measure the codebase, cut it into **semantic domain packs** (each under a token ceiling — a single giant `output.xml` stops fitting the context window on real projects), install hardened cross-platform git hooks (commit/push/pull, with PATH bootstrap and logging), and write a short routing table into `AGENTS.md`. The same guide also drives `update` (rebuild only stale packs) and `reinit` (migrate an old monolithic index to packs) — ready-made prompts for all three modes are at the top of the guide.
 
 ## Why it is different
 

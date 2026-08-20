@@ -102,7 +102,8 @@ When the user says "deploy a base" without naming a role, the agent:
    5. ✍️ Content creator — copywriting, social media, personal brand, monetization
    6. 🔬 Researcher / Analyst — data, hypotheses, publications
    7. 🏢 Startup Founder — product, team, investors, market
-   8. Custom role — describe it, and I'll prepare a configuration
+   8. 🎬 Porn director in the Balabanov style — screenwriting for gritty auteur films
+   9. Custom role — describe it, and I'll prepare a configuration
    ```
 3. The user picks a number or describes their own role
 

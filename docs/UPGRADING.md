@@ -149,6 +149,32 @@ python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
   --kb-root /path/to/kb-name --force
 ```
 
+## AGENTS.md is merged by an AI agent, never overwritten
+
+`AGENTS.md` is a live file: agents legitimately evolve it while working in
+the base (new commands, sharpened rules, role notes). The upgrader therefore
+touches only its managed blocks (`AI-KE:VIEW`, `AI-KE:INDEX`), and even those
+it auto-replaces **only when the deployed block text matches a known reference
+version**. In every other case — local edits inside a managed block, or
+damaged markers — it:
+
+1. leaves `AGENTS.md` completely untouched;
+2. writes the fresh reference block to a sidecar
+   (`AGENTS.md.view-block.new` / `AGENTS.md.index-block.new`);
+3. reports `AI merge required` (which also blocks the version bump, like any
+   customized file) and prints a ready-to-paste prompt.
+
+To finish the upgrade, ask the AI agent working in that base:
+
+> Compare AGENTS.md with AGENTS.md.index-block.new: integrate the
+> improvements from the new reference block into the corresponding managed
+> section of AGENTS.md WITHOUT losing any local customizations, then delete
+> the .new file.
+
+Then re-run `kb_upgrade.py` — with the block matching the reference again, the
+version bump proceeds. `--force` does NOT override this: forced runs discard
+script customizations, but AGENTS.md merges always stay AI-mediated.
+
 ## Verification
 
 After a successful upgrade:

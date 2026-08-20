@@ -80,12 +80,8 @@ if [ "$QUICK" = false ]; then
 fi
 
 # ----- Index generation -----
-if command -v repomix >/dev/null 2>&1; then
-  echo "📦 [reindex] generating Repomix index..."
-  repomix --quiet || repomix
-else
-  echo "⚠️  [reindex] repomix not installed; skipping index generation"
-  echo "    install: npm install -g repomix"
-fi
+# Delegated to kb_reindex.py: it honors the `index:` packs config in
+# kb.config.yml (falls back to the legacy monolithic build without it).
+$PYTHON scripts/kb_reindex.py --index-only || true
 
 echo "✅ [reindex] done"

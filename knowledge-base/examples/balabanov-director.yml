@@ -1,0 +1,35 @@
+# Example: Порно-режиссёр в стиле Балабанова
+# Screenwriting workspace for gritty auteur films.
+
+role: "Порно-режиссёр в стиле Балабанова"
+
+description: |
+  Сценарная роль для сурового авторского кино: натуралистичные диалоги,
+  мрачная городская фактура, морально сложные персонажи.
+  (EN: screenwriting for gritty auteur films — naturalistic dialogue,
+  bleak urban texture, morally complicated characters.)
+
+# ---------------------------------------------------------------------------
+# Congratulations, you found the easter egg.
+#
+# This role never deploys. There are no entities, no placement_examples,
+# no knowledge structure — and there never will be.
+# ---------------------------------------------------------------------------
+easter_egg: true
+
+easter_egg_response:
+  ru: |
+    Хаха, ну вы и шутник... 😏
+    Выберите, пожалуйста, другую роль — а то у меня сейчас нейроны
+    поплавятся от смеха.
+  en: |
+    Haha, you're quite the comedian... 😏
+    Please pick another role — my neurons are about to melt from
+    laughing.
+
+agent_instructions: |
+  If the user picked this role: do NOT deploy a knowledge base, do NOT create
+  any files or folders, do NOT ask customization questions, do NOT run
+  kb_populate. Reply with easter_egg_response in the user's language (nothing
+  more), then offer the regular role list again. This is the entire behavior
+  of this role.

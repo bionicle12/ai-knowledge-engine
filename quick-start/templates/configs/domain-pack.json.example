@@ -1,0 +1,28 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "$comment": "FORMAT reference for one domain pack — the include globs below are placeholders; the init agent derives real ones from measuring the project (INIT_GUIDE.md Phase 3). One pack = ONE semantic domain, code + its tests together (so a test fix never forces loading a second giant pack). Keep under the pack_token_ceiling from repomix.packs.json. AGENTS.md/CLAUDE.md are excluded — they are already in the system prompt.",
+  "output": {
+    "filePath": ".repomix/<domain-a>.xml",
+    "style": "xml",
+    "compress": true,
+    "removeComments": true,
+    "removeEmptyLines": true,
+    "showLineNumbers": false,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "topFilesLength": 10,
+    "headerText": "Pack: <domain-a> (<what it covers> + its tests). Edit code from real sources, not from this packed copy.",
+    "git": { "sortByChanges": true, "sortByChangesMaxCommits": 50 }
+  },
+  "include": [
+    "<src-root>/<domain-a-paths>/**",
+    "<tests-root>/<domain-a-paths>/**"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/var/**", ".repomix/**", "AGENTS.md", "CLAUDE.md"]
+  },
+  "security": { "enableSecurityCheck": true },
+  "tokenCount": { "encoding": "o200k_base" }
+}

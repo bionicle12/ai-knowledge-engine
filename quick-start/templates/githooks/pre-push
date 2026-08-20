@@ -1,0 +1,9 @@
+#!/bin/sh
+# `git push` does not fire post-commit, so the index is refreshed here,
+# synchronously (skips instantly when already fresh).
+# The hook's stdin is the list of refs being pushed — it must NOT leak into
+# the update script, hence </dev/null.
+root=$(git rev-parse --show-toplevel)
+# Not exec: stdin has to be /dev/null for the script, not git's refs.
+"$root/scripts/update-repomix-index.sh" </dev/null
+exit 0

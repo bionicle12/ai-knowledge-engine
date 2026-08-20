@@ -3,6 +3,12 @@
 > The AI agent must create `AGENTS.md` at the base root from this template, adapted to the user's role and entities.
 >
 > **Reference template:** `knowledge-base/templates/AGENTS.md.template` — already contains the full structure with placeholders `{{KB_NAME}}`, `{{PRIMARY_ROLE}}`, `{{PRIMARY_LANGUAGE}}`, `{{KB_INSTRUCTIONS_VERSION}}`. The agent copies and parameterizes it rather than writing from scratch.
+>
+> **Ownership after deployment:** `AGENTS.md` belongs to the base, not to the
+> engine. Agents evolve it while working; upgrades (`kb_upgrade.py`) maintain
+> only the managed `AI-KE:*` blocks and **never overwrite a block with local
+> edits** — they write a `.new` sidecar and ask an AI agent to merge
+> (see `docs/UPGRADING.md`). No script may replace this file wholesale.
 
 ---
 
@@ -18,8 +24,9 @@ Helps the AI agent understand context, thinking style, decisions, expertise, and
 
 ## Context
 
-- Repomix index: `.repomix/output.xml`
-- Config: `kb.config.yml`
+- Repomix packs: `.repomix/*.xml`, fresh sizes in `.repomix/PACKS_STATUS.md`
+- Routing map: `knowledge/routing-table.md`
+- Config: `kb.config.yml` (`index:` section controls the packs)
 - Structure: `KNOWLEDGE_STRUCTURE.md`
 - Placement examples: `DATA_PLACEMENT_EXAMPLES.md`
 
@@ -34,8 +41,14 @@ Helps the AI agent understand context, thinking style, decisions, expertise, and
 
 ## How to use
 
-- Read `.repomix/output.xml` for broad context before strategy, analysis, or planning
+- **Never read a full-base index dump.** Load the `core` pack plus AT MOST ONE
+  domain pack per task (routing: `knowledge/routing-table.md` →
+  `.repomix/PACKS_STATUS.md`). Library/reference packs — only when the task
+  is about that material.
 - Read specific `knowledge/` files before targeted edits
+- **Lost the thread mid-session?** Re-read `knowledge/routing-table.md` and
+  `.repomix/PACKS_STATUS.md` (both tiny), then reload only the one pack the
+  current question needs — never re-read everything you already saw.
 - Process `review/needs-ai-decision/` — the queue of materials needing semantic analysis
 - Useful conclusions from review → clean Markdown in `knowledge/`
 - Update `assets-index/` when describing a binary asset

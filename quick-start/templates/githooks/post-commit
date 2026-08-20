@@ -1,0 +1,4 @@
+#!/bin/sh
+# Rebuild the Repomix index in the background so commits stay fast.
+root=$(git rev-parse --show-toplevel)
+exec "$root/scripts/update-repomix-index.sh" --background

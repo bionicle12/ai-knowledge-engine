@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/05_INDEX.md
 source_commit: e630f31fd065e0e360416d60c166232da2494398
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.13.0
+translated_at: 2026-08-20
 translator: ai-assisted
 ---
 
@@ -20,105 +20,110 @@ translator: ai-assisted
 В Repomix-индекс попадают **только**:
 - `knowledge/**/*.md` — извлечённые знания
 - `assets-index/**/*.md` — описания бинарных файлов
-- Мета-файлы: `AGENTS.md`, `README.md`, `KNOWLEDGE_STRUCTURE.md`, `kb.config.yml`
+- Мета-файлы: `README.md`, `KNOWLEDGE_STRUCTURE.md`, `kb.config.yml`
 
-**НЕ индексируются:** `raw/`, `processed/`, `assets/`, `review/`, `interactions/`, `setup/`, `scripts/`.
+**НЕ индексируются:** `raw/`, `processed/`, `assets/`, `review/`, `interactions/`, `setup/`, `scripts/`, **и `AGENTS.md`** — он и так загружен в системный промпт каждой сессии; его индексация тарифицирует те же токены дважды.
 
 ---
 
-## repomix.config.json
+## Принцип: пакеты, а не монолит
 
-```json
-{
-  "$schema": "https://repomix.com/schemas/latest/schema.json",
-  "output": {
-    "filePath": ".repomix/output.xml",
-    "style": "xml",
-    "compress": false,
-    "removeComments": false,
-    "removeEmptyLines": false,
-    "showLineNumbers": false,
-    "fileSummary": true,
-    "directoryStructure": true,
-    "topFilesLength": 20,
-    "headerText": "Локальная non-code knowledge base. Прочитай AGENTS.md перед использованием."
-  },
-  "include": [
-    "AGENTS.md",
-    "README.md",
-    "KNOWLEDGE_STRUCTURE.md",
-    "DATA_PLACEMENT_EXAMPLES.md",
-    "kb.config.yml",
-    "knowledge/**/*.md",
-    "assets-index/**/*.md"
-  ],
-  "ignore": {
-    "useGitignore": true,
-    "useDefaultPatterns": true,
-    "customPatterns": [
-      "raw/**",
-      "processed/**",
-      "assets/**",
-      "review/**",
-      "interactions/**",
-      "setup/**",
-      "scripts/**",
-      ".repomix/**",
-      ".venv/**",
-      "__pycache__/**",
-      "log.md",
-      "log-archive/**",
-      "lint-report.md",
-      "**/*.pdf", "**/*.docx", "**/*.pptx", "**/*.xlsx",
-      "**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp", "**/*.gif",
-      "**/*.mp3", "**/*.wav", "**/*.mp4", "**/*.mov",
-      "**/*.zip", "**/*.tar.gz", "**/*.rar"
-    ]
-  },
-  "security": {
-    "enableSecurityCheck": true
-  },
-  "tokenCount": {
-    "encoding": "o200k_base"
-  }
-}
-```
+Один `.repomix/output.xml` перестаёт работать, как только база вырастает:
+база с библиотекой учебных книг легко переваливает за 150–250K токенов,
+которые уже не влезают в 256K-окно контекста *ещё до начала сессии*, а
+инструкция «прочитай индекс для широкого контекста» превращается в отравление
+контекста. Длинные чаты деградируют — модель заметно «теряет нить».
 
-`compress: false` — для текстовых знаний важны формулировки и нюансы.
+Поэтому индекс собирается **семантическими пакетами**, каждый под потолком
+токенов:
+
+| Профиль окна | Потолок пакета |
+|--------------|---------------|
+| `256k` (дефолт) | 80K |
+| `200k` | 60K |
+| `1m` | 150K |
+
+- `core.xml` — профиль автора, принципы, голос, таблицы маршрутизации,
+  мета-файлы. Маленький по замыслу; грузить безопасно всегда.
+- По пакету на каждую секцию `knowledge/` (`domain.xml`, `insights.xml`, …).
+- Секция **сверх потолка автоматически режется по подпапкам**:
+  `knowledge/library/craft/` → `library-craft.xml` и т.д. Библиотека
+  справочных книг никогда не делит пакет с рабочими знаниями — книжные
+  пакеты грузятся только когда задача о них.
+- Секции меньше ~15K склеиваются в общий `aux.xml` (маршрутизация между
+  двадцатью микрофайлами так же вредна, как один гигантский файл).
+- `.repomix/PACKS_STATUS.md` — автогенерируемая таблица пакетов со свежими
+  оценками токенов; агенты читают её вместо захардкоженных чисел.
+
+Правило загрузки для агента (уже в шаблоне AGENTS.md): маршрутизируйся через
+`knowledge/routing-table.md`, затем грузи `core` плюс **максимум один**
+доменный пакет на задачу.
+
+Конфигурация живёт в секции `index:` файла `kb.config.yml`
+(см. `templates/kb.config.yml.template`): `window_profile`, опциональные
+переопределения `pack_token_ceiling` / `merge_below_tokens` и `packs: auto`
+(рекомендуется) либо явный список пакетов. `kb_reindex.py` планирует пакеты,
+генерирует `.repomix/configs/<pack>.json` из базового `repomix.config.json`,
+пересобирает только устаревшие пакеты (skip по mtime) и **предупреждает,
+когда пакет превышает потолок** — это сигнал резать дальше (глубже по
+подпапкам или явным списком `packs:`).
+
+Базы, развёрнутые до пакетного режима, продолжают работать: без секции
+`index:` `kb_reindex.py` собирает старый монолитный `output.xml` и громко
+предупреждает, когда тот переваливает ~150K токенов, советуя включить пакеты.
+
+---
+
+## Почему `compress: false` здесь не обсуждается
+
+Для **кода** Tree-sitter-сжатие — честная сделка: структура выживает, тела
+методов уходят — агент дочитает детали в реальных исходниках.
+
+Для **базы знаний текст И ЕСТЬ полезная нагрузка**: формулировки, нюансы,
+целые абзацы извлечённых знаний. Сжатие ампутировало бы ровно то, ради чего
+база существует. Поэтому каждый KB-пакет сохраняет
+`compress: false, removeComments: false` — а проблема размера решается
+**более жёсткой нарезкой** (пакеты, разбивка по подпапкам), но никогда
+сжатием.
+
+---
+
+## repomix.config.json (базовый конфиг)
+
+В пакетном режиме этот файл — **базовый конфиг**: `kb_reindex.py` наследует
+его `ignore` / `security` / `tokenCount` и output-опции в каждый
+сгенерированный `.repomix/configs/<pack>.json`, переопределяя только
+per-pack `include`, `filePath` и заголовок. Его собственные
+`include`/`filePath` используются напрямую только в legacy-режиме (без секции
+`index:`).
+
+Полная эталонная копия — `templates/repomix.config.json.template`. Ключевые
+моменты в любом режиме:
+
+- `compress: false`, `removeComments: false` — см. секцию выше.
+- `ignore.customPatterns` исключает `raw/`, `processed/`, `assets/`,
+  `review/`, `interactions/`, `setup/`, `scripts/`, `.repomix/`, логи и все
+  бинарные форматы.
+- `tokenCount.encoding: o200k_base`.
+- Legacy `include` исторически содержит `AGENTS.md`; пакетный режим его
+  выбрасывает (уже в системном промпте).
 
 ---
 
 ## shell/reindex.sh
 
-```bash
-#!/bin/bash
-set -e
-cd "$(dirname "$0")"
+Эталонный скрипт `knowledge-base/shell/reindex.sh` (копируется в развёрнутую
+базу) выполняет: ingest → routing → quick lint → троттлированная
+консолидация → **`kb_reindex.py --index-only`**, который собирает пакеты
+(или legacy-монолит, если пакеты не настроены). На Windows —
+`shell/reindex.bat`, он делегирует в тот же `kb_reindex.py` — идентичное
+поведение, Git Bash не нужен.
 
-PYTHON="python3"
-if [ -f ".venv/bin/python" ]; then
-  PYTHON=".venv/bin/python"
-fi
-
-echo "Запуск ingest-пайплайна..."
-$PYTHON scripts/kb_ingest.py
-
-echo "Quick lint..."
-$PYTHON scripts/kb_lint.py --quick || true
-
-echo "Генерация Repomix-индекса..."
-repomix
-
-# Запись в лог
-echo "" >> log.md
-echo "## [$(date -Iseconds)] reindex | Auto reindex" >> log.md
-echo "- Output: .repomix/output.xml" >> log.md
-
-echo "Готово: .repomix/output.xml"
-```
+Ручная пересборка только индекса:
 
 ```bash
-chmod +x shell/reindex.sh
+python3 scripts/kb_reindex.py --index-only            # только устаревшие пакеты
+python3 scripts/kb_reindex.py --index-only --force    # всё
 ```
 
 ---

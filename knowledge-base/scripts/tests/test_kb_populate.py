@@ -91,6 +91,21 @@ def test_load_role_yaml_invalid(tmp_path: Path):
         kp.load_role_yaml(p)
 
 
+def test_easter_egg_role_never_deploys(tmp_path: Path, capsys):
+    """The balabanov-director role must joke and exit without writing anything."""
+    egg = REPO_ROOT / "knowledge-base" / "examples" / "balabanov-director.yml"
+    assert egg.is_file()
+
+    rc = kp.main(["--from", str(egg), "--kb-root", str(tmp_path)])
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "шутник" in out
+    assert "comedian" in out
+    # Nothing deployed: no DATA_PLACEMENT_EXAMPLES.md, no samples, no folders.
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_render_markdown_includes_role_title(minimal_role: Path):
     data = kp.load_role_yaml(minimal_role)
     md = kp.render_markdown(data, source_path=minimal_role)

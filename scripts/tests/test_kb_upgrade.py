@@ -110,15 +110,109 @@ def test_managed_view_block_is_appended_and_replaced_idempotently(
     assert first.count(up.VIEW_BLOCK_BEGIN) == 1
     assert up.managed_view_block_state(agents) == "up_to_date"
 
+    # A locally customized block is NEVER overwritten: AGENTS.md is a live
+    # file agents evolve while working — the upgrade writes a .new sidecar
+    # and asks the user's AI agent to merge instead.
+    customized = first.replace("python3 scripts/kb_view.py", "python MINE.py")
+    agents.write_text(customized, encoding="utf-8")
+    assert up.managed_view_block_state(agents) == "outdated"
+    action = up.update_managed_view_block(agents, dry_run=False)
+    assert action.startswith("AI merge required (local edits kept)")
+    assert agents.read_text(encoding="utf-8") == customized  # untouched
+    sidecar = agents.with_name("AGENTS.md.view-block.new")
+    assert sidecar.is_file()
+    assert up.VIEW_BLOCK in sidecar.read_text(encoding="utf-8")
+
+
+def test_managed_index_block_matches_agents_template():
+    template = (
+        up.SRC_TEMPLATES_DIR / "AGENTS.md.template"
+    ).read_text(encoding="utf-8")
+    start = template.index(up.INDEX_BLOCK_BEGIN)
+    end = template.index(up.INDEX_BLOCK_END) + len(up.INDEX_BLOCK_END)
+    assert template[start:end] == up.INDEX_BLOCK
+
+
+def test_managed_index_block_is_appended_and_replaced_idempotently(
+    tmp_path: Path,
+):
+    agents = tmp_path / "AGENTS.md"
+    agents.write_text("# My custom instructions\n", encoding="utf-8")
+
+    assert up.managed_index_block_state(agents) == "missing"
+    assert up.update_managed_index_block(agents, dry_run=False) == "appended"
+    first = agents.read_text(encoding="utf-8")
+    assert "# My custom instructions" in first
+    assert first.count(up.INDEX_BLOCK_BEGIN) == 1
+    assert up.managed_index_block_state(agents) == "up_to_date"
+    assert (
+        up.update_managed_index_block(agents, dry_run=False)
+        == "skipped (up to date)"
+    )
+
+    # Local customization -> sidecar + AI merge, original preserved.
+    customized = first.replace("routing-table.md", "MY-ROUTING.md")
+    agents.write_text(customized, encoding="utf-8")
+    assert up.managed_index_block_state(agents) == "outdated"
+    action = up.update_managed_index_block(agents, dry_run=False)
+    assert action.startswith("AI merge required (local edits kept)")
+    assert agents.read_text(encoding="utf-8") == customized
+
+
+def test_managed_block_auto_updates_known_previous_version(tmp_path: Path):
+    agents = tmp_path / "AGENTS.md"
+    old_block = (
+        f"{up.INDEX_BLOCK_BEGIN}\n### Index loading rules (old wording)\n"
+        f"{up.INDEX_BLOCK_END}"
+    )
+    agents.write_text(f"# Mine\n\n{old_block}\n", encoding="utf-8")
+
+    action = up._update_managed_block(
+        agents,
+        up.INDEX_BLOCK_BEGIN,
+        up.INDEX_BLOCK_END,
+        up.INDEX_BLOCK,
+        label="index",
+        previous=(old_block,),
+        dry_run=False,
+    )
+
+    assert action == "updated"
+    text = agents.read_text(encoding="utf-8")
+    assert "old wording" not in text
+    assert up.INDEX_BLOCK in text
+    assert "# Mine" in text
+
+
+def test_managed_block_malformed_markers_get_sidecar(tmp_path: Path):
+    agents = tmp_path / "AGENTS.md"
     agents.write_text(
-        first.replace("python3 scripts/kb_view.py", "python OLD.py"),
+        f"# Mine\n\n{up.INDEX_BLOCK_BEGIN}\nno end marker here\n",
         encoding="utf-8",
     )
-    assert up.managed_view_block_state(agents) == "outdated"
-    assert up.update_managed_view_block(agents, dry_run=False) == "updated"
-    final = agents.read_text(encoding="utf-8")
-    assert "python OLD.py" not in final
-    assert final.count(up.VIEW_BLOCK_BEGIN) == 1
+
+    assert up.managed_index_block_state(agents) == "malformed"
+    action = up.update_managed_index_block(agents, dry_run=False)
+    assert action.startswith("AI merge required (markers damaged)")
+    assert "no end marker here" in agents.read_text(encoding="utf-8")
+    assert agents.with_name("AGENTS.md.index-block.new").is_file()
+
+
+def test_ensure_index_section_appends_once(tmp_path: Path):
+    cfg = tmp_path / "kb.config.yml"
+    cfg.write_text("knowledge_base:\n  name: t\n", encoding="utf-8")
+
+    assert up.kb_config_index_state(tmp_path) == "missing"
+    assert up.ensure_index_section(tmp_path, dry_run=True) == "would append"
+    assert "index:" not in cfg.read_text(encoding="utf-8")
+
+    assert up.ensure_index_section(tmp_path, dry_run=False) == "appended"
+    text = cfg.read_text(encoding="utf-8")
+    assert "index:" in text
+    assert "packs: auto" in text
+    assert up.kb_config_index_state(tmp_path) == "present"
+    assert up.ensure_index_section(tmp_path, dry_run=False) == "skipped (present)"
+    assert cfg.read_text(encoding="utf-8") == text
 
 
 def test_discover_kb_roots_scans_only_configured_kb_directories(tmp_path: Path):

@@ -243,29 +243,42 @@ systemctl --user status kb-watch
 
 For bases under git control.
 
-### post-commit hook
+Hard-earned hook rules (each one is a real production failure):
+
+1. `post-commit` alone is not enough: `git push` never fires it, and
+   pull/merge/rebase change files without a local commit. Install
+   `post-merge` and `post-rewrite` too (and `pre-push` if the index must be
+   fresh before every push).
+2. Git GUIs and IDEs run hooks with a bare `PATH` — a silent
+   `command -v repomix || exit` turns the hook into a no-op for months.
+   Delegate to `kb_reindex.py`: Python resolves repomix itself and *reports*
+   when it is missing instead of silently skipping.
+3. A plain `... &` background job is killed by SIGHUP when the hook exits —
+   use `nohup` and redirect output to a log, never to `/dev/null` (swallowed
+   errors are how indexes silently rot).
+4. Hooks must never block git: always `exit 0`.
+5. `.git/hooks/` is not versioned. Keep hook sources in the repo and document
+   the one-command install after clone.
+
+### post-commit / post-merge / post-rewrite hook
 
 ```bash
 #!/bin/sh
-# .git/hooks/post-commit
-
-# If knowledge/ files changed → reindex
-changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
-
-if echo "$changed_files" | grep -q "^knowledge/"; then
-  echo "[hook] Knowledge files changed, reindexing..."
-  ./shell/reindex.sh > /dev/null 2>&1 &
-
-  # Quick lint
-  if [ -f "scripts/kb_lint.py" ]; then
-    python3 scripts/kb_lint.py --quick > /dev/null 2>&1 &
-  fi
-fi
+# .git/hooks/post-commit  (identical for post-merge and post-rewrite)
+root=$(git rev-parse --show-toplevel)
+cd "$root" || exit 0
+PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python
+mkdir -p .repomix
+nohup "$PY" scripts/kb_reindex.py --quick >> .repomix/update.log 2>&1 </dev/null &
+exit 0
 ```
 
 ```bash
-chmod +x .git/hooks/post-commit
+chmod +x .git/hooks/post-commit .git/hooks/post-merge .git/hooks/post-rewrite
 ```
+
+On Windows, git executes these `.sh` hooks through its bundled Git Bash —
+no extra setup needed.
 
 ### pre-commit hook (optional)
 

@@ -344,6 +344,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"❌ Failed to load {role_path}: {e}", file=sys.stderr)
         return 1
 
+    if role_data.get("easter_egg"):
+        # This role never deploys anything. That's the whole joke.
+        responses = role_data.get("easter_egg_response") or {}
+        text = "\n\n".join(
+            str(responses[lang]).strip()
+            for lang in ("ru", "en")
+            if responses.get(lang)
+        ) or "Nice try. Pick another role. 😏"
+        if args.json:
+            print(json.dumps({"easter_egg": True, "response": text},
+                             ensure_ascii=False))
+        else:
+            print(text)
+        return 0
+
     if not role_data.get("placement_examples"):
         print(
             f"❌ {role_path}: missing 'placement_examples' section",

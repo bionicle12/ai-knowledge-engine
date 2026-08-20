@@ -194,6 +194,7 @@ class KbConfig:
     instructions_version: str = "0.0.0"
     media: dict[str, Any] = field(default_factory=dict)
     sync: dict[str, Any] = field(default_factory=dict)
+    index: dict[str, Any] = field(default_factory=dict)
 
     @property
     def stt(self) -> dict[str, Any]:
@@ -284,6 +285,7 @@ def load_config(root: Path | None = None) -> KbConfig:
         instructions_version=raw.get("instructions_version", "0.0.0"),
         media=raw.get("media", {}) or {},
         sync=raw.get("sync", {}) or {},
+        index=raw.get("index", {}) or {},
     )
     return cfg
 

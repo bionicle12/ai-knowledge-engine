@@ -160,4 +160,22 @@ logging:
 indexer:
   tool: "repomix"                   # extensible: future support for other tools
   config_file: "repomix.config.json"
-  output_path: ".repomix/output.xml"
+  output_path: ".repomix/output.xml"  # legacy monolith path (pack mode ignores it)
+
+# Pack-based index (see 05_INDEX.md). One monolithic output.xml stops fitting
+# a context window as the base grows; packs keep every load under a ceiling.
+# compress is ALWAYS false for knowledge bases: full wording is the payload.
+index:
+  enabled: true
+  window_profile: "256k"            # 256k (ceiling 80K) | 200k (60K) | 1m (150K)
+  # pack_token_ceiling: 80000       # override the profile ceiling explicitly
+  # merge_below_tokens: 15000       # sections smaller than this merge into `aux`
+  packs: auto
+  # `auto`: core (profile/principles/voice/routing + meta) + one pack per
+  # knowledge/ section; oversized sections split by subfolder automatically
+  # (knowledge/library/craft -> library-craft.xml, ...).
+  # Explicit control instead:
+  # packs:
+  #   - name: library-craft
+  #     include: ["knowledge/library/craft/**"]
+  #     when_to_load: "writing-craft questions"
