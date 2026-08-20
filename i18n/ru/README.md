@@ -1,6 +1,6 @@
 ---
 translation_of: README.md
-source_commit: 973e0cf18e7a9a4b99e9a9b5ef7e601a9066d7fd
+source_commit: f823b558bd01d1535c07a183bcefc0508460f6e9
 source_version: 0.13.0
 translated_at: 2026-08-20
 translator: ai-assisted
