@@ -226,6 +226,22 @@ CLI/config merge semantics can never surprise us. Each pack's `watch` array in
 the manifest lists its source roots — the update script uses them for
 skip-if-fresh checks.
 
+**Ignore-glob gotcha (verified on repomix 1.14.0).** When a config has an
+`include` list, ignore `customPatterns` of the form `**/*Name*` (bare `**/`
+prefix, no file extension) are **silently not applied** — the pack builds
+without error and comes out 2–4× fatter than measured. Patterns with an
+explicit root (`src/**/*Name*`) or a file extension (`**/*Name*.php`) DO
+work. Always write cross-domain ignores in a working form, e.g.
+`src/**/*Order*.php` + `tests/**/*Order*.php`, never `**/*Order*`.
+
+**Cross-pack ownership.** Domains cut by name prefix overlap: one file can
+match two packs' includes (`InspectionProtocol` matches both `*Inspection*`
+and `*Protocol*`; a `Service/Task/CourtDecisionResolver` matches a tasks dir
+glob and a court name glob). Decide a priority order between domains, then
+give the losing pack an explicit ignore for the winner's patterns — every
+file must end up in EXACTLY one pack. The coverage check in Phase 6 catches
+what you miss.
+
 ## Phase 5: infrastructure (scripts + hooks)
 
 Copy from `quick-start/templates/`:
@@ -277,8 +293,23 @@ No git in the project → skip hooks; the update script alone is the manual
 cat .repomix/PACKS_STATUS.md
 ```
 
-Verify: every pack under the ceiling; catalog in the 5–15K band; the script
-warns about any pack over the ceiling. Fix the split now, not later.
+Verify: every pack under the ceiling; catalog in the 5–15K band (a
+`files: false` catalog may come in under 5K — that's fine, less routing tax);
+the script warns about any pack over the ceiling. Fix the split now, not later.
+
+**Coverage check (mandatory).** Sizes alone don't prove the split is right —
+a silently-dropped ignore (see the glob gotcha in Phase 4) or a domain overlap
+leaves packs looking plausible while files are orphaned or double-indexed.
+Extract `<file path="…">` from every domain pack XML and compare the union
+against the Phase 2 census:
+
+- **0 orphans** — every measured file lands in at least one pack;
+- **0 duplicates** — no file appears in two packs (resolve with cross-pack
+  ignores per the ownership priority chosen in Phase 3).
+
+It's a dozen lines of script. On a real reinit this check caught 5 duplicated
+files and a platform pack that had silently ballooned from 34K to 160K with
+zero build warnings.
 
 ## Phase 7: AGENTS.md
 
@@ -303,6 +334,7 @@ fill in the pack table. Hard rules:
 [ ] scripts/ + .githooks/ copied, executable, committed; hooks installed
 [ ] .gitignore covers .repomix/ artifacts
 [ ] First build: all packs under ceiling, catalog 5–15K
+[ ] Coverage check: 0 orphans, 0 duplicates across domain packs
 [ ] AGENTS.md: pack table + loading rules (short!), no "read everything" advice
 ```
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://repomix.com/schemas/latest/schema.json",
-  "$comment": "FORMAT reference for one domain pack — the include globs below are placeholders; the init agent derives real ones from measuring the project (INIT_GUIDE.md Phase 3). One pack = ONE semantic domain, code + its tests together (so a test fix never forces loading a second giant pack). Keep under the pack_token_ceiling from repomix.packs.json. AGENTS.md/CLAUDE.md are excluded — they are already in the system prompt.",
+  "$comment": "FORMAT reference for one domain pack — the include globs below are placeholders; the init agent derives real ones from measuring the project (INIT_GUIDE.md Phase 3). One pack = ONE semantic domain, code + its tests together (so a test fix never forces loading a second giant pack). Keep under the pack_token_ceiling from repomix.packs.json. AGENTS.md/CLAUDE.md are excluded — they are already in the system prompt. GOTCHA (repomix 1.14.0): with an include list present, ignore customPatterns like '**/*Name*' (bare **/ prefix, no extension) are SILENTLY dropped — write cross-domain ignores with an explicit root or an extension ('src/**/*Name*.php'), then run the Phase 6 coverage check (0 orphans, 0 duplicates).",
   "output": {
     "filePath": ".repomix/<domain-a>.xml",
     "style": "xml",
