@@ -48,6 +48,19 @@ def undo_operation(store_root: Path, op_result: dict) -> None:
             )
         _remove_managed(dest, op_result)
         shutil.move(str(backup), str(dest))
+    elif op_type == "update":
+        previous = op_result.get("previous_target")
+        if not previous:
+            raise RollbackError(
+                f"no previous link target recorded for update of {dest}"
+            )
+        if dest.is_symlink():
+            dest.unlink()
+        elif dest.exists():
+            raise RollbackError(
+                f"{dest} is no longer a managed link; refusing to replace it"
+            )
+        dest.symlink_to(previous)
     elif op_type == "quarantine":
         if backup is None or not backup.is_dir():
             raise RollbackError(

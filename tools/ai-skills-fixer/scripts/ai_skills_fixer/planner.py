@@ -216,11 +216,20 @@ def _skill_suffix(skill_id: str) -> str:
     return skill_id.split(":", 1)[1] if ":" in skill_id else "skill"
 
 
+def _under_releases(store_root: Path, path: Path) -> bool:
+    try:
+        Path(path).relative_to(Path(store_root) / "releases")
+    except ValueError:
+        return False
+    return True
+
+
 def build_plan(
     store_root: Path,
     machine: str,
     home: Path | None = None,
     project_dir: Path | None = None,
+    prune: bool = False,
 ) -> dict:
     """Dry-run reconciliation: desired state vs installed state.
 
@@ -382,6 +391,26 @@ def build_plan(
                     "risk": "none",
                     "approval_required": False,
                 })
+            elif inst.entry_type == "symlink" and _under_releases(
+                store_root, inst.real_path
+            ):
+                operations.append({
+                    "skill_id": pskill.skill_id,
+                    "host": host,
+                    "type": "update",
+                    "strategy": default_strategy,
+                    "source": str(release_path),
+                    "destination": str(dest),
+                    "precondition": {
+                        "destination": "managed-link",
+                        "target": str(inst.real_path),
+                    },
+                    "backup": None,
+                    "validation": "post-install discovery check",
+                    "rollback": "relink the previous release",
+                    "risk": "low",
+                    "approval_required": True,
+                })
             elif inst.content_hash == digest:
                 operations.append({
                     "skill_id": pskill.skill_id,
@@ -419,6 +448,63 @@ def build_plan(
                     "approval_required": True,
                 })
 
+    prune_skipped: dict[str, list[str]] = {}
+    if prune:
+        profiled_states: dict[str, str] = {}
+        for pskill in profile:
+            entry = catalog.get(pskill.skill_id)
+            basename = (
+                Path(entry[0].rel_path).name if entry
+                else Path(_skill_suffix(pskill.skill_id)).name
+            )
+            profiled_states[basename] = pskill.state
+
+        kept: set[tuple[str, str]] = set()
+        for op in operations:
+            if op["type"] in ("install", "adopt", "noop", "update", "review"):
+                kept.add((op["host"], Path(op["destination"]).name))
+        already_quarantined = {
+            (op["host"], Path(op["destination"]).name)
+            for op in operations
+            if op["type"] == "quarantine"
+        }
+
+        hash_to_skill: dict[str, str] = {}
+        for skill_id, (source_skill, _spec, _commit) in catalog.items():
+            hash_to_skill.setdefault(content_hash(source_skill.repo_path), skill_id)
+
+        for (host, basename), inst in sorted(installed.items()):
+            if getattr(inst, "root_kind", "user") != "user":
+                continue
+            if (host, basename) in kept or (host, basename) in already_quarantined:
+                continue
+            state = profiled_states.get(basename)
+            if state in ("excluded", "undecided", "protected", "enabled"):
+                continue  # excluded handled above; the rest are not prune targets
+            matched = hash_to_skill.get(inst.content_hash)
+            if matched is None:
+                prune_skipped.setdefault(host, []).append(basename)
+                continue
+            operations.append({
+                "skill_id": matched,
+                "host": host,
+                "type": "quarantine",
+                "strategy": None,
+                "source": None,
+                "destination": str(inst.path),
+                "precondition": {
+                    "destination": "exists",
+                    "content_hash": inst.content_hash,
+                },
+                "backup": f"move to state/backups/<apply-id>/{host}/{basename}",
+                "validation": "destination absent after quarantine",
+                "rollback": "restore quarantined copy from backup",
+                "risk": "medium",
+                "approval_required": True,
+            })
+        for host in prune_skipped:
+            prune_skipped[host] = sorted(prune_skipped[host])
+
     operations.sort(key=lambda op: (op["skill_id"], op["host"], op["type"]))
     op_counts: dict[str, int] = {}
     for op in operations:
@@ -437,7 +523,10 @@ def build_plan(
         },
         "sources": source_commits,
         "operations": operations,
-        "notes": {"occasional_fallbacks": occasional_fallbacks},
+        "notes": {
+            "occasional_fallbacks": occasional_fallbacks,
+            "prune_skipped": prune_skipped,
+        },
         "lock_proposal": {"schema_version": 1, "skills": lock_skills},
         "summary": {"operations_by_type": dict(sorted(op_counts.items()))},
     }

@@ -126,6 +126,7 @@ def _apply_op(
         "strategy": op.get("strategy"),
         "backup_path": None,
         "release_hash": None,
+        "previous_target": None,
         "status": None,
     }
     dest = Path(op["destination"])
@@ -154,6 +155,21 @@ def _apply_op(
         _materialize(release, dest, op["strategy"])
         _validate_installed(dest, digest)
         result.update(status="applied", release_hash=digest)
+    elif op_type == "update":
+        expected_target = op["precondition"]["target"]
+        if not dest.is_symlink() or str(dest.resolve()) != str(
+            Path(expected_target).resolve()
+        ):
+            raise DriftError(
+                f"{dest} is no longer the managed link the plan expected"
+            )
+        release, digest = _ensure_release(store_root, lock_by_id[op["skill_id"]])
+        dest.unlink()
+        _materialize(release, dest, op["strategy"])
+        _validate_installed(dest, digest)
+        result.update(
+            status="applied", release_hash=digest, previous_target=expected_target
+        )
     elif op_type == "quarantine":
         expected = op["precondition"]["content_hash"]
         if not dest.is_dir() or content_hash(dest) != expected:

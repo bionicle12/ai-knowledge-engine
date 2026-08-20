@@ -32,6 +32,7 @@ from .sources import (
     add_source,
     detect_layout,
     load_registry,
+    promote_source,
     refresh_source,
     scan_source,
     source_checkout,
@@ -260,6 +261,18 @@ def _cmd_source_refresh(args) -> int:
     return 0
 
 
+def _cmd_source_promote(args) -> int:
+    store = resolve_store_root(args.store_root)
+    result = promote_source(store, args.source_id)
+    _emit(
+        result,
+        args.json,
+        [f"promoted {result['source_id']} to {result['commit'][:12]}; "
+         "run reconcile to plan the corresponding updates"],
+    )
+    return 0
+
+
 def _cmd_catalog(args) -> int:
     store = resolve_store_root(args.store_root)
     registry = load_registry(store)
@@ -344,7 +357,10 @@ def _cmd_reconcile(args) -> int:
         return 0
 
     machine = args.machine_id or machine_id()
-    plan = build_plan(store, machine, home=args.home, project_dir=args.project_dir)
+    plan = build_plan(
+        store, machine, home=args.home, project_dir=args.project_dir,
+        prune=args.prune,
+    )
 
     lines = [
         f"plan {plan['plan_id']} (dry run, machine {plan['machine']})",
@@ -357,6 +373,11 @@ def _cmd_reconcile(args) -> int:
         )
     for skill_id, note in plan["notes"]["occasional_fallbacks"].items():
         lines.append(f"  note: {skill_id}: {note}")
+    for host, skipped in plan["notes"].get("prune_skipped", {}).items():
+        lines.append(
+            f"  prune skipped on {host} (unknown/modified origin, untouched): "
+            + ", ".join(skipped)
+        )
     lines.append(
         "dry run only; nothing was changed. Apply with: "
         f"reconcile --apply {plan['plan_id']}"
@@ -617,6 +638,10 @@ def main(argv: list[str] | None = None) -> int:
     refresh_p.add_argument("source_id", nargs="?", default=None)
     _add_store_opts(refresh_p)
     refresh_p.set_defaults(handler=_cmd_source_refresh)
+    promote_p = ssub.add_parser("promote", help="move the checkout to the candidate")
+    promote_p.add_argument("source_id")
+    _add_store_opts(promote_p)
+    promote_p.set_defaults(handler=_cmd_source_promote)
 
     catalog_p = sub.add_parser("catalog", help="list skills in registered sources")
     catalog_p.add_argument("source_id", nargs="?", default=None)
@@ -647,6 +672,9 @@ def main(argv: list[str] | None = None) -> int:
     reconcile_p.add_argument("--project-dir", type=Path, default=None)
     reconcile_p.add_argument("--apply", metavar="PLAN_ID", default=None,
                              help="apply a saved approved plan (checks drift)")
+    reconcile_p.add_argument("--prune", action="store_true",
+                             help="also quarantine exact source copies the "
+                                  "profile does not keep")
     reconcile_p.set_defaults(handler=_cmd_reconcile)
 
     usage_p = sub.add_parser("usage", help="advisory usage evidence from host logs")

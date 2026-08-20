@@ -203,6 +203,29 @@ def add_source(
     return spec
 
 
+def promote_source(store_root: Path, source_id: str) -> dict:
+    """Move the source checkout to its update candidate (spec §5.3).
+
+    Promotion only moves the store-internal checkout; installed skills
+    change exclusively through an approved reconcile plan.
+    """
+    registry = load_registry(store_root)
+    if source_id not in registry:
+        raise CatalogError(f"source {source_id!r} is not registered")
+    spec = registry[source_id]
+    repo = source_checkout(store_root, source_id)
+    if not repo.is_dir():
+        raise CatalogError(f"source checkout missing at {repo}; re-add the source")
+    if gitops.is_dirty(repo):
+        raise CatalogError(f"source checkout {source_id!r} is dirty; refusing")
+    try:
+        candidate = gitops.rev_parse(repo, f"origin/{spec.ref}")
+    except gitops.GitError:
+        candidate = gitops.rev_parse(repo, spec.ref)
+    gitops.checkout(repo, candidate)
+    return {"source_id": source_id, "commit": candidate}
+
+
 def refresh_source(store_root: Path, source_id: str) -> dict:
     registry = load_registry(store_root)
     if source_id not in registry:
