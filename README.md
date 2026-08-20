@@ -369,11 +369,12 @@ See [the upgrading guide](docs/UPGRADING.md) for examples and safety rules.
 
 ## Role blueprints
 
-Full mode includes 15 starting configurations in [`knowledge-base/examples/`](knowledge-base/examples/):
+Full mode includes 16 starting configurations in [`knowledge-base/examples/`](knowledge-base/examples/):
 
 | Template | Role | Focus |
 |---|---|---|
 | [`b2b-strategic-product-owner.yml`](knowledge-base/examples/b2b-strategic-product-owner.yml) | B2B Strategic Product Owner | SaaS strategy, roadmaps, risks, sales-ready PRDs |
+| [`balabanov-director.yml`](knowledge-base/examples/balabanov-director.yml) | Porn director in the Balabanov style | Screenwriting for gritty auteur films: naturalistic dialogue, bleak urban texture |
 | [`battle-rap-producer.yml`](knowledge-base/examples/battle-rap-producer.yml) | Battle rap producer & lyricist | Lyric craft, punchlines, vocal stacks, mixing, battle prep |
 | [`content-creator.yml`](knowledge-base/examples/content-creator.yml) | Content creator | Voice, audience, formats, publishing, monetization |
 | [`creative-hybrid.yml`](knowledge-base/examples/creative-hybrid.yml) | Creative Hybrid | Software, music production, indie game development |
@@ -449,7 +450,7 @@ ai-knowledge-engine/
 │   ├── scripts/                Python reference pipeline and tests
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              config, agent, structure, and dependency templates
-│   └── examples/               15 role blueprints
+│   └── examples/               16 role blueprints
 ├── scripts/                    upgrades, translation checks, repository maintenance
 ├── tools/ai-skills-fixer/      cross-IDE AI skill inventory, audit, and reconciliation
 ├── i18n/ru/                    Russian documentation and instruction set

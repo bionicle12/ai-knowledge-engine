@@ -380,11 +380,12 @@ Launcher автоматически находит исходный репози
 
 ## Ролевые шаблоны
 
-Full mode включает 15 стартовых конфигураций в [`knowledge-base/examples/`](../../knowledge-base/examples/):
+Full mode включает 16 стартовых конфигураций в [`knowledge-base/examples/`](../../knowledge-base/examples/):
 
 | Шаблон | Роль | Основные задачи |
 |---|---|---|
 | [`b2b-strategic-product-owner.yml`](../../knowledge-base/examples/b2b-strategic-product-owner.yml) | Стратегический владелец B2B-продукта | B2B SaaS-стратегия, roadmap, риски, готовые для продаж PRD |
+| [`balabanov-director.yml`](../../knowledge-base/examples/balabanov-director.yml) | Порно-режиссёр в стиле Балабанова | Сценарии суровых авторских фильмов: натуралистичные диалоги, мрачная городская фактура |
 | [`battle-rap-producer.yml`](../../knowledge-base/examples/battle-rap-producer.yml) | Продюсер и автор баттл-рэпа | Тексты, панчлайны, вокальные стеки, сведение, подготовка к баттлам |
 | [`content-creator.yml`](../../knowledge-base/examples/content-creator.yml) | Контент-креатор | Авторский голос, аудитория, форматы, публикации, монетизация |
 | [`creative-hybrid.yml`](../../knowledge-base/examples/creative-hybrid.yml) | Креативный гибрид | Разработка, музыкальное производство, инди-геймдев |
@@ -463,7 +464,7 @@ ai-knowledge-engine/
 │   ├── scripts/                эталонный Python-конвейер и тесты
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              шаблоны конфигов, агента, структуры и зависимостей
-│   └── examples/               15 ролевых шаблонов
+│   └── examples/               16 ролевых шаблонов
 ├── scripts/                    обновления, проверка переводов, обслуживание репозитория
 ├── tools/ai-skills-fixer/      инвентаризация, аудит и синхронизация AI-скиллов между IDE
 ├── i18n/ru/                    русская документация и набор инструкций
