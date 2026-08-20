@@ -32,7 +32,7 @@ The visual above is the actual storage model, not a conceptual cloud architectur
 - `raw/`, `processed/`, `review/`, and `interactions/` stay out of the generated AI index.
 - `knowledge/` contains reviewed, reusable Markdown and is safe to index.
 - `assets-index/` holds searchable descriptions while original binaries remain private.
-- `.repomix/output.xml` is a rebuildable context artifact, not the source of truth.
+- `.repomix/*.xml` are rebuildable context packs (core + one per knowledge section), not the source of truth.
 
 ## Choose your path
 
@@ -96,7 +96,15 @@ Then tell your agent:
 Read docs/ai-init/INIT_GUIDE.md and initialize the Repomix pack index in this project (mode: init). Show me the proposed pack table before writing any configs.
 ```
 
-The guide has the agent measure the codebase, cut it into **semantic domain packs** (each under a token ceiling — a single giant `output.xml` stops fitting the context window on real projects), install hardened cross-platform git hooks (commit/push/pull, with PATH bootstrap and logging), and write a short routing table into `AGENTS.md`. The same guide also drives `update` (rebuild only stale packs) and `reinit` (migrate an old monolithic index to packs) — ready-made prompts for all three modes are at the top of the guide.
+The guide has the agent measure the codebase, cut it into **semantic domain packs** (each under a token ceiling — a single giant `output.xml` stops fitting the context window on real projects), install hardened cross-platform git hooks (commit/push/pull, with PATH bootstrap and logging), and write a short routing table into `AGENTS.md`. The result is not one file: it is `.repomix/catalog.xml` plus the domain packs listed in `repomix.packs.json`, with fresh sizes in `.repomix/PACKS_STATUS.md`.
+
+**Already initialized?** Routine rebuilds run themselves through the git hooks; manually it's `scripts/update-repomix-index.sh` (`--force` to rebuild everything). When the project was set up with an old single-`output.xml` index — or the packs no longer match the grown codebase — tell the agent:
+
+```text
+Read docs/ai-init/INIT_GUIDE.md and REINITIALIZE the Repomix index in this project (mode: reinit): measure everything from scratch, propose a new pack split, show me the diff against the current setup, back up the old configs, and migrate.
+```
+
+Ready-made prompts for all three modes (`init` / `update` / `reinit`), in English and Russian, sit at the top of the guide.
 
 ## Why it is different
 
@@ -133,7 +141,7 @@ processed/               Markdown + extraction metadata, never indexed
 knowledge/               clean linked notes, indexed
 assets-index/            searchable descriptions of binary assets
     ↓  context indexer
-.repomix/output.xml      rebuildable AI context
+.repomix/*.xml           rebuildable AI context packs (each under a token ceiling)
 ```
 
 The pipeline adds five controls around that path:
