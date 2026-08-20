@@ -1,6 +1,6 @@
 ---
 translation_of: quick-start/INIT_GUIDE.md
-source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
+source_commit: 093d47fc1366085f87cd895756e9db194409202e
 source_version: 0.13.0
 translated_at: 2026-08-20
 translator: ai-assisted

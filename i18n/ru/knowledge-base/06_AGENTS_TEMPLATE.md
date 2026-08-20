@@ -1,6 +1,6 @@
 ---
 translation_of: knowledge-base/06_AGENTS_TEMPLATE.md
-source_commit: 9935743b96cd1ce99e52e6c84df2d18721ef6fa4
+source_commit: 093d47fc1366085f87cd895756e9db194409202e
 source_version: 0.13.0
 translated_at: 2026-08-20
 translator: ai-assisted

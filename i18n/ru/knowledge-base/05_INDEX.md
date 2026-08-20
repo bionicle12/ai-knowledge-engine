@@ -1,6 +1,6 @@
 ---
 translation_of: knowledge-base/05_INDEX.md
-source_commit: e630f31fd065e0e360416d60c166232da2494398
+source_commit: 093d47fc1366085f87cd895756e9db194409202e
 source_version: 0.13.0
 translated_at: 2026-08-20
 translator: ai-assisted

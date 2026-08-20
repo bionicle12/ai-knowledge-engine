@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/02_INIT.md
-source_commit: d82f0395afa7e65a0d84b4ba78f99701048f2bfe
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_commit: 093d47fc1366085f87cd895756e9db194409202e
+source_version: 0.13.0
+translated_at: 2026-08-20
 translator: ai-assisted
 ---
 

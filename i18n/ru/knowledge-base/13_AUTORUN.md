@@ -1,6 +1,6 @@
 ---
 translation_of: knowledge-base/13_AUTORUN.md
-source_commit: ba0445d4e2f47c138df7354020807616d38a0739
+source_commit: 093d47fc1366085f87cd895756e9db194409202e
 source_version: 0.13.0
 translated_at: 2026-08-20
 translator: ai-assisted
