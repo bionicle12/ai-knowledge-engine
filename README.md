@@ -391,6 +391,54 @@ Full mode includes 15 starting configurations in [`knowledge-base/examples/`](kn
 
 A role file defines useful entities, folder routes, placement examples, recurring queries, and review priorities. If none fits, the deployment agent can derive a custom configuration from your work.
 
+## AI Skills Fixer
+
+The repository also ships `tools/ai-skills-fixer/` — a standalone tool that
+curates AI agent skills across Claude Code, Codex, Cursor, and Antigravity.
+It inventories installed skills with provenance (which repository and commit
+each copy came from), audits prompt debt, and reconciles every environment
+to one declarative profile of pinned skill releases, so all your machines
+run the same up-to-date skill set. Design:
+[the specification](docs/superpowers/specs/2026-08-19-ai-skills-fixer-design.md);
+agent entry point: [SKILL.md](tools/ai-skills-fixer/SKILL.md).
+
+Requirements: Python 3.10+, PyYAML, git 2.30+. Nothing mutating runs without
+an explicitly approved plan ID; every change is backed up and reversible.
+
+```bash
+# one-time setup on a machine
+python3 tools/ai-skills-fixer/scripts/run.py init
+python3 tools/ai-skills-fixer/scripts/run.py source add <skill-repo-url-or-path>
+
+# see what is installed and where it came from
+python3 tools/ai-skills-fixer/scripts/run.py inventory
+
+# decide what you keep (repeat per skill, or let your agent run the questionnaire)
+python3 tools/ai-skills-fixer/scripts/run.py profile set <source>:<skill> enabled \
+    --targets claude codex cursor antigravity
+
+# dry run, review the exact plan, then apply it by ID
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --apply <plan-id>
+
+# update skills to a new upstream version later
+python3 tools/ai-skills-fixer/scripts/run.py source refresh
+python3 tools/ai-skills-fixer/scripts/run.py source promote <source-id>
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune   # then --apply <plan-id>
+
+# undo any apply, byte-for-byte
+python3 tools/ai-skills-fixer/scripts/run.py rollback <apply-id>
+```
+
+The managed store lives in a sibling `skill-repositories/` directory
+(override with `--store-root` or `AI_SKILLS_FIXER_STORE_ROOT`); the machine
+id defaults to the hostname. To reuse your skill policy on another PC:
+clone this repository there, run `init`, `source add` the same skill
+repositories, copy `profiles/default.yml` from your other machine's store,
+then `reconcile --prune` and apply. `--prune` quarantines (recoverably)
+every exact source copy your profile does not keep, which is how one
+machine converges to the same skill set as the others.
+
 ## Project map
 
 ```text
@@ -403,6 +451,7 @@ ai-knowledge-engine/
 │   ├── templates/              config, agent, structure, and dependency templates
 │   └── examples/               15 role blueprints
 ├── scripts/                    upgrades, translation checks, repository maintenance
+├── tools/ai-skills-fixer/      cross-IDE AI skill inventory, audit, and reconciliation
 ├── i18n/ru/                    Russian documentation and instruction set
 └── docs/                       architecture, troubleshooting, upgrades, roadmap
 ```
@@ -454,6 +503,18 @@ python -m pytest
 On Windows, tests for POSIX launchers require a working WSL environment, and the finalize-script fixtures require permission to create symbolic links. The Python pipeline tests run natively.
 
 Contributions are welcome, especially new role blueprints, clearer instruction modules, cross-platform fixes, translations, and pipeline tests. For substantial changes, open an issue first and follow the [contribution guide](docs/CONTRIBUTING.md).
+
+## Acknowledgements
+
+- Thanks for the inspiration — [this talk](https://www.youtube.com/watch?v=LKHLN3UffmQ)
+- Thanks for the food for thought — [escaped_ai](https://boosty.to/escaped_ai)
+- Thanks for simply existing — [Andrej Karpathy](https://x.com/karpathy)
+
+## Support the author
+
+If you would like to help me survive in this world — visit
+[github.com/bionicle12](https://github.com/bionicle12/): gift AI
+subscriptions are welcome, details in the profile README.
 
 ## License
 

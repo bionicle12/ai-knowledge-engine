@@ -402,6 +402,57 @@ Full mode включает 15 стартовых конфигураций в [`k
 
 Файл роли задаёт полезные сущности, маршруты папок, примеры размещения, повторяющиеся запросы и приоритеты проверки. Если готового варианта нет, агент развёртывания может создать пользовательскую конфигурацию на основе вашей работы.
 
+## AI Skills Fixer
+
+В репозитории также живёт `tools/ai-skills-fixer/` — самостоятельный
+инструмент для наведения порядка в скиллах AI-агентов (Claude Code, Codex,
+Cursor, Antigravity). Он инвентаризирует установленные скиллы с
+провенансом (из какого репозитория и коммита пришла каждая копия), находит
+prompt-debt и приводит все среды к одному декларативному профилю
+закреплённых релизов — чтобы на всех машинах был одинаковый актуальный
+набор скиллов. Дизайн:
+[спецификация](../../docs/superpowers/specs/2026-08-19-ai-skills-fixer-design.md);
+входная точка для агента: [SKILL.md](../../tools/ai-skills-fixer/SKILL.md).
+
+Требования: Python 3.10+, PyYAML, git 2.30+. Никакая мутирующая операция
+не выполняется без явно одобренного ID плана; каждое изменение бэкапится и
+обратимо.
+
+```bash
+# разовая настройка на машине
+python3 tools/ai-skills-fixer/scripts/run.py init
+python3 tools/ai-skills-fixer/scripts/run.py source add <url-или-путь-репозитория-скиллов>
+
+# что установлено и откуда пришло
+python3 tools/ai-skills-fixer/scripts/run.py inventory
+
+# решаете, что оставить (по скиллу, или доверьте опросник агенту)
+python3 tools/ai-skills-fixer/scripts/run.py profile set <source>:<skill> enabled \
+    --targets claude codex cursor antigravity
+
+# сухой прогон, просмотр точного плана, применение по ID
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --apply <plan-id>
+
+# позже — обновление скиллов до новой версии источника
+python3 tools/ai-skills-fixer/scripts/run.py source refresh
+python3 tools/ai-skills-fixer/scripts/run.py source promote <source-id>
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune   # затем --apply <plan-id>
+
+# откат любого применения, байт-в-байт
+python3 tools/ai-skills-fixer/scripts/run.py rollback <apply-id>
+```
+
+Управляемый стор живёт в соседней директории `skill-repositories/`
+(переопределяется `--store-root` или `AI_SKILLS_FIXER_STORE_ROOT`);
+идентификатор машины по умолчанию — hostname. Чтобы перенести политику
+скиллов на другой ПК: клонируйте этот репозиторий, выполните `init`,
+`source add` тех же репозиториев скиллов, скопируйте `profiles/default.yml`
+из стора другой машины, затем `reconcile --prune` и apply. Режим `--prune`
+отправляет в карантин (восстановимо) каждую точную копию источника,
+которую профиль не сохраняет — так машина сходится к тому же набору
+скиллов, что и остальные.
+
 ## Карта проекта
 
 ```text
@@ -414,6 +465,7 @@ ai-knowledge-engine/
 │   ├── templates/              шаблоны конфигов, агента, структуры и зависимостей
 │   └── examples/               15 ролевых шаблонов
 ├── scripts/                    обновления, проверка переводов, обслуживание репозитория
+├── tools/ai-skills-fixer/      инвентаризация, аудит и синхронизация AI-скиллов между IDE
 ├── i18n/ru/                    русская документация и набор инструкций
 └── docs/                       архитектура, troubleshooting, обновления, roadmap
 ```
@@ -465,6 +517,18 @@ python -m pytest
 В Windows тестам POSIX-launchers требуется рабочее окружение WSL, а fixtures для finalize-script — разрешение на создание символических ссылок. Тесты Python-конвейера работают нативно.
 
 Приветствуются новые ролевые шаблоны, более ясные модули инструкций, кроссплатформенные исправления, переводы и pipeline tests. Перед существенными изменениями откройте issue и следуйте [руководству для контрибьюторов](../../docs/CONTRIBUTING.md).
+
+## Благодарности
+
+- Спасибо за вдохновение — [это видео](https://www.youtube.com/watch?v=LKHLN3UffmQ)
+- Спасибо за размышления — [escaped_ai](https://boosty.to/escaped_ai)
+- Спасибо за то, что ты есть — [Андрей Карпаты](https://x.com/karpathy)
+
+## Поддержать автора
+
+Если вы хотите помочь мне выжить в этом мире — загляните на
+[github.com/bionicle12](https://github.com/bionicle12/): буду рад гифтам
+на ИИ-подписки, подробности в приветственном README профиля.
 
 ## Лицензия
 
