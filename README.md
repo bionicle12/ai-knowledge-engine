@@ -403,6 +403,20 @@ run the same up-to-date skill set. Design:
 [the specification](docs/superpowers/specs/2026-08-19-ai-skills-fixer-design.md);
 agent entry point: [SKILL.md](tools/ai-skills-fixer/SKILL.md).
 
+The easiest way to use it: don't learn the commands — hand the tool to your
+AI agent in this repository's root and let it drive. Paste this:
+
+```text
+There is a skill-curation tool in tools/ai-skills-fixer/. Read its SKILL.md
+and fix my skills: inventory what is installed and where it came from, audit
+for problems, walk me through what to keep, then reconcile — show me the
+plan and wait for my approval before applying anything.
+```
+
+The agent will read the entry point, run the right commands in the right
+order, and stop for your approval before any change. The command reference
+below is for manual runs (and for the agent itself).
+
 Requirements: Python 3.10+, PyYAML, git 2.30+. Nothing mutating runs without
 an explicitly approved plan ID; every change is backed up and reversible.
 
