@@ -1,6 +1,6 @@
 ---
 translation_of: knowledge-base/16_MERGE.md
-source_commit: d82f0395afa7e65a0d84b4ba78f99701048f2bfe
+source_commit: e497375d391668b75c4fefdddae3dde4d3e200c5
 source_version: 0.15.0
 translated_at: 2026-08-23
 translator: ai-assisted

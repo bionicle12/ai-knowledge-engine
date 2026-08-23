@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/10_LOG.md
-source_commit: e630f31fd065e0e360416d60c166232da2494398
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_commit: e497375d391668b75c4fefdddae3dde4d3e200c5
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 

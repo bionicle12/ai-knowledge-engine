@@ -1,6 +1,6 @@
 ---
 translation_of: knowledge-base/00_OVERVIEW.md
-source_commit: d47821780644a3542a8015dc76b2320e532649a8
+source_commit: e497375d391668b75c4fefdddae3dde4d3e200c5
 source_version: 0.15.0
 translated_at: 2026-08-23
 translator: ai-assisted
