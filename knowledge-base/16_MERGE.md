@@ -261,7 +261,7 @@ than merely bigger.
 Then in the AI chat:
 
 ```
-Read AGENTS.md and use it as the primary instruction for everything that follows.
+Use AGENTS.md as the primary instruction
 !merge
 ```
 

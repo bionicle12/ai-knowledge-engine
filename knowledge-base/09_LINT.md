@@ -33,6 +33,18 @@ Run by `scripts/kb_lint.py` — deterministic, no LLM.
 | **Low importance + stale** | `importance < 3` + `lifecycle: temporal` + `last_accessed > 90 days` → suggest archive | ℹ️ info |
 | **Annotation overflow** | A file has > 5 `context_annotations` → suggest creating an insight | ℹ️ info |
 | **Expired temporal** | `valid_until != null` + `valid_until < now` + file not in `_archive/` | 🟡 warning |
+| **Invariants** | `AGENTS.md` is missing a required `AI-KE:INVARIANT` block (`forbidden`, `language`) or markers are malformed. Skips if `AGENTS.md` is absent | 🔴 error |
+| **AGENTS.md bytes** | The **deployed** `AGENTS.md` larger than `instructions_lint.agents_max_bytes` (default 10240 / 10 KiB) → propose `!refactor`. The stock template is smaller than that on purpose: `kb_upgrade` appends the managed `!view` block to the deployed file | 🟡 warning |
+| **Instruction absolutes** | `always` / `never` / `must` / `forbidden` outside INVARIANT blocks exceed `absolute_max_outside_invariants` (default 8) | 🟡 warning |
+| **Work-ordering phrases** | Any configured phrase, matched case-insensitively (`thoroughly`, `consider all`, `максимально тщательно`, …) — these inflate reasoning, not accuracy | 🟡 warning |
+| **Instruction duplicates** | `AGENTS.md` restates `privacy.*` or `language_policy` already in `kb.config.yml`. Text **inside** `AI-KE:INVARIANT` blocks is exempt — a copy there is deliberate, it has to survive every trim | ℹ️ info |
+| **Instructions review** | `instructions_review.reviewed_at` older than `review_stale_days` (default 90). **Skips** if the field is missing. Procedure: `17_REFACTOR.md` | 🟡 warning |
+| **Assumption hotspot** | More than 3 `## Assumptions` bullets naming one `knowledge/<area>/` in 30 days → tighten `DATA_PLACEMENT_EXAMPLES.md` | ℹ️ info |
+| **Profile review** | `profile_review.reviewed_at` older than 30 days. **Skips** if the field is missing. Procedure: `!profile-review` | 🟡 warning |
+
+Thresholds for the instruction-budget checks live in top-level
+`instructions_lint:` in `kb.config.yml`, not in the script and not under
+`mode_profiles.*.lint` (that block is Level 2).
 
 ### Level 2: AI review (LLM) — mode-aware
 
@@ -173,6 +185,25 @@ echo "- Report: see lint-report.md" >> log.md
 ```bash
 chmod +x lint.sh
 ```
+
+---
+
+## Mutation check (`kb_mutate.py`)
+
+Copies the base (plus a tiny seed cluster) into a temp tree, plants **seven**
+L1 defects, and scores lint:
+
+broken wikilink, duplicate slug, `source_hash` mismatch, stale
+`last_verified`, orphan, expired `valid_until`, missing frontmatter field.
+
+```bash
+python3 scripts/kb_mutate.py
+python3 scripts/kb_doctor.py --with-mutation   # not in the default doctor run
+```
+
+Report line: `7 mutations / 7 killed / 0 survivors`. Survivors mean that L1
+check does not see a real defect — fix the check or record the limit.
+L2 contradictions are not planted here; that is `!audit`.
 
 ---
 

@@ -19,6 +19,7 @@ ai-knowledge-engine/
 ├── README.md                     ← Project landing (EN); RU → i18n/ru/README.md
 ├── VERSION                       ← semver of instructions (e.g., 0.12.0)
 ├── CHANGELOG.md                  ← Keep-a-Changelog format
+├── MIGRATIONS.md                 ← catch-up steps per version, read by kb_heal.py
 ├── LICENSE
 │
 ├── docs/                         ← Meta-docs (contributors)
@@ -29,7 +30,7 @@ ai-knowledge-engine/
 │
 ├── knowledge-base/               ← Full Mode (canonical EN)
 │   ├── README.md                 ← Reading order & principles
-│   ├── 00_OVERVIEW.md … 16_MERGE.md
+│   ├── 00_OVERVIEW.md … 18_HEAL.md
 │   ├── templates/                ← Files to copy & parameterize
 │   │   ├── kb.config.yml.template
 │   │   ├── repomix.config.json.template
@@ -44,7 +45,9 @@ ai-knowledge-engine/
 │   │   ├── kb_export.py, kb_import.py
 │   │   │                           ← cross-base merge (16_MERGE.md)
 │   │   ├── kb_lint.py, kb_watch.py, kb_reflect.py, kb_nlp_batch.py
-│   │   ├── kb_populate.py, kb_save_session.py, kb_doctor.py, kb_view.py
+│   │   ├── kb_heal.py             ← catch-up after upgrade (18_HEAL.md)
+│   │   ├── kb_mutate.py           ← plants L1 defects, scores lint (09_LINT.md)
+│   │   ├── kb_populate.py, kb_structure.py, kb_save_session.py, kb_doctor.py, kb_view.py
 │   │   ├── kb_update.py           ← thin launcher for the central updater
 │   │   ├── kb_viewer/             ← offline graph viewer UI + vendored library
 │   │   └── tests/
@@ -95,8 +98,9 @@ Agent flow:
 15. **`14_INITIAL_POPULATION.md`** — generate role-specific `DATA_PLACEMENT_EXAMPLES.md`
 16. **`15_MEDIA_PROCESSING.md`** — STT/OCR/archives (`kb_stt.py`, `kb_ocr.py`, `requirements-media.txt`)
 17. **`16_MERGE.md`** — cross-base merge (`kb_export.py`, `kb_import.py`, `shell/export.sh`, `shell/import.sh`); only needed when the base runs on more than one machine
-18. **Run `kb_doctor.py`** — smoke-test the deployment
-19. **Run `finalize.sh`** — flatten into the project root
+18. **`18_HEAL.md`** — catch-up after upgrade (`kb_heal.py`, `!heal`)
+19. **Run `kb_doctor.py`** — smoke-test the deployment
+20. **Run `finalize.sh`** — flatten into the project root
 
 ## Key invariants
 
@@ -107,6 +111,8 @@ Agent flow:
 - **Reference scripts must be idempotent** — re-running on already-processed inputs is safe.
 - **Privacy:** never index `raw/`, `assets/`, `review/`, `interactions/`, `sync/` — only `knowledge/**` and `assets-index/**`.
 - **Merges never overwrite silently.** `kb_import.py` applies only what is provably safe (new pages, identical content, non-destructive metadata merges, fast-forwards of untouched pages) and backs up everything it touches; anything ambiguous goes to `review/needs-merge/` for the agent's `!merge`.
+- **A capability that deployed bases must catch up to ships with its `MIGRATIONS.md` entry in the same commit.** Otherwise `kb_heal.py` cannot see what to repair, and the list has to be reconstructed from the changelog after the fact. Each entry is `id` / `bucket` (`auto` / `assisted` / `human`) / `detect` / `fix`, under the version heading that introduced it.
+- **`kb.config.yml` is edited line by line, never round-tripped through a YAML dumper.** It is a hand-edited, heavily commented file; `yaml.safe_dump` would silently strip every comment in it.
 
 ## Versioning model
 

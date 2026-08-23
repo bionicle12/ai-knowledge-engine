@@ -214,8 +214,9 @@ def _ensure_kb_dirs(root: Path) -> None:
         (root / "assets" / sub).mkdir(parents=True, exist_ok=True)
     for sub in kbc.REVIEW_DIRS:
         (root / "review" / sub).mkdir(parents=True, exist_ok=True)
-    for sub in ("sessions",):
+    for sub in ("sessions", "init", "quiz"):
         (root / "interactions" / sub).mkdir(parents=True, exist_ok=True)
+    (root / kbc.EVAL_ROOT / kbc.EVAL_RESULTS_DIR).mkdir(parents=True, exist_ok=True)
     kbc.ensure_sync_dirs(root)
 
 

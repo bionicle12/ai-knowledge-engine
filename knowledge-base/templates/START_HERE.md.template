@@ -4,19 +4,16 @@
 
 ## How to talk to the AI
 
-Whenever you open a **new chat** with an AI agent (Claude, GPT, Cursor, Codex, etc.) and want it to work with this knowledge base, **start with this exact line**:
+Start every new chat with **«Используй AGENTS.md как основную инструкцию»**
+(or: `Use AGENTS.md as the primary instruction`).
 
-```
-Read AGENTS.md and use it as the primary instruction for everything that follows.
-```
-
-(or in Russian:)
-
-```
-Прочитай AGENTS.md и используй его как основную инструкцию для всего, что следует дальше.
-```
-
-If you skip this step the agent has no idea this knowledge base exists, will ignore your custom voice and rules, and the special commands below will not work.
+In Codex and Cursor the file is already auto-loaded, but the line costs
+almost nothing and covers the three cases where that load silently fails:
+the combined AGENTS.md budget is full (32 KiB across every file Codex
+reads), `AGENTS.override.md` is sitting in the project root, or you started
+the agent from a subdirectory that has its own `AGENTS.md`. In chatbots
+(claude.ai, a ChatGPT project) there is no auto-load at all — there the
+line is required.
 
 ## Commands you can use in chat
 
@@ -27,12 +24,16 @@ After the agent has read `AGENTS.md`, these commands work:
 | `!view` | Open the local read-only knowledge graph viewer | 0 tokens |
 | `!save` | Save a session summary now (decisions, conclusions, processed materials) | ~2K tokens |
 | `!reflect` | Synthesize higher-level insights from accumulated facts | ~15K tokens |
-| `!audit` | Full AI review of the base — contradictions, gaps, merge candidates | ~50–100K tokens |
+| `!audit` | Per-pack review in a fresh session (`.repomix/audit/<pack>__request.md`) | ~5–20K / pack |
 | `!review` | Process the `review/` queue: pick up files routed for AI judgment, extract knowledge, ask for input where needed | ~5–30K tokens |
 | `!populate` | Re-generate `DATA_PLACEMENT_EXAMPLES.md` (when you've changed your role YAML) | ~50 tokens |
 | `!export` | Pack this base into a bundle for another machine | ~100 tokens |
 | `!import` | Merge bundles waiting in `sync/inbox/` | ~200 tokens |
 | `!merge` | Finish an import: resolve conflicts, check contradictions, cross-link the new knowledge | ~5–40K tokens |
+| `!heal` | Catch up after an upgrade (plan + auto fixes + assisted queue). See `18_HEAL.md` | ~0–40K tokens |
+| `!refactor` | Two-step instruction trim (`17_REFACTOR.md`). Backup + eval. `--global` reports only | ~5–40K tokens |
+| `!profile-review` | Interview `knowledge/profile/`: gaps first (3 questions), then stale facts | ~5–15K tokens |
+| `!quiz` | Five questions about what is already in the base; costliest mistakes first | ~5–15K tokens |
 | `!super` | Toggle operating mode: default ↔ super | 0 tokens |
 | `!super on` / `!super off` | Force a mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |
@@ -87,7 +88,7 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 
 | Problem | Fix |
 |---------|-----|
-| Agent ignores my voice / rules | You forgot the "Read AGENTS.md..." opening line. Say it now. |
+| Agent ignores my voice / rules | Say the opening line above; if that does not help, run `./shell/doctor.sh` and read the Codex environment section. |
 | Files keep landing in `review/needs-ai-decision/` | Say `!review` in chat. The agent will go through the queue. |
 | Chat-uploaded files should enter the base | Tell the agent: "Ask me before adding attached files to the main knowledge base." |
 | Generated `DATA_PLACEMENT_EXAMPLES.md` doesn't fit me | Edit `examples/<role>.yml`, then say `!populate`. |
@@ -106,4 +107,4 @@ See `DATA_PLACEMENT_EXAMPLES.md` — the role-specific placement guide that was 
 
 ## One-line summary
 
-> Drop files in `raw/`, double-click `watcher-start.command`, talk to the agent in chat — but **always start every new chat with "Read AGENTS.md..."** first.
+> Drop files in `raw/`, double-click `watcher-start.command`, talk to the agent in chat — start new chats with **"Используй AGENTS.md как основную инструкцию"**.

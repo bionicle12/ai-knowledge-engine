@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/05_INDEX.md
 source_commit: 093d47fc1366085f87cd895756e9db194409202e
-source_version: 0.13.0
-translated_at: 2026-08-20
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 
@@ -39,9 +39,10 @@ translator: ai-assisted
 
 | Профиль окна | Потолок пакета |
 |--------------|---------------|
-| `256k` (дефолт) | 80K |
+| `400k` (Codex) | 120K |
+| `256k` (Cursor / консервативный дефолт) | 80K |
 | `200k` | 60K |
-| `1m` | 150K |
+| `1m` (Claude Code 1M) | 150K |
 
 - `core.xml` — профиль автора, принципы, голос, таблицы маршрутизации,
   мета-файлы. Маленький по замыслу; грузить безопасно всегда.
@@ -54,6 +55,8 @@ translator: ai-assisted
   двадцатью микрофайлами так же вредна, как один гигантский файл).
 - `.repomix/PACKS_STATUS.md` — автогенерируемая таблица пакетов со свежими
   оценками токенов; агенты читают её вместо захардкоженных чисел.
+- `.repomix/audit/<pack>__request.md` — бриф `!audit` на пакет (новая сессия,
+  нужны `file:line` + цитата) и `CROSS_PACK__request.md` (только заголовки).
 
 Правило загрузки для агента (уже в шаблоне AGENTS.md): маршрутизируйся через
 `knowledge/routing-table.md`, затем грузи `core` плюс **максимум один**
@@ -102,8 +105,9 @@ per-pack `include`, `filePath` и заголовок. Его собственн�
 
 - `compress: false`, `removeComments: false` — см. секцию выше.
 - `ignore.customPatterns` исключает `raw/`, `processed/`, `assets/`,
-  `review/`, `interactions/`, `setup/`, `scripts/`, `.repomix/`, логи и все
-  бинарные форматы.
+  `review/`, `interactions/`, `eval/`, `.kb-backups/`, `setup/`, `scripts/`,
+  `.repomix/`, логи
+  и все бинарные форматы.
 - `tokenCount.encoding: o200k_base`.
 - Legacy `include` исторически содержит `AGENTS.md`; пакетный режим его
   выбрасывает (уже в системном промпте).

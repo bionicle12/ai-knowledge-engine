@@ -26,15 +26,16 @@ Dialogue → Session Summary → interactions/sessions/
 
 ---
 
-## Automatic capture
+## Capture
 
-The AI agent **decides on its own** when to write a session summary:
+Write a session summary on `!save` or when the user explicitly asks to save
+(or "lock this into the base"). Do not auto-detect that "enough material has
+accumulated" and write on your own.
 
 | Situation | Action |
 |-----------|--------|
-| 5–7 substantive exchanges have accumulated | Writes summary, continues working |
-| Dialogue logically wraps up | Writes a final summary |
 | User issues `!save` | Writes summary immediately (agent writes under `interactions/sessions/`; optional CLI: `python3 scripts/kb_save_session.py`) |
+| User explicitly asks to save | Same as `!save` |
 | User asks not to save | No write |
 
 ### Layout in `interactions/sessions/`
@@ -94,7 +95,17 @@ quality: high
 
 ## What did not work
 - The SWOT was too long — author prefers bullet points
+
+## Assumptions
+- Filed `q3-notes.md` under `domain/`, not `decisions/` — discussion only, no decision
+- Read "DF" in the transcript as DragonflyDB (three neighbouring paragraphs)
+- importance=7 from synthesis volume; the user did not confirm
 ```
+
+On a borderline call: pick the most cautious placement, write one assumption
+line, continue. Ask only when the answer changes the outcome. Lint info if
+one `knowledge/<area>/` collects more than 3 assumption bullets in 30 days
+→ tighten `DATA_PLACEMENT_EXAMPLES.md` for that area.
 
 ---
 
@@ -252,8 +263,20 @@ reflection:
   # importance_threshold: 5      # reflect when importance ≥5
   # min_interval_days: 0         # no minimum interval
   # require_changes: false
-  max_insights_per_run: 3        # at most 3 insights per reflection run
+  max_insights_per_run: 3        # ceiling, not a quota — 0 insights is valid
 ```
+
+### Brakes
+
+- **Honest zero.** No new insight is a valid, expected result. Log it
+  (`python3 scripts/kb_reflect.py --record-result 0`) and stop. Do not invent
+  insights to fill `max_insights_per_run`.
+- **Meta-insight (level 2)** only if new level-0 facts (ingests) arrived
+  since the last level-1 reflection. `kb_reflect.py` sets
+  `meta_insight_allowed` from that.
+- **Stagnation.** Two consecutive reflections with 0 insights → scheduled
+  reflection (`--check-threshold`) stays `SKIP` until new L0 facts arrive.
+  `!reflect` from the user still runs.
 
 ### Process
 
@@ -261,7 +284,9 @@ reflection:
 2. AI generates 3 important questions about recent experience
 3. For each, search relevant pages via routing + wikilinks
 4. Synthesize a higher-level insight
-5. Write to `knowledge/insights/` with `[[wikilinks]]` to source pages
+5. Write at most `max_insights_per_run` pages to `knowledge/insights/`
+   with `[[wikilinks]]` to source pages — or write none and
+   `--record-result 0`
 
 ### Insight format
 
@@ -504,9 +529,63 @@ query: "Why is LLM Wiki better than RAG at our scale?"
 
 ---
 
+## `!audit` — clean context, by pack
+
+The writer of a page must not be the only reviewer. `kb_reindex.py` writes
+`.repomix/audit/<pack>__request.md` (pack + checklist + report format) and
+`CROSS_PACK__request.md` (titles only).
+
+`!audit` → open a **new session** per request file. A finding without
+`file:line` and a quote is discarded. There is no `kb_audit.py`.
+
+## `!profile-review`
+
+`knowledge/profile/` uses `lifecycle: permanent`, so L1 stale lint skips it.
+
+1. Read what you know about the author from `knowledge/profile/`. What is
+   missing? Ask **three questions at a time**, important first. Update pages
+   from the answers.
+2. Then: what may be outdated or incomplete? Same cadence.
+
+Stamp `profile_review.reviewed_at` in `kb.config.yml`. Lint warns after 30
+days if that field is set; missing field is not a warning.
+
+## `!quiz`
+
+The base exams the owner. This is the only command that checks the human,
+not the pages.
+
+1. Skim `knowledge/profile/`, `knowledge/principles/`, `knowledge/decisions/`,
+   and `knowledge/routing-table.md`. Do not load the whole base.
+2. Ask **five questions** about what is already in the base. Start with the
+   **costliest mistakes** (a silent contradiction, a decision the owner
+   would hate to see inverted, a fact the AI would invent if the page is
+   thin). Then coverage gaps. Then a recall check on a dated decision.
+3. One question at a time is fine if the owner is answering in chat;
+   batch only when they ask.
+4. Write the sheet to `interactions/quiz/YYYY-MM-DD.md` (not indexed):
+   question, owner answer, page that should have held it, whether the
+   page needs an edit. Log operation `quiz`.
+5. If an answer contradicts a page — do not silently "fix" the page.
+   Show the diff and wait.
+
+There is no `kb_quiz.py`.
+
+## Exploration slot (`!reflect`)
+
+When `kb_reflect.py --json` (or `--generate`) returns `exploration` pairs,
+use **at most two** of them as reflection questions: "What connects
+[[A]] and [[B]] that the graph does not show?" Pairs are disconnected
+components (or nodes with no directed path) with tag/title overlap
+`< 0.8`. An empty list is valid — do not invent a link. New insights
+from a real connection go to `knowledge/insights/`.
+
+---
+
 ## Logging
 
 All feedback-loop operations are recorded in `log.md` (see `10_LOG.md`):
 - `session-capture` — when a session summary is written
 - `query-writeback` — when a valuable answer is saved
+- `quiz` — when `!quiz` writes `interactions/quiz/`
 - Meta-review results — when insights are created

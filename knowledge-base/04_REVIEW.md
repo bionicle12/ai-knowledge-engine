@@ -12,6 +12,7 @@
 | `review/needs-ai-decision/` | Needs semantic analysis | AI agent in IDE |
 | `review/needs-redaction/` | Sensitive data detected | AI agent + human |
 | `review/excluded-sensitive/` | Cannot be used | Nobody (archive) |
+| `review/needs-heal/` | Catch-up items after an upgrade (`HEAL_PLAN.md`) | `!heal` — see `18_HEAL.md` |
 
 All of `review/` is excluded from the Repomix index.
 

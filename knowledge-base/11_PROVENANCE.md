@@ -78,7 +78,7 @@ Every fact in `knowledge/` gets an importance score (1-10).
 
 ### Recency decay
 
-Each AI access to a `knowledge/` page "freshens" it:
+When a `knowledge/` page actually influenced an answer, the agent "freshens" it:
 
 ```yaml
 last_accessed: 2026-05-06    # date of last read
@@ -87,7 +87,8 @@ access_count: 12             # how many times read
 
 ### Update
 
-- **AI agent:** when reading a `knowledge/` file via dynamic context loading, updates `last_accessed` and `access_count += 1`
+- **AI agent:** update `last_accessed` and `access_count += 1` only when the
+  page actually influenced the answer — not on every glance or pack load
 - **Python script:** during reindex can compute `recency_score` for sorting
 
 ### Recency score

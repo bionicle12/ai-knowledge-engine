@@ -49,6 +49,8 @@ This script:
 3. Removes the empty `knowledge-base/` folder
 4. Removes the original `setup/` folder (use `--keep-setup` to keep it)
 5. Refreshes executable bits on `*.sh` / `*.command` files
+6. Asks whether the user works in Claude Code; on yes, writes a one-line
+   `CLAUDE.md` containing `@AGENTS.md` (Claude Code does not read `AGENTS.md`)
 
 **Final layout — flat at the project root, no `setup/`, no `knowledge-base/`:**
 
@@ -67,7 +69,7 @@ my-project/
 ├── shell/        ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh, export.sh, import.sh
 ├── scripts/      ← Python pipeline
 ├── templates/, examples/
-├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, sync/
+├── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, eval/, sync/
 ├── .repomix/
 └── .venv/
 ```
@@ -130,10 +132,47 @@ After selecting a template the agent **does not just copy yml**, it asks clarify
    - "I have a side game project"
 
 4. **Want to add anything or keep as is?**
-   - "As is" → deploy without further questions
-   - Anything to add → AI integrates it into the config
+   - "As is" → still run the blind-spot pass and the four structure sketches;
+     do not skip to folder creation
+   - Anything to add → AI integrates it into the config, then continues
 
-### Mandatory questions (after customization)
+### Blind-spot pass (before any structure)
+
+**Do not propose `knowledge/` folders yet.** People with this role usually
+forget things that later force a layout rewrite. Interview first.
+
+1. Run `python3 scripts/kb_structure.py --role <slug> --blind-spots`
+   (or `--from examples/<slug>.yml`). If the YAML has `blind_spots:`, use
+   that list; otherwise the script derives defaults from entities and
+   artefacts. Custom roles: fill `blind_spots:` in
+   `templates/role.yml.template` while authoring the YAML.
+2. Ask **in the printed order**. The first items are the ones that change
+   the `knowledge/` layout (where abandoned work lives, whether artefacts
+   earn folders, how old material is found, what stays immutable). Content
+   gaps come after.
+3. Record answers in the working notes. They feed the four sketches.
+
+Do not invent a fifth questionnaire about folders. The next step is
+sketches, not more form fields.
+
+### Four structure variants (react, do not pick a number)
+
+1. Run
+   `python3 scripts/kb_structure.py --role <slug> --write --kb-root knowledge-base`
+   (cwd already inside the deployed base → `--kb-root .`).
+2. That writes `interactions/init/STRUCTURE_VARIANTS.md` — four sketches
+   from the same role YAML: **by project / by artefact type / by time /
+   by decision**. Show them in chat. The owner **reacts** (likes,
+   dislikes, "this plus dated decisions", "hybrid"). They do not pick
+   1–4 from a form.
+3. There are four sketches, not ten. Material is the 16 role YAMLs in
+   `examples/` plus the blind-spot answers.
+4. **Hybrid default:** if the reaction is "a bit of everything" or "as
+   is", use the stock 12-folder tree in `KNOWLEDGE_STRUCTURE.md.template`.
+   `kb_ingest.py --init-dirs` still creates those stock dirs as empty
+   compatibility shelves; add extra folders the reaction needs.
+
+### Mandatory questions (after the structure reaction)
 
 1. **What raw data will be loaded?**
    - Documents, presentations, chats, code, audio, video, notes, articles
@@ -147,11 +186,30 @@ After selecting a template the agent **does not just copy yml**, it asks clarify
 4. **Is there Git?**
    - If yes — set up auto-update via post-commit hook
 
+5. **Which agent is primary?** Set `index.primary_agent` and `index.window_profile`
+   in `kb.config.yml` from the answer:
+   - **Codex** → `primary_agent: codex`, `window_profile: 400k`
+   - **Cursor** → `primary_agent: cursor`, `window_profile: 256k`
+   - **Claude Code** → `primary_agent: claude-code`; `window_profile: 1m` if
+     they use a 1M-window model, otherwise `256k`
+
+6. **What three questions will you ask this base most often?** Write
+   `eval/QUESTIONS.md` from `templates/eval/QUESTIONS.md.template`. For each
+   question record: the question text, a page it must cite, terms it must
+   mention, and a rejected alternative it must NOT propose. Create empty
+   `eval/results/`. These are the before/after probes for later instruction
+   edits — not indexed.
+
 ---
 
 ## Phase 1: create structure
 
-After clarification the AI agent creates in the project root:
+After the blind-spot pass and the owner's reaction to the four sketches,
+create folders. The tree below is the **hybrid default**. If the reaction
+chose one axis (projects / artefacts / time / decisions), follow that
+sketch and keep unused stock dirs only as empty shelves.
+
+The AI agent creates in the project root:
 
 ```text
 knowledge-base/
@@ -224,12 +282,19 @@ knowledge-base/
 │   ├── needs-ai-decision/
 │   ├── needs-redaction/
 │   ├── needs-merge/            # Cross-base merge packages (see 16_MERGE.md)
+│   ├── needs-heal/             # Catch-up after upgrade (see 18_HEAL.md)
 │   └── excluded-sensitive/
 │
 ├── interactions/               # Feedback loop (NOT indexed directly)
 │   ├── sessions/               # Dialog folders with timestamps
 │   ├── insights/               # Extracted patterns
-│   └── meta-reviews/           # Periodic analysis
+│   ├── meta-reviews/           # Periodic analysis
+│   ├── init/                   # STRUCTURE_VARIANTS.md (E2) — not indexed
+│   └── quiz/                   # !quiz answer sheets — not indexed
+│
+├── eval/                       # Manual instruction probes (NOT indexed)
+│   ├── QUESTIONS.md            # Three typical questions (02_INIT Q6)
+│   └── results/                # Before/after answer dumps — keep, do not gitignore
 │
 ├── sync/                       # Cross-base import/export (NOT indexed)
 │   ├── inbox/                  # Drop bundles from the other machine here
@@ -350,13 +415,19 @@ After creating the structure and config the agent **must** proceed to `14_INITIA
 
 1. Read the chosen role template (`examples/<role>.yml`) and find the `placement_examples:` section.
 2. **If the role is custom (not in `examples/`)**: create `examples/<slug>.yml` from `templates/role.yml.template` first by walking the user through the placeholders. The YAML must exist on disk **before** populating.
-3. Run `python3 scripts/kb_populate.py --role <slug> --kb-root knowledge-base` (where `knowledge-base/` is the deployed base directory the agent built) — deterministic generation, no LLM tokens.
+3. If `interactions/init/STRUCTURE_VARIANTS.md` is missing, run
+   `python3 scripts/kb_structure.py --role <slug> --write --kb-root knowledge-base`
+   first (deterministic; no LLM). Then run
+   `python3 scripts/kb_populate.py --role <slug> --kb-root knowledge-base`
+   (where `knowledge-base/` is the deployed base directory the agent built)
+   — deterministic generation, no LLM tokens.
 4. (Recommended) Read the generated file and append a `## Project notes` section with project-specific tips that don't fit in YAML (~1-2K tokens).
 5. **Generate `START_HERE.md`** by copying `templates/START_HERE.md.template` and parameterizing `{{KB_NAME}}` and `{{PRIMARY_ROLE}}`. This is the **first thing** the user reads after deployment.
-6. **Run `kb_doctor.py`** to confirm everything is wired correctly.
-7. **Run `bash setup/shell/finalize.sh`** — promotes `knowledge-base/` contents to the project root, removes `setup/` and the empty `knowledge-base/` folder. After this the user's project is flat and tidy.
-8. Show the user a 3-5 line summary in chat that:
-   - **Explicitly tells them**: *"Read `START_HERE.md` first, and remember to start every new chat session with: 'Read AGENTS.md and use it as the primary instruction.'"*
+6. **Generate `eval/QUESTIONS.md`** from `templates/eval/QUESTIONS.md.template` using the three typical questions from mandatory Q6. Leave `eval/results/` empty.
+7. **Run `kb_doctor.py`** to confirm everything is wired correctly.
+8. **Run `bash setup/shell/finalize.sh`** — promotes `knowledge-base/` contents to the project root, removes `setup/` and the empty `knowledge-base/` folder. After this the user's project is flat and tidy.
+9. Show the user a 3-5 line summary in chat that:
+   - **Explicitly tells them**: *"Read `START_HERE.md` first, and start every new chat with: 'Используй AGENTS.md как основную инструкцию'."*
    - Lists the most actionable quickstart items
    - Mentions the watcher launcher relevant to their OS
 

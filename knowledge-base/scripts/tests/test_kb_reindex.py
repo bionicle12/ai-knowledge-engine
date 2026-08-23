@@ -71,6 +71,20 @@ def test_plan_packs_respects_window_profile_ceiling(tmp_path: Path):
     assert "domain-sub" in auto_200
 
 
+def test_plan_packs_400k_ceiling_is_120k(tmp_path: Path):
+    root = _kb(tmp_path)
+    # 100K section: over the 256k ceiling (80K), under the 400k one (120K).
+    _write_md(root / "knowledge/domain/sub/a.md", 100_000)
+
+    assert kb_reindex.index_ceiling({"window_profile": "400k"}) == 120_000
+    auto_256 = {p.name for p in kb_reindex.plan_packs(root, {"window_profile": "256k"})}
+    auto_400 = {p.name for p in kb_reindex.plan_packs(root, {"window_profile": "400k"})}
+
+    assert "domain-sub" in auto_256
+    assert "domain" in auto_400
+    assert "domain-sub" not in auto_400
+
+
 def test_plan_packs_explicit_list(tmp_path: Path):
     root = _kb(tmp_path)
     _write_md(root / "knowledge/library/craft/book.md", 500)
@@ -158,6 +172,22 @@ def test_run_pack_index_builds_skips_fresh_and_warns_oversized(
     assert kb_reindex.run_pack_index(root, {"pack_token_ceiling": 10}, force=True)
     out = capsys.readouterr().out
     assert "over ceiling" in out
+
+
+def test_run_pack_index_writes_audit_requests(tmp_path: Path, monkeypatch):
+    root = _kb(tmp_path)
+    _write_md(root / "knowledge/domain/a.md", 100)
+    monkeypatch.setattr(kb_reindex.shutil, "which", lambda _: None)
+    kb_reindex.run_pack_index(root, {})
+    audit = root / ".repomix" / "audit"
+    assert (audit / "CROSS_PACK__request.md").is_file()
+    pack_requests = [
+        p for p in audit.glob("*__request.md") if p.name != "CROSS_PACK__request.md"
+    ]
+    assert pack_requests
+    text = next(iter(pack_requests)).read_text(encoding="utf-8")
+    assert "file:line" in text
+    assert "new session" in text.lower()
 
 
 def test_legacy_monolith_warning(tmp_path: Path, capsys):

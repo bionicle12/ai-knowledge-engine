@@ -147,6 +147,14 @@ ai_assistant_tasks:
   - "Critique my query letter against [agent's] preferences — what would they zero in on?"
   - "Synopsis dry-run: does it convey the spine of the story without losing voice?"
 
+blind_spots:
+  - "Where do abandoned novels, trunked novellas, and 'maybe later' shorts live so they do not mix with the current WIP? (changes knowledge/ layout)"
+  - "Do craft books stay in raw/reference, or does each earn a distilled knowledge/principles page?"
+  - "How should a scene note from two years ago be found — by book, by year, or by the craft decision it produced?"
+  - "Which craft decisions (POV, tense, series bible) stay immutable once the book is drafted?"
+  - "What do fiction writers usually forget to capture until the draft is already cold (why a scene worked, a line they stole from themselves)?"
+  - "What would be expensive if the AI invented it — a character fact, a continuity rule, a publisher constraint?"
+
 placement_examples:
   intro: |
     Fiction is about voice and structure, and both compound only if you

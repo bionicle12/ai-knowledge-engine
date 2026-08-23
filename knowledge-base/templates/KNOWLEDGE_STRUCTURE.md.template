@@ -72,12 +72,19 @@
 │   ├── needs-ai-decision/
 │   ├── needs-redaction/
 │   ├── needs-merge/            # Cross-base conflicts → resolved by !merge
+│   ├── needs-heal/             # Catch-up after upgrade → !heal
 │   └── excluded-sensitive/
 │
 ├── interactions/               # 🚫 Session feedback loop (NOT indexed directly)
 │   ├── sessions/
 │   ├── insights/
-│   └── meta-reviews/
+│   ├── meta-reviews/
+│   ├── init/                   # STRUCTURE_VARIANTS.md from kb_structure.py
+│   └── quiz/                   # !quiz answer sheets
+│
+├── eval/                       # 🚫 Manual instruction probes (NOT indexed)
+│   ├── QUESTIONS.md            # Three typical questions the owner asks
+│   └── results/                # Before/after answer dumps — keep in git
 │
 ├── sync/                       # 🚫 Cross-base import/export (NOT indexed)
 │   ├── inbox/                  # Drop bundles from the other machine here
@@ -102,6 +109,7 @@
 | `assets/**` | 🚫 No | Binary, not LLM-readable |
 | `review/**` | 🚫 No | Queue, not curated yet |
 | `interactions/**` | 🚫 No | Session logs (privacy + noise) |
+| `eval/**` | 🚫 No | Manual before/after probes, not knowledge |
 | `sync/**` | 🚫 No | Transfer bundles and backups, not knowledge |
 | `scripts/`, `shell/`, `templates/` | 🚫 No | Tooling, not knowledge |
 | `log.md`, `lint-report.md` | 🚫 No | Operational state |
@@ -141,12 +149,19 @@ Files attached in chat must be confirmed by the user before being staged into `r
 | `needs-ai-decision/` | Needs semantic analysis (complexity ≥ threshold) |
 | `needs-redaction/` | Sensitive data detected |
 | `needs-merge/` | An imported page and the local one both changed → `!merge` |
+| `needs-heal/` | Upgrade left contents behind → `!heal` (`18_HEAL.md`) |
 | `excluded-sensitive/` | Permanently excluded, archive only |
 
 ### `assets/` ↔ `assets-index/`
 
 For every binary file in `assets/`, there's a Markdown description in `assets-index/<type>.md`.
 The description goes into the index; the binary doesn't.
+
+### `eval/` — before/after probes for instruction edits
+
+Three typical questions in `QUESTIONS.md`. After a change to `AGENTS.md` or
+the instruction modules, ask them in a fresh session and save answers in
+`results/<date>__<what-changed>.md`. Not indexed. Do not gitignore `results/`.
 
 ### `sync/` — moving knowledge between machines
 

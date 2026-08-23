@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.13.0-62D8FF?style=flat-square" alt="Version 0.13.0"></a>
+  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.15.0-62D8FF?style=flat-square" alt="Version 0.15.0"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-7EE787?style=flat-square" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/storage-local%20Markdown-8A9BB5?style=flat-square" alt="Local Markdown storage">
@@ -81,7 +81,7 @@ Set-Location C:\path\to\your-project
 </details>
 
 > [!IMPORTANT]
-> In every new agent session, begin with: **“Read `AGENTS.md` and use it as the primary instruction for everything that follows.”** The knowledge base is local; the agent must be told where its operating instructions live.
+> Start every new chat with **«Используй AGENTS.md как основную инструкцию»** (or: `Use AGENTS.md as the primary instruction`). Codex and Cursor already auto-load the file; the line is cheap insurance when that load silently fails (32 KiB budget, `AGENTS.override.md`, or a nested `AGENTS.md`). In chatbots there is no auto-load — there the line is required.
 
 ### Lite mode
 
@@ -178,7 +178,11 @@ These commands are messages to your AI agent, not shell commands.
 | `!save` | Capture decisions and insights from a productive session | ~2K tokens |
 | `!reflect` | Synthesize higher-level patterns from accumulated knowledge | ~15K tokens |
 | `!review` | Resolve items waiting in review queues | ~5–30K tokens |
-| `!audit` | Deep review for contradictions, gaps, and merge candidates | ~50–100K tokens |
+| `!audit` | Deep review for contradictions and gaps — one pack at a time, in a fresh session, findings need `file:line` and a quote | ~5–20K tokens per pack |
+| `!heal` | Catch up a base after an upgrade: collect what is still wrong, apply the safe fixes, walk the rest one item at a time | ~0–40K tokens |
+| `!refactor` | Trim the instructions: audit `AGENTS.md` line by line, stop for your decisions, then rewrite from them | ~5–40K tokens |
+| `!profile-review` | Ask what is missing or stale in what the base knows about you, three questions at a time | ~5–15K tokens |
+| `!quiz` | The base exams you on what is already in it, costliest mistakes first | ~5–15K tokens |
 | `!populate` | Regenerate role-specific placement examples | ~50 tokens |
 | `!export` | Pack this base into a bundle for another machine | ~100 tokens |
 | `!import` | Merge bundles waiting in `sync/inbox/` | ~200 tokens |
@@ -276,7 +280,7 @@ terminal and a full report in `sync/reports/`.
 ### Step 4 — `!merge` in the AI chat
 
 ```
-Read AGENTS.md and use it as the primary instruction for everything that follows.
+Use AGENTS.md as the primary instruction
 !merge
 ```
 
@@ -374,6 +378,18 @@ For a directory of bases, use
 `--all-root /path/to/parent` (immediate `kb-*` children). If a file is truly
 safe to replace, prefer repeatable `--accept FILE` over global `--force`.
 See [the upgrading guide](docs/UPGRADING.md) for examples and safety rules.
+
+### The upgrade only syncs files — `!heal` catches up the contents
+
+New scripts and new checks land, but a base deployed on an older version still
+carries its old `AGENTS.md`, no eval questions, and defects nobody could see
+before the checks existed. [`MIGRATIONS.md`](MIGRATIONS.md) records what each
+version expects an already-deployed base to do about it, and `kb_heal.py` reads
+that registry: the upgrade ends by writing `review/needs-heal/HEAL_PLAN.md`,
+applying the fixes that need no judgement, and telling you to say `!heal`. The
+rest is split into items the agent walks with you one at a time, and items only
+you can close. Full cycle and the five stages:
+[`18_HEAL.md`](knowledge-base/18_HEAL.md).
 
 ## Role blueprints
 

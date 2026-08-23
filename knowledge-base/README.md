@@ -36,6 +36,8 @@ The agent must read modules **strictly in this order**:
 | 14 | `14_INITIAL_POPULATION.md` | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` |
 | 15 | `15_MEDIA_PROCESSING.md` | Transcription (STT), OCR, archives — out-of-the-box, all platforms |
 | 16 | `16_MERGE.md` | Cross-base import/export: merge two deployments without losing knowledge |
+| 17 | `17_REFACTOR.md` | Instruction trim: `!refactor`, two-step audit, `--global` report only |
+| 18 | `18_HEAL.md` | Catch-up after upgrade: `kb_heal.py`, `!heal`, five stages |
 
 Role configurations: `examples/`.
 Templates ready for copy + parameterization: `templates/`.
@@ -78,10 +80,13 @@ Things you can say to the AI agent in the IDE:
 | `!view` | Start or reopen the local read-only knowledge graph viewer | 0 tokens | Browse pages, links, metadata, full-text search, and the health panel (orphans, broken links, stale, ambiguous) without AI |
 | `!save` | Save a session summary with conclusions and processed materials | ~2K tokens | At the end of a productive session, or when useful conclusions accumulate |
 | `!reflect` | Reflect: synthesize higher-level insights from accumulated facts | ~15K tokens | When a lot of new material has been added |
-| `!audit` | AI review of the base: contradictions, gaps, merge candidates | ~50–100K tokens | Every 2–4 weeks |
+| `!audit` | Per-pack L2 review in a fresh session (`.repomix/audit/`) | ~5–20K / pack | Every 2–4 weeks |
+| `!profile-review` | Interview `knowledge/profile/` (3 questions at a time) | ~5–15K tokens | When lint warns, or monthly |
+| `!quiz` | Five questions about what is already in the base; costliest mistakes first | ~5–15K tokens | When you want the base to exam *you* |
 | `!review` | Process `review/` queues, extract durable knowledge, redact sensitive materials, and ask focused questions when input is needed | ~5–30K tokens | When `review/needs-ai-decision/` starts to accumulate |
 | `!populate` | Re-generate `DATA_PLACEMENT_EXAMPLES.md` from the role YAML | ~50 tokens | After editing `examples/<role>.yml` |
-| `!super` | Toggle mode: default ↔ super | 0 tokens | When you need maximum learning speed |
+| `!heal` | Catch up an upgraded base (`kb_heal.py`, `18_HEAL.md`) | ~0–40K tokens | After `kb_upgrade.py`, or when doctor warns about heal |
+| `!refactor` | Two-step instruction trim (`17_REFACTOR.md`) | ~5–40K tokens | When lint warns `agents-bytes` / stale `instructions_review`, or after a model change |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens | See below |
 | `!super status` | Show the current mode | 0 tokens | Quick check |
 
@@ -91,6 +96,7 @@ Things you can say to the AI agent in the IDE:
 - **`!save`** — after any productive 45+ minute session where you discussed documents, made decisions, or analyzed data
 - **`!reflect`** — after a series of additions to the base (5+ new pages), before a major strategic decision, or when the system itself says "time"
 - **`!audit`** — when you haven't checked the base in a while (2+ weeks), or before large work, to ensure the context is clean
+- **`!quiz`** — when you want the base to exam you on what it already holds (costliest mistakes first)
 
 ### When it doesn't make sense
 

@@ -32,6 +32,8 @@
 #   --keep-setup      do NOT delete setup/ at the end (useful if you want to
 #                     re-read the original instructions later)
 #   --force           proceed even if the project root contains conflicting files
+#   --claude-md       write a one-line CLAUDE.md (`@AGENTS.md`) without asking
+#   --no-claude-md    skip the Claude Code / CLAUDE.md question
 #
 # Exit codes:
 #   0 — finalized successfully
@@ -44,6 +46,7 @@ KB_DIR=""
 DRY_RUN=false
 KEEP_SETUP=false
 FORCE=false
+CLAUDE_MD=""   # "" = ask; yes/no = explicit
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -63,8 +66,16 @@ while [ $# -gt 0 ]; do
       FORCE=true
       shift
       ;;
+    --claude-md)
+      CLAUDE_MD="yes"
+      shift
+      ;;
+    --no-claude-md)
+      CLAUDE_MD="no"
+      shift
+      ;;
     -h|--help)
-      sed -n '1,40p' "$0"
+      sed -n '1,45p' "$0"
       exit 0
       ;;
     *)
@@ -174,6 +185,11 @@ if [ "$DRY_RUN" = true ]; then
   if [ "$KEEP_SETUP" = false ]; then
     echo "🔸 would remove (setup):          $SETUP_DIR"
   fi
+  if [ "$CLAUDE_MD" = "yes" ]; then
+    echo "🔸 would write:                   ./CLAUDE.md  (@AGENTS.md)"
+  else
+    echo "🔸 would ask:                     create CLAUDE.md for Claude Code?"
+  fi
   echo ""
   echo "Dry-run complete. Re-run without --dry-run to apply."
   exit 0
@@ -244,6 +260,40 @@ chmod +x "$PROJECT_ROOT"/*.sh 2>/dev/null || true
 chmod +x "$PROJECT_ROOT"/*.command 2>/dev/null || true
 chmod +x "$PROJECT_ROOT"/shell/*.sh 2>/dev/null || true
 chmod +x "$PROJECT_ROOT"/shell/*.command 2>/dev/null || true
+
+# Claude Code reads CLAUDE.md, not AGENTS.md. A one-line import is the
+# portable bridge (a symlink breaks on Windows). Ask unless the caller
+# already decided via --claude-md / --no-claude-md.
+_write_claude_md() {
+  local dest="$PROJECT_ROOT/CLAUDE.md"
+  if [ -e "$dest" ]; then
+    echo "ℹ️  CLAUDE.md already exists — left untouched"
+    return 0
+  fi
+  printf '%s\n' '@AGENTS.md' > "$dest"
+  echo "✅ wrote CLAUDE.md (@AGENTS.md)"
+}
+
+create_claude=""
+if [ "$CLAUDE_MD" = "yes" ]; then
+  create_claude="yes"
+elif [ "$CLAUDE_MD" = "no" ]; then
+  create_claude="no"
+else
+  echo ""
+  echo "Claude Code reads CLAUDE.md, not AGENTS.md."
+  echo "If you work in Claude Code, I can create a one-line CLAUDE.md that imports AGENTS.md."
+  printf "Use Claude Code and create CLAUDE.md? [y/N] "
+  ans=""
+  read -r ans || true
+  case "$ans" in
+    y|Y|yes|YES) create_claude="yes" ;;
+    *) create_claude="no" ;;
+  esac
+fi
+if [ "$create_claude" = "yes" ]; then
+  _write_claude_md
+fi
 
 echo ""
 echo "✅ Finalization complete."

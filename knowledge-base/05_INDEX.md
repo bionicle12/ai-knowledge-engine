@@ -30,9 +30,10 @@ So the index is built as **semantic packs**, each under a token ceiling:
 
 | Window profile | Pack ceiling |
 |---------------|-------------|
-| `256k` (default) | 80K |
+| `400k` (Codex) | 120K |
+| `256k` (Cursor / conservative default) | 80K |
 | `200k` | 60K |
-| `1m` | 150K |
+| `1m` (Claude Code 1M) | 150K |
 
 - `core.xml` — author profile, principles, voice, routing tables, meta files.
   Small by design; always safe to load.
@@ -45,6 +46,8 @@ So the index is built as **semantic packs**, each under a token ceiling:
   micro-files is as bad as one giant file).
 - `.repomix/PACKS_STATUS.md` — auto-generated table of packs with fresh token
   estimates; agents read it instead of hardcoded numbers.
+- `.repomix/audit/<pack>__request.md` — `!audit` brief per pack (new session,
+  `file:line` + quote required) plus `CROSS_PACK__request.md` (titles only).
 
 The agent's loading rule (already in the AGENTS.md template): route via
 `knowledge/routing-table.md`, then load `core` plus **at most one** domain
@@ -91,8 +94,8 @@ points, in either mode:
 
 - `compress: false`, `removeComments: false` — see the section above.
 - `ignore.customPatterns` excludes `raw/`, `processed/`, `assets/`, `review/`,
-  `interactions/`, `setup/`, `scripts/`, `.repomix/`, logs, and all binary
-  formats.
+  `interactions/`, `eval/`, `.kb-backups/`, `setup/`, `scripts/`,
+  `.repomix/`, logs, and all binary formats.
 - `tokenCount.encoding: o200k_base`.
 - Legacy `include` lists `AGENTS.md` for historical reasons; pack mode drops
   it (already in the system prompt).

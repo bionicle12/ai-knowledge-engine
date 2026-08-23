@@ -42,7 +42,7 @@ DAY_SECONDS = 86400
 # --- Pack-based index constants ---------------------------------------------
 # o200k_base averages ~3.8 chars/token on prose; used for estimates only.
 CHARS_PER_TOKEN = 3.8
-WINDOW_CEILINGS = {"256k": 80_000, "200k": 60_000, "1m": 150_000}
+WINDOW_CEILINGS = {"200k": 60_000, "256k": 80_000, "400k": 120_000, "1m": 150_000}
 DEFAULT_MERGE_BELOW = 15_000
 # A legacy monolithic output.xml above this deserves a loud warning.
 MONOLITH_WARN_TOKENS = 150_000
@@ -389,6 +389,70 @@ def _run_repomix_config(root: Path, config_rel: str) -> bool:
     return result.returncode == 0
 
 
+AUDIT_CHECKLIST = """\
+- Contradictions with other pages in this pack
+- Missing cross-refs between related pages
+- Data gaps (too thin to answer confidently)
+- Consolidation candidates
+- Freshness: which pages need re-verify
+
+A finding without `file:line` and a short quote does not enter the report.
+"""
+
+
+def write_audit_requests(root: Path, plans: list[PackPlan]) -> None:
+    """Write per-pack !audit briefs. Fresh session; no kb_audit.py."""
+    dest = root / ".repomix" / "audit"
+    dest.mkdir(parents=True, exist_ok=True)
+    for plan in plans:
+        path = dest / f"{plan.name}__request.md"
+        path.write_text(
+            "\n".join(
+                [
+                    f"# Audit request — pack `{plan.name}`",
+                    "",
+                    "Open this in a **new session** with a clean context.",
+                    f"Load only `.repomix/{plan.name}.xml` (or the files it covers).",
+                    f"When to load: {plan.when_to_load or 'see PACKS_STATUS.md'}",
+                    "",
+                    "## Checklist",
+                    AUDIT_CHECKLIST.rstrip(),
+                    "",
+                    "## Report format",
+                    "",
+                    "```markdown",
+                    "## Finding",
+                    "- file: `knowledge/.../page.md:12`",
+                    "- quote: \"…\"",
+                    "- issue: …",
+                    "```",
+                    "",
+                    "Write the answer in `eval/results/<date>__audit-"
+                    f"{plan.name}.md` or keep it in the session.",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    cross = dest / "CROSS_PACK__request.md"
+    names = ", ".join(f"`{p.name}`" for p in plans) or "(no packs)"
+    cross.write_text(
+        "\n".join(
+            [
+                "# Audit request — cross-pack (titles only)",
+                "",
+                "New session. Do **not** load full packs.",
+                f"Packs in this base: {names}.",
+                "Read `.repomix/PACKS_STATUS.md` and page titles / H1s only.",
+                "Look for contradictions that span two domains.",
+                "Same rule: no `file:line` + quote → drop the finding.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def write_packs_status(root: Path, rows: list[tuple[str, int, str, str]], ceiling: int) -> None:
     status = root / ".repomix" / "PACKS_STATUS.md"
     status.parent.mkdir(parents=True, exist_ok=True)
@@ -413,15 +477,15 @@ def write_packs_status(root: Path, rows: list[tuple[str, int, str, str]], ceilin
 
 def run_pack_index(root: Path, index_cfg: dict, *, force: bool = False) -> bool:
     """Build the pack-based index. Returns True if repomix ran."""
-    if shutil.which("repomix") is None:
-        print("⚠️  [reindex] repomix not installed; skipping index generation")
-        print("    install: npm install -g repomix")
-        return False
-
     ceiling = index_ceiling(index_cfg)
     plans = plan_packs(root, index_cfg)
     if not plans:
         print("⚠️  [reindex] index.packs produced an empty plan; nothing to build")
+        return False
+    write_audit_requests(root, plans)
+    if shutil.which("repomix") is None:
+        print("⚠️  [reindex] repomix not installed; skipping index generation")
+        print("    install: npm install -g repomix")
         return False
 
     write_pack_configs(root, plans)

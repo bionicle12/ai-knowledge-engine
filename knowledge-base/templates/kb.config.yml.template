@@ -30,6 +30,45 @@ language_policy:
   extraction_rule: "extract in primary language; preserve original terms/brand names verbatim"
   metadata_language: "en"                              # for slugs, frontmatter keys
 
+# Catch-up after upgrade (see 18_HEAL.md). auto_apply lets kb_upgrade.py
+# run kb_heal.py --apply auto; assisted/human still need !heal.
+heal:
+  auto_apply: true
+  stage: 1                    # 1 safe | 2 hygiene | 3 measure | 4 trim | 5 content
+  assisted_batch: 20          # max assisted items per !heal session
+  # last_run:
+  #   at: "{{DEPLOYED_AT}}"
+  #   version: "{{KB_INSTRUCTIONS_VERSION}}"
+
+# Set by !profile-review. Lint warns if reviewed_at is older than 30 days.
+# Skip the warning if the field is missing.
+# profile_review:
+#   reviewed_at: "{{DEPLOYED_AT}}"
+
+# Last time these instructions were reviewed against a model generation
+# (see 17_REFACTOR.md). Lint warns if reviewed_at is older than
+# instructions_lint.review_stale_days. Skip the stale check if reviewed_at
+# is empty.
+instructions_review:
+  reviewed_at: "{{DEPLOYED_AT}}"
+  reviewed_model: ""                 # e.g. "gpt-5.6-codex" — fill at first review
+  clean_run_baseline: ""             # eval/results/<date>__<what>.md after a clean run
+
+# L1 instruction-budget lint (see 09_LINT.md). Thresholds belong here, not
+# in scripts — they will move. mode_profiles.*.lint is L2 only.
+instructions_lint:
+  agents_max_bytes: 10240
+  absolute_max_outside_invariants: 8
+  review_stale_days: 90
+  work_ordering_phrases:
+    - "максимально тщательно"
+    - "рассмотри все варианты"
+    - "перепроверь несколько раз"
+    - "добейся полной уверенности"
+    - "thoroughly"
+    - "consider all"
+    - "be maximally"
+
 # Entities to track (drives knowledge/* folders & routing)
 # Source-controlled: copy from examples/<role>.yml during deployment.
 entities: {}
@@ -167,7 +206,8 @@ indexer:
 # compress is ALWAYS false for knowledge bases: full wording is the payload.
 index:
   enabled: true
-  window_profile: "256k"            # 256k (ceiling 80K) | 200k (60K) | 1m (150K)
+  # primary_agent: "codex"          # codex | cursor | claude-code
+  window_profile: "256k"            # 400k (Codex, ceiling 120K) | 256k (80K) | 200k (60K) | 1m (150K)
   # pack_token_ceiling: 80000       # override the profile ceiling explicitly
   # merge_below_tokens: 15000       # sections smaller than this merge into `aux`
   packs: auto

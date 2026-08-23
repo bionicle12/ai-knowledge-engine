@@ -17,6 +17,14 @@ Checks:
   * domain-overflow:  > 15 .md in a single subfolder
   * expired-temporal: lifecycle=temporal with valid_until in the past
   * annotation-overflow: > 5 context_annotations on a page
+  * invariants:           required AI-KE:INVARIANT blocks in AGENTS.md
+  * agents-bytes:         AGENTS.md larger than configured byte budget
+  * instruction-absolutes: always/never/must/forbidden outside INVARIANT
+  * work-ordering:        phrases that inflate reasoning ("thoroughly", …)
+  * instruction-duplicates: AGENTS.md restates privacy/language_policy
+  * instructions-review:  instructions_review.reviewed_at older than N days
+  * assumption-hotspot:   >N ## Assumptions bullets for one knowledge/ area in 30 days
+  * profile-review:       profile_review.reviewed_at older than 30 days
 
 Exit codes:
   0 — no issues
@@ -37,6 +45,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -66,7 +75,39 @@ ALL_CHECKS = (
     "domain-overflow",
     "expired-temporal",
     "annotation-overflow",
+    "invariants",
+    "agents-bytes",
+    "instruction-absolutes",
+    "work-ordering",
+    "instruction-duplicates",
+    "instructions-review",
+    "assumption-hotspot",
+    "profile-review",
 )
+
+# Instruction-budget knobs live in top-level `instructions_lint:` (not under
+# mode_profiles.*.lint, which is L2). Numbers are defaults for old bases.
+DEFAULT_AGENTS_MAX_BYTES = 10240
+DEFAULT_ABSOLUTE_MAX_OUTSIDE_INVARIANTS = 8
+DEFAULT_REVIEW_STALE_DAYS = 90
+DEFAULT_ASSUMPTION_MAX_PER_AREA = 3
+DEFAULT_ASSUMPTION_WINDOW_DAYS = 30
+DEFAULT_PROFILE_REVIEW_DAYS = 30
+_AREA_RE = re.compile(
+    r"(?:knowledge/)?(domain|decisions|playbooks|insights|profile|"
+    r"principles|voice|opinions|routing)/"
+)
+_ASSUMPTION_BULLET_RE = re.compile(r"^[-*]\s+\S", re.MULTILINE)
+DEFAULT_WORK_ORDERING_PHRASES = (
+    "максимально тщательно",
+    "рассмотри все варианты",
+    "перепроверь несколько раз",
+    "добейся полной уверенности",
+    "thoroughly",
+    "consider all",
+    "be maximally",
+)
+_ABSOLUTE_RE = re.compile(r"\b(always|never|must|forbidden)\b", re.IGNORECASE)
 
 
 @dataclass
@@ -521,6 +562,296 @@ def _check_annotation_overflow(
 
 
 # ---------------------------------------------------------------------------
+# Instruction-budget checks (AGENTS.md + kb.config.yml)
+# ---------------------------------------------------------------------------
+
+
+def _instructions_lint_settings(root: Path) -> tuple[dict, kbc.KbConfig]:
+    cfg = kbc.load_config(root)
+    raw = (cfg.raw.get("instructions_lint") or {}) if cfg.raw else {}
+    phrases = raw.get("work_ordering_phrases")
+    if phrases is None:
+        phrase_list = list(DEFAULT_WORK_ORDERING_PHRASES)
+    else:
+        phrase_list = [str(p) for p in phrases]
+    settings = {
+        "agents_max_bytes": int(
+            raw.get("agents_max_bytes", DEFAULT_AGENTS_MAX_BYTES)
+        ),
+        "absolute_max_outside_invariants": int(
+            raw.get(
+                "absolute_max_outside_invariants",
+                DEFAULT_ABSOLUTE_MAX_OUTSIDE_INVARIANTS,
+            )
+        ),
+        "review_stale_days": int(
+            raw.get("review_stale_days", DEFAULT_REVIEW_STALE_DAYS)
+        ),
+        "work_ordering_phrases": phrase_list,
+    }
+    return settings, cfg
+
+
+def _read_agents_md(root: Path) -> tuple[Path, str] | None:
+    path = root / "AGENTS.md"
+    if not path.is_file():
+        return None
+    return path, path.read_text(encoding="utf-8")
+
+
+def _check_invariants(root: Path, report: LintReport) -> None:
+    loaded = _read_agents_md(root)
+    if loaded is None:
+        return
+    path, text = loaded
+    problems = kbc.invariant_problems(text)
+    if not problems:
+        return
+    report.issues.append(
+        LintIssue(
+            check="invariants",
+            severity="error",
+            path=_relative_to_root(path, root),
+            message="; ".join(problems),
+        )
+    )
+
+
+def _check_agents_bytes(
+    root: Path, report: LintReport, *, max_bytes: int
+) -> None:
+    loaded = _read_agents_md(root)
+    if loaded is None:
+        return
+    path, _text = loaded
+    size = path.stat().st_size
+    if size <= max_bytes:
+        return
+    report.issues.append(
+        LintIssue(
+            check="agents-bytes",
+            severity="warning",
+            path=_relative_to_root(path, root),
+            message=(
+                f"AGENTS.md is {size} bytes (threshold: {max_bytes}). "
+                "Propose `!refactor` to shrink instructions."
+            ),
+        )
+    )
+
+
+def _check_instruction_absolutes(
+    root: Path, report: LintReport, *, max_outside: int
+) -> None:
+    loaded = _read_agents_md(root)
+    if loaded is None:
+        return
+    path, text = loaded
+    outside = kbc.strip_invariant_bodies(text)
+    hits = _ABSOLUTE_RE.findall(outside)
+    if len(hits) <= max_outside:
+        return
+    report.issues.append(
+        LintIssue(
+            check="instruction-absolutes",
+            severity="warning",
+            path=_relative_to_root(path, root),
+            message=(
+                f"{len(hits)} always/never/must/forbidden outside INVARIANT "
+                f"blocks (threshold: {max_outside})."
+            ),
+        )
+    )
+
+
+def _check_work_ordering(
+    root: Path, report: LintReport, *, phrases: list[str]
+) -> None:
+    loaded = _read_agents_md(root)
+    if loaded is None:
+        return
+    path, text = loaded
+    lowered = text.lower()
+    found = [
+        phrase for phrase in phrases if phrase and phrase.lower() in lowered
+    ]
+    if not found:
+        return
+    report.issues.append(
+        LintIssue(
+            check="work-ordering",
+            severity="warning",
+            path=_relative_to_root(path, root),
+            message=(
+                "work-ordering phrase(s) inflate reasoning: "
+                + ", ".join(found)
+            ),
+        )
+    )
+
+
+def _check_instruction_duplicates(root: Path, report: LintReport) -> None:
+    loaded = _read_agents_md(root)
+    if loaded is None:
+        return
+    path, text = loaded
+    cfg = kbc.load_config(root)
+    privacy = (cfg.raw.get("privacy") or {}) if cfg.raw else {}
+    language = (cfg.raw.get("language_policy") or {}) if cfg.raw else {}
+    # INVARIANT blocks restate privacy and Language on purpose (B1): they must
+    # survive any trim, so a copy there is the design, not debt.
+    lower = kbc.strip_invariant_bodies(text).lower()
+    dupes: list[str] = []
+    if privacy.get("raw_indexing_allowed") is False and (
+        "do not index `raw/`" in lower or "do not index raw/" in lower
+    ):
+        dupes.append("privacy.raw_indexing_allowed")
+    if privacy.get("review_indexing_allowed") is False and (
+        "do not index `review/`" in lower or "do not index review/" in lower
+    ):
+        dupes.append("privacy.review_indexing_allowed")
+    if privacy.get("interactions_indexing_allowed") is False and (
+        "do not index `interactions/`" in lower
+        or "do not index interactions/" in lower
+    ):
+        dupes.append("privacy.interactions_indexing_allowed")
+    if language.get("primary") and "primary language" in lower:
+        dupes.append("language_policy.primary")
+    if not dupes:
+        return
+    report.issues.append(
+        LintIssue(
+            check="instruction-duplicates",
+            severity="info",
+            path=_relative_to_root(path, root),
+            message=(
+                "AGENTS.md restates config already in kb.config.yml: "
+                + ", ".join(dupes)
+            ),
+        )
+    )
+
+
+def _check_instructions_review(
+    root: Path, report: LintReport, *, stale_days: int
+) -> None:
+    if _read_agents_md(root) is None:
+        return
+    cfg = kbc.load_config(root)
+    review = (cfg.raw.get("instructions_review") or {}) if cfg.raw else {}
+    raw_date = review.get("reviewed_at")
+    if not raw_date:
+        return
+    parsed = _parse_date(raw_date)
+    if parsed is None:
+        return
+    age = (_today() - parsed).days
+    if age <= stale_days:
+        return
+    report.issues.append(
+        LintIssue(
+            check="instructions-review",
+            severity="warning",
+            path="kb.config.yml",
+            message=(
+                f"instructions_review.reviewed_at is {age} days old "
+                f"(threshold: {stale_days})."
+            ),
+        )
+    )
+
+
+def _session_date(path: Path, meta: dict) -> _dt.date | None:
+    parsed = _parse_date(meta.get("session_date"))
+    if parsed:
+        return parsed
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", path.name)
+    if match:
+        return _parse_date(match.group(1))
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", path.parent.name)
+    if match:
+        return _parse_date(match.group(1))
+    return None
+
+
+def _assumption_bullets(body: str) -> list[str]:
+    idx = re.search(r"^##\s+Assumptions\s*$", body, re.MULTILINE | re.IGNORECASE)
+    if not idx:
+        return []
+    rest = body[idx.end() :]
+    nxt = re.search(r"^##\s+", rest, re.MULTILINE)
+    block = rest[: nxt.start()] if nxt else rest
+    return [ln.strip() for ln in block.splitlines() if _ASSUMPTION_BULLET_RE.match(ln)]
+
+
+def _check_assumption_hotspot(root: Path, report: LintReport) -> None:
+    sessions = root / "interactions" / "sessions"
+    if not sessions.is_dir():
+        return
+    cutoff = _today() - _dt.timedelta(days=DEFAULT_ASSUMPTION_WINDOW_DAYS)
+    per_area: dict[str, int] = {}
+    for path in sessions.rglob("*.md"):
+        if not path.is_file():
+            continue
+        try:
+            meta, body = kbc.parse_frontmatter(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        when = _session_date(path, meta)
+        if when is None or when < cutoff:
+            continue
+        for bullet in _assumption_bullets(body):
+            hit = _AREA_RE.search(bullet)
+            if not hit:
+                continue
+            area = hit.group(1)
+            per_area[area] = per_area.get(area, 0) + 1
+    for area, count in sorted(per_area.items()):
+        if count <= DEFAULT_ASSUMPTION_MAX_PER_AREA:
+            continue
+        report.issues.append(
+            LintIssue(
+                check="assumption-hotspot",
+                severity="info",
+                path=f"knowledge/{area}/",
+                message=(
+                    f"{count} assumptions about knowledge/{area}/ in the last "
+                    f"{DEFAULT_ASSUMPTION_WINDOW_DAYS} days "
+                    f"(threshold: {DEFAULT_ASSUMPTION_MAX_PER_AREA}). "
+                    "Tighten DATA_PLACEMENT_EXAMPLES.md for that area."
+                ),
+            )
+        )
+
+
+def _check_profile_review(root: Path, report: LintReport) -> None:
+    cfg = kbc.load_config(root)
+    raw = cfg.raw or {}
+    block = raw.get("profile_review") or {}
+    raw_date = block.get("reviewed_at") or raw.get("profile_reviewed_at")
+    if not raw_date:
+        return
+    parsed = _parse_date(raw_date)
+    if parsed is None:
+        return
+    age = (_today() - parsed).days
+    if age <= DEFAULT_PROFILE_REVIEW_DAYS:
+        return
+    report.issues.append(
+        LintIssue(
+            check="profile-review",
+            severity="warning",
+            path="kb.config.yml",
+            message=(
+                f"profile_review.reviewed_at is {age} days old "
+                f"(threshold: {DEFAULT_PROFILE_REVIEW_DAYS}). "
+                "Run !profile-review."
+            ),
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # Health metrics (--metrics flag)
 # ---------------------------------------------------------------------------
 
@@ -726,6 +1057,36 @@ def run_lint(
         _check_annotation_overflow(
             pages, root, report, threshold=annotation_overflow
         )
+
+    instr_settings, _instr_cfg = _instructions_lint_settings(root)
+    if enabled("invariants"):
+        _check_invariants(root, report)
+    if enabled("agents-bytes"):
+        _check_agents_bytes(
+            root, report, max_bytes=instr_settings["agents_max_bytes"]
+        )
+    if enabled("instruction-absolutes"):
+        _check_instruction_absolutes(
+            root,
+            report,
+            max_outside=instr_settings["absolute_max_outside_invariants"],
+        )
+    if enabled("work-ordering"):
+        _check_work_ordering(
+            root,
+            report,
+            phrases=instr_settings["work_ordering_phrases"],
+        )
+    if enabled("instruction-duplicates"):
+        _check_instruction_duplicates(root, report)
+    if enabled("instructions-review"):
+        _check_instructions_review(
+            root, report, stale_days=instr_settings["review_stale_days"]
+        )
+    if enabled("assumption-hotspot"):
+        _check_assumption_hotspot(root, report)
+    if enabled("profile-review"):
+        _check_profile_review(root, report)
 
     if metrics:
         report.metrics = _compute_metrics(pages, root)

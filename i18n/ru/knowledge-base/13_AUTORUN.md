@@ -491,6 +491,10 @@ fi
 
 Последний пункт важен: при активной работе с базой рефлексия запустится раньше 7 дней, предотвращая застой.
 
+`kb_reflect.py --json` также возвращает `exploration`: не больше двух пар
+страниц из разных компонент графа (пересечение `< 0.8`). Агент может
+взять их как вопросы рефлексии. Пустой список валиден.
+
 ### Гарантии
 
 - Консолидация **не чаще раза в сутки** (маркер `.last_consolidation`)
@@ -509,7 +513,11 @@ fi
 | Файл изменён в `knowledge/` | Reindex + Quick lint | `./shell/watcher.sh` или git hook |
 | `!save` в AI-сессии | Session capture (с enrichment) → Reindex | AI-агент |
 | `!reflect` | Рефлексия: генерация insights (~15K токенов) | AI-агент |
-| `!audit` | Lint уровня 2: AI-ревью (~50-100K токенов) | AI-агент |
+| `!audit` | L2 по пакам из `.repomix/audit/<pack>__request.md` | AI-агент |
+| `!profile-review` | Интервью `knowledge/profile/` (по 3 вопроса) | AI-агент |
+| `!quiz` | Пять вопросов о том, что уже лежит в базе; сначала самые дорогие ошибки | AI-агент |
+| `!heal` | Догоняющая починка после апгрейда (`kb_heal.py --plan` / `--apply auto`) | AI-агент |
+| `!refactor` | Двухшаговое ужатие инструкций (`17_REFACTOR.md`) | AI-агент |
 | Lint нашёл и исправил issues | Reindex | `kb_lint.py --fix` |
 | AI сделал query-writeback | Write page → Reindex | AI-агент |
 | Commit в git | Quick lint + Reindex | git hook |

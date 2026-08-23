@@ -421,6 +421,201 @@ def test_unreadable_file_reported_not_crashing(kb_root: Path):
     assert report.pages_scanned == 2  # broken file still counted as scanned
 
 
+def _write_agents(root: Path, body: str) -> Path:
+    p = root / "AGENTS.md"
+    p.write_text(body, encoding="utf-8")
+    return p
+
+
+def _wrapped(forbidden: str, language: str) -> str:
+    return (
+        f"<!-- AI-KE:INVARIANT:BEGIN id=\"forbidden\" -->\n{forbidden}\n"
+        f"<!-- AI-KE:INVARIANT:END id=\"forbidden\" -->\n"
+        f"<!-- AI-KE:INVARIANT:BEGIN id=\"language\" -->\n{language}\n"
+        f"<!-- AI-KE:INVARIANT:END id=\"language\" -->\n"
+    )
+
+
+def test_invariants_error_when_markers_missing(kb_root: Path):
+    _write_agents(kb_root, "## Forbidden\n\n- no wrap\n\n## Language\nen\n")
+    report = kb_lint.run_lint(kb_root, only={"invariants"})
+    issues = [i for i in report.issues if i.check == "invariants"]
+    assert issues and issues[0].severity == "error"
+    assert "forbidden" in issues[0].message
+
+
+def test_invariants_ok_when_required_blocks_present(kb_root: Path):
+    _write_agents(kb_root, _wrapped("## Forbidden\n- x\n", "## Language\nen\n"))
+    report = kb_lint.run_lint(kb_root, only={"invariants"})
+    assert not [i for i in report.issues if i.check == "invariants"]
+
+
+def test_agents_bytes_warns_over_config_threshold(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "instructions_lint:\n  agents_max_bytes: 32\n",
+        encoding="utf-8",
+    )
+    _write_agents(kb_root, _wrapped("## Forbidden\n", "## Language\n") + ("x" * 40))
+    report = kb_lint.run_lint(kb_root, only={"agents-bytes"})
+    issues = [i for i in report.issues if i.check == "agents-bytes"]
+    assert issues and issues[0].severity == "warning"
+    assert "!refactor" in issues[0].message
+
+
+def test_instruction_absolutes_ignore_invariant_bodies(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "instructions_lint:\n  absolute_max_outside_invariants: 1\n",
+        encoding="utf-8",
+    )
+    inside = "never always must forbidden never always must forbidden\n"
+    _write_agents(
+        kb_root,
+        _wrapped(f"## Forbidden\n{inside}", "## Language\n") + "You must also skim voice.\n",
+    )
+    report = kb_lint.run_lint(kb_root, only={"instruction-absolutes"})
+    # only the one "must" outside the block — under the threshold of 1? wait 1 means >1
+    # threshold 1 → count > 1 warns. one "must" should be ok.
+    assert not [i for i in report.issues if i.check == "instruction-absolutes"]
+
+
+def test_instruction_absolutes_warns_when_over_threshold(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "instructions_lint:\n  absolute_max_outside_invariants: 1\n",
+        encoding="utf-8",
+    )
+    _write_agents(
+        kb_root,
+        _wrapped("## Forbidden\n", "## Language\n")
+        + "You must always never skip this.\n",
+    )
+    report = kb_lint.run_lint(kb_root, only={"instruction-absolutes"})
+    issues = [i for i in report.issues if i.check == "instruction-absolutes"]
+    assert issues and issues[0].severity == "warning"
+
+
+def test_work_ordering_phrases_warn(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "instructions_lint:\n  work_ordering_phrases:\n    - thoroughly\n",
+        encoding="utf-8",
+    )
+    _write_agents(
+        kb_root,
+        _wrapped("## Forbidden\n", "## Language\n") + "Review this thoroughly.\n",
+    )
+    report = kb_lint.run_lint(kb_root, only={"work-ordering"})
+    issues = [i for i in report.issues if i.check == "work-ordering"]
+    assert issues and issues[0].severity == "warning"
+    assert "thoroughly" in issues[0].message
+
+
+def test_instruction_duplicates_info(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "privacy:\n  raw_indexing_allowed: false\n",
+        encoding="utf-8",
+    )
+    _write_agents(
+        kb_root,
+        "## Notes\n- Do not index `raw/` directly\n\n"
+        + _wrapped("## Forbidden\n- x\n", "## Language\n"),
+    )
+    report = kb_lint.run_lint(kb_root, only={"instruction-duplicates"})
+    issues = [i for i in report.issues if i.check == "instruction-duplicates"]
+    assert issues and issues[0].severity == "info"
+
+
+def test_instruction_duplicates_ignores_invariant_blocks(kb_root: Path):
+    """A privacy rule inside an INVARIANT is the design (B1), not debt."""
+    (kb_root / "kb.config.yml").write_text(
+        "privacy:\n  raw_indexing_allowed: false\n"
+        "language_policy:\n  primary: en\n",
+        encoding="utf-8",
+    )
+    _write_agents(
+        kb_root,
+        _wrapped(
+            "## Forbidden\n- Do not index `raw/` directly\n",
+            "## Language\n\nPrimary language: **en**.\n",
+        ),
+    )
+    report = kb_lint.run_lint(kb_root, only={"instruction-duplicates"})
+    assert [i for i in report.issues if i.check == "instruction-duplicates"] == []
+
+
+def test_instructions_review_stale_warns(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "instructions_review:\n  reviewed_at: 2020-01-01\n"
+        "instructions_lint:\n  review_stale_days: 90\n",
+        encoding="utf-8",
+    )
+    _write_agents(kb_root, _wrapped("## Forbidden\n", "## Language\n"))
+    report = kb_lint.run_lint(kb_root, only={"instructions-review"})
+    issues = [i for i in report.issues if i.check == "instructions-review"]
+    assert issues and issues[0].severity == "warning"
+
+
+def test_assumption_hotspot_info_when_area_repeats(kb_root: Path):
+    from datetime import date
+
+    day = date.today().isoformat()
+    folder = kb_root / "interactions" / "sessions" / f"{day}__x"
+    folder.mkdir(parents=True)
+    bullets = "\n".join(
+        f"- parked note in `domain/` because routing was unclear ({i})"
+        for i in range(4)
+    )
+    (folder / f"{day}__summary.md").write_text(
+        f"---\nsession_date: {day}\n---\n\n# S\n\n## Assumptions\n"
+        + bullets
+        + "\n",
+        encoding="utf-8",
+    )
+    report = kb_lint.run_lint(kb_root, only={"assumption-hotspot"})
+    issues = [i for i in report.issues if i.check == "assumption-hotspot"]
+    assert issues and issues[0].severity == "info"
+    assert "domain" in issues[0].message
+
+
+def test_profile_review_stale_warns(kb_root: Path):
+    (kb_root / "kb.config.yml").write_text(
+        "profile_review:\n  reviewed_at: 2020-01-01\n",
+        encoding="utf-8",
+    )
+    report = kb_lint.run_lint(kb_root, only={"profile-review"})
+    issues = [i for i in report.issues if i.check == "profile-review"]
+    assert issues and issues[0].severity == "warning"
+
+
+def test_instruction_checks_are_registered():
+    for name in (
+        "invariants",
+        "agents-bytes",
+        "instruction-absolutes",
+        "work-ordering",
+        "instruction-duplicates",
+        "instructions-review",
+        "assumption-hotspot",
+        "profile-review",
+    ):
+        assert name in kb_lint.ALL_CHECKS
+
+
+def test_instruction_checks_skip_when_agents_md_missing(kb_root: Path):
+    report = kb_lint.run_lint(
+        kb_root,
+        only={
+            "invariants",
+            "agents-bytes",
+            "instruction-absolutes",
+            "work-ordering",
+            "instruction-duplicates",
+            "instructions-review",
+            "assumption-hotspot",
+            "profile-review",
+        },
+    )
+    assert report.issues == []
+
+
 def test_bom_page_parses_cleanly(kb_root: Path):
     p = kb_root / "knowledge" / "domain" / "bom.md"
     p.parent.mkdir(parents=True, exist_ok=True)

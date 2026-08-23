@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/16_MERGE.md
 source_commit: d82f0395afa7e65a0d84b4ba78f99701048f2bfe
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 
@@ -276,7 +276,7 @@ merge_source_fingerprint: "sha256:1a2b3c…"    # отпечаток на мом
 Затем в чате с AI:
 
 ```
-Прочитай AGENTS.md и используй его как основную инструкцию для всего, что следует дальше.
+Используй AGENTS.md как основную инструкцию
 !merge
 ```
 

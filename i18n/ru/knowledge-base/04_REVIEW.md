@@ -20,6 +20,7 @@ translator: ai-assisted
 | `review/needs-ai-decision/` | Нужен смысловой анализ | AI-агент в IDE |
 | `review/needs-redaction/` | Обнаружены чувствительные данные | AI-агент + человек |
 | `review/excluded-sensitive/` | Нельзя использовать | Никто (архив) |
+| `review/needs-heal/` | Догоняющие пункты после апгрейда (`HEAL_PLAN.md`) | `!heal` — см. `18_HEAL.md` |
 
 Весь `review/` исключён из Repomix-индекса.
 

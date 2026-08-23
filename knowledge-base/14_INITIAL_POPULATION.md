@@ -5,6 +5,7 @@
 > **Reference template:** `knowledge-base/templates/DATA_PLACEMENT_EXAMPLES.md.template` — a starting skeleton.
 > **Reference role template (for custom roles):** `knowledge-base/templates/role.yml.template`.
 > **Reference generator (preferred):** `scripts/kb_populate.py` — yaml → markdown without LLM tokens.
+> **Structure sketches (before folders):** `scripts/kb_structure.py` — four variants + blind-spot list from the same YAML (`02_INIT.md`).
 > **Source of examples:** the `placement_examples:` section inside `examples/<role>.yml`.
 >
 > ⚠️ **Path note:** during deployment the base lives at `<project-root>/knowledge-base/`, so `--kb-root knowledge-base` is the correct argument while building. After `setup/shell/finalize.sh` the base is flat at the project root and re-runs use `--kb-root .` (or omit the flag, since cwd is the root). The examples below assume the deployment-time path.
@@ -144,11 +145,12 @@ When deployment completes:
 - [ ] (Recommended) Read the generated file and appended a `## Project notes` section with user-specific tips
 - [ ] (Optional) Re-ran with `--create-samples` if the user wants format examples
 - [ ] **Generated `START_HERE.md`** from `templates/START_HERE.md.template` (parameterize `{{KB_NAME}}` and `{{PRIMARY_ROLE}}`)
+- [ ] **Wrote `eval/QUESTIONS.md`** from the three typical questions (mandatory Q6 in `02_INIT.md`); `eval/results/` exists and is empty
 - [ ] Ran `python3 knowledge-base/scripts/kb_doctor.py --root knowledge-base` to confirm the install
 - [ ] Ran `bash setup/shell/finalize.sh` — promotes the base to the project root, removes `setup/` and the empty `knowledge-base/`
 - [ ] Showed the user a 3-5 line summary in chat. **Must include**:
   - "Read `START_HERE.md` first."
-  - "Every new chat session: start with the line *'Read AGENTS.md and use it as the primary instruction for everything that follows.'*"
+  - "Every new chat session: start with *'Используй AGENTS.md как основную инструкцию'*."
   - The OS-specific watcher launcher (`watcher-start.command` for macOS, `./shell/watcher.sh` for Linux, `watcher-start.bat` for Windows)
 - [ ] Logged the operation in `log.md` (auto-handled if integrated)
 

@@ -24,6 +24,8 @@
 | `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` | ✅ in sync | `e630f31` | — |
 | `i18n/ru/knowledge-base/15_MEDIA_PROCESSING.md` | ✅ in sync | `988ed34` | — |
 | `i18n/ru/knowledge-base/16_MERGE.md` | ✅ in sync | `d82f039` | — |
+| `i18n/ru/knowledge-base/17_REFACTOR.md` | ✅ in sync | pending | — |
+| `i18n/ru/knowledge-base/18_HEAL.md` | ✅ in sync | pending | — |
 | `i18n/ru/knowledge-base/README.md` | ✅ in sync | `d82f039` | — |
 | `i18n/ru/quick-start/INIT_GUIDE.md` | ✅ in sync | `1237e83` | — |
 

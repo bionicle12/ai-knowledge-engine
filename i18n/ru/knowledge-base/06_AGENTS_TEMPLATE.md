@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/06_AGENTS_TEMPLATE.md
 source_commit: 093d47fc1366085f87cd895756e9db194409202e
-source_version: 0.13.0
-translated_at: 2026-08-20
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 
@@ -14,11 +14,15 @@ translator: ai-assisted
 >
 > **Принадлежность после развёртывания:** `AGENTS.md` принадлежит базе, а не
 > движку. Агенты дорабатывают его в процессе работы; обновления
-> (`kb_upgrade.py`) поддерживают только managed-блоки `AI-KE:*` и **никогда не
-> перезаписывают блок с локальными правками** — вместо этого пишут
-> `.new`-файл рядом и просят ИИ-агента сделать merge (см.
-> `docs/UPGRADING.md`). Ни один скрипт не имеет права заменить этот файл
-> целиком.
+> (`kb_upgrade.py`) поддерживают managed-блоки `AI-KE:INDEX` и `AI-KE:VIEW` и
+> **никогда не перезаписывают блок с локальными правками** — вместо этого
+> пишут `.new`-файл рядом и просят ИИ-агента сделать merge (см.
+> `docs/UPGRADING.md`). Блоки `AI-KE:INVARIANT` (`forbidden`, `language`)
+> никогда не пишутся и не перезаписываются автоматически; отсутствие
+> обёрток — ошибка lint и assisted-шаг heal. Ни один скрипт не имеет права
+> заменить этот файл целиком. Ужимать — через `!refactor` (`17_REFACTOR.md`):
+> два шага, решения владельца, eval до и после. Не раздувай файл
+> пересказом `kb.config.yml` или `mode_profiles`.
 
 ---
 
@@ -88,10 +92,9 @@ translator: ai-assisted
 
 ## Feedback Loop
 
-Во время работы с пользователем AI-агент захватывает выводы из диалогов:
-- Автоматически определяет, когда накопился содержательный материал
-- Пишет session summary в `interactions/sessions/` (с секцией «Обработанные материалы»)
-- По команде `!save` — немедленно сохраняет текущие выводы
+Пиши session summary в `interactions/sessions/` по `!save` или когда
+пользователь явно просит сохранить. Не выдумывай запись потому что
+«накопилось достаточно материала».
 
 ### Команды
 
@@ -100,25 +103,19 @@ translator: ai-assisted
 | `!view` | Запустить или повторно открыть локальный read-only граф знаний | 0 токенов |
 | `!save` | Сохранить session summary + enrichment сейчас | ~2K токенов |
 | `!reflect` | Запустить рефлексию: синтез insights из накопленного | ~15K токенов |
-| `!audit` | Запустить AI-ревью базы (lint уровня 2) | ~50-100K токенов |
+| `!audit` | L2 по пакам — `.repomix/audit/<pack>__request.md`, новая сессия | ~5–20K / пак |
 | `!review` | Пройтись по `review/needs-classification/`, `review/needs-ai-decision/` и `review/needs-redaction/`, обработать каждый элемент и отчитаться, что было извлечено, отредактировано, архивировано или отложено | ~5–30K токенов |
 | `!populate` | Перегенерировать `DATA_PLACEMENT_EXAMPLES.md` (запустить `python3 scripts/kb_populate.py --role <role> --kb-root .`) | ~50 токенов |
+| `!heal` | Догоняющая починка после апгрейда — `18_HEAL.md` | ~0–40K токенов |
+| `!refactor` | Двухшаговое ужатие инструкций — `17_REFACTOR.md`. `--global` только отчёт | ~5–40K токенов |
+| `!profile-review` | Интервью `knowledge/profile/` (по 3 вопроса) | ~5–15K токенов |
+| `!quiz` | Пять вопросов о том, что уже лежит в базе; сначала самые дорогие ошибки | ~5–15K токенов |
 | `!super` | Переключить режим: default ↔ super | 0 токенов |
 | `!super on/off` | Явно включить или выключить super mode | 0 токенов |
 | `!super status` | Показать текущий режим | 0 токенов |
 
-Для `!view` используй детерминированный локальный инструмент: не читай и не
-перестраивай граф средствами AI.
-
-- `!view` → запусти `python3 scripts/kb_view.py --background` и сообщи URL
-- `!view status` → запусти `python3 scripts/kb_view.py --status`
-- `!view stop` → запусти `python3 scripts/kb_view.py --stop`
-
-Вьювер уже покрывает разбор здоровья базы (чипы orphans / broken / stale /
-ambiguous с очередью исправлений и строкой-источником), полнотекстовый поиск,
-фокус на 1–3 хопа и кратчайший путь между страницами — отправляй пользователя
-туда вместо того, чтобы отвечать на вопросы «что куда ссылается» и «что
-сломано» средствами AI.
+Граф, sync и heal — это скрипты: не собирай граф и не выдумывай
+механику export/import/merge средствами AI.
 
 ## Жизненный цикл знаний
 
@@ -139,23 +136,9 @@ ambiguous с очередью исправлений и строкой-исто�
 | `default` | Python-first, throttled | ~3-4K | Обычная работа, ограниченный бюджет |
 | `super` | AI-first, on-demand | ~50-200K+ | Безлимитный план, интенсивное наполнение базы |
 
-### default mode
-- Surprise filter: Python NLP overlap (0 tok)
-- Annotations: Python шаблонные (0 tok)
-- Entity resolution: Python fuzzy match (0 tok)
-- Рефлексия: по threshold (≥25) ИЛИ ≥7 дней + changes
-- Lint L2: только по `!audit`
-- Review queue: ждёт ручного запуска
-
-### super mode
-- Surprise filter: AI семантический анализ каждого ingest (~2-5K tok)
-- Annotations: AI содержательные связи с предложениями правок (~1-3K tok)
-- Entity resolution: AI семантический + cross-language (~500-1K tok)
-- Рефлексия: после каждого значимого ingest (importance ≥5)
-- Lint L2: автоматически при каждой консолидации (24h)
-- Review queue: AI автоматически обрабатывает `review/needs-ai-decision/`
-
 > ⚠️ **Super mode** потребляет максимально возможное количество токенов и может выжрать все лимиты. Взамен — максимальная скорость и качество обучения системы.
+
+Цифры токенов живут в `kb.config.yml` `mode_profiles` — не повторяй их здесь.
 
 ## Context Budget
 
@@ -165,33 +148,10 @@ ambiguous с очередью исправлений и строкой-исто�
    (синтезированное → сырое; как в Hindsight — сначала «что я думаю», потом «что я знаю»)
 2. **Routing first:** всегда начинай с routing table, не загружай все файлы домена
 3. **Лимит загрузки:** не больше 7 knowledge/ файлов в контексте одновременно
-4. Если загрузил > 5 файлов — остановись и оцени: все ли нужны?
-5. Суммаризуй прочитанное, прежде чем загружать следующую порцию
-6. **Ранжирование:** при прочих равных предпочитай файлы с высоким `importance` и свежим `last_accessed`
-7. **Temporal filter:** если вопрос про конкретный период — фильтруй по `valid_from`/`valid_until`
-8. **Access tracking:** при чтении knowledge/ файла обнови `last_accessed` и `access_count += 1`
-
-## Token Budget
-
-Зависит от `mode` в `kb.config.yml`:
-
-### default mode — не более 10% токенов сессии
-
-- **При ingest:** importance scoring (~500 tok) + review если сложный (~5-15K)
-- **При query-writeback:** 1 вызов (~3K tok)
-- **Surprise filter:** Python-only (0 tok), AI только для >3000 слов (max 2/день)
-- **Self-editing annotations:** Python-only (0 tok), без LLM
-- **Рефлексия и lint L2:** ТОЛЬКО по команде `!reflect` / `!audit` или еженедельно
-
-### super mode — без ограничений
-
-- **При ingest:** AI surprise (~2-5K) + AI annotations (~1-3K) + AI entity resolution (~1K) + importance с reasoning (~1-2K)
-- **При query-writeback:** 1 вызов + автоматическое обновление связанных страниц (~5-8K)
-- **Surprise filter:** AI для **каждого** материала, без ограничений по размеру/частоте
-- **Self-editing annotations:** AI содержательные + предложения правок
-- **Рефлексия:** после каждого значимого ingest (importance ≥5)
-- **Lint L2:** автоматически при каждой консолидации
-- **Review queue:** автоматическая обработка без ожидания `!audit`
+4. Суммаризуй прочитанное, прежде чем загружать следующую порцию
+5. **Ранжирование:** при прочих равных предпочитай файлы с высоким `importance` и свежим `last_accessed`
+6. **Temporal filter:** если вопрос про конкретный период — фильтруй по `valid_from`/`valid_until`
+7. **Access tracking:** обновляй `last_accessed` и `access_count += 1` только если страница реально повлияла на ответ — не на каждый взгляд
 
 ## Язык
 

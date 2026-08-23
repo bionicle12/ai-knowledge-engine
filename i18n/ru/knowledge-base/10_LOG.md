@@ -57,6 +57,10 @@ knowledge-base/
 | `archive` | Страница перемещена в _archive/ |
 | `reindex` | Repomix-индекс перегенерирован |
 | `nlp-enrich` | NLP-предобработка нового материала |
+| `heal` | Догоняющая починка после апгрейда (`kb_heal.py` / `!heal`) |
+| `refactor` | Ужатие инструкций (`!refactor` / `17_REFACTOR.md`) |
+| `mutate` | Самопроверка L1 (`kb_mutate.py`) |
+| `quiz` | Экзамен владельца (`!quiz`) — ответы в `interactions/quiz/` |
 
 ---
 

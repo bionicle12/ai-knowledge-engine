@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/14_INITIAL_POPULATION.md
 source_commit: e630f31fd065e0e360416d60c166232da2494398
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 
@@ -13,6 +13,7 @@ translator: ai-assisted
 > **Reference template:** `knowledge-base/templates/DATA_PLACEMENT_EXAMPLES.md.template` — стартовый скелет.
 > **Reference role template (для кастомных ролей):** `knowledge-base/templates/role.yml.template`.
 > **Reference generator (предпочтительный путь):** `scripts/kb_populate.py` — yaml → markdown без LLM-токенов.
+> **Эскизы структуры (до папок):** `scripts/kb_structure.py` — четыре варианта + список слепых зон из того же YAML (`02_INIT.md`).
 > **Источник примеров:** секция `placement_examples:` внутри `examples/<role>.yml`.
 >
 > ⚠️ **Замечание о путях:** во время развёртывания база живёт в `<project-root>/knowledge-base/`, поэтому на этапе сборки правильный аргумент — `--kb-root knowledge-base`. После `setup/shell/finalize.sh` база лежит плоско в корне проекта, и повторные запуски используют `--kb-root .` (или вовсе без флага, так как cwd — корень). Примеры ниже предполагают путь этапа развёртывания.
@@ -152,11 +153,12 @@ python3 knowledge-base/scripts/kb_populate.py --role <role> --create-samples --k
 - [ ] (Рекомендуется) Прочитан сгенерированный файл и дописана секция `## Project notes` с user-specific советами
 - [ ] (Опционально) Повторный запуск с `--create-samples`, если пользователь хочет примеры форматов
 - [ ] **Сгенерирован `START_HERE.md`** из `templates/START_HERE.md.template` (параметризовать `{{KB_NAME}}` и `{{PRIMARY_ROLE}}`)
+- [ ] **Записан `eval/QUESTIONS.md`** по трём типовым вопросам (обязательный вопрос 6 в `02_INIT.md`); `eval/results/` существует и пуст
 - [ ] Запущен `python3 knowledge-base/scripts/kb_doctor.py --root knowledge-base` для подтверждения установки
 - [ ] Запущен `bash setup/shell/finalize.sh` — поднимает базу в корень проекта, удаляет `setup/` и пустую `knowledge-base/`
 - [ ] Пользователю показано summary на 3-5 строк в чате. **Обязательно включает**:
   - «Сначала прочитай `START_HERE.md`.»
-  - «Каждая новая чат-сессия: начинай со строки *«Прочитай AGENTS.md и используй его как основную инструкцию для всего, что последует дальше»*.»
+  - «Каждая новая чат-сессия: начинай словами *«Используй AGENTS.md как основную инструкцию»*.»
   - OS-специфичный лаунчер watcher-а (`watcher-start.command` для macOS, `./shell/watcher.sh` для Linux, `watcher-start.bat` для Windows)
 - [ ] Операция записана в `log.md` (автоматически, если интеграция настроена)
 

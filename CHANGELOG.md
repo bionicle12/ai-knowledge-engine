@@ -18,7 +18,76 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-23
+
+### Changed
+- **AGENTS.md template (iteration C2, owner verdicts).** Dropped
+  `## Token budget` and the long default/super checklists; kept a short
+  mode table plus the Super-mode warning. Chat-attached stays 8 steps.
+  Knowledge lifecycle stays. Both reading orders stay. Feedback writes
+  only on `!save` / an explicit ask. Loading cap stays 7 files; the
+  "> 5, stop" line is gone. `last_accessed` updates only when a page
+  influenced the answer. Command extras collapsed to one line (scripts,
+  not AI). INDEX and INVARIANT untouched. Lint / doctor size warn is
+  10 KiB: what both measure is the *deployed* `AGENTS.md`, and `kb_upgrade`
+  appends the managed `!view` block to it — stock template 8990 B + 454 B
+  = 9419 B, which a 9 KiB threshold yellowed straight out of the box.
+
 ### Added
+- **Deploy interview and owner exam (iteration E).** `02_INIT` runs a
+  blind-spot pass before any `knowledge/` folders, then
+  `kb_structure.py` writes four sketches (project / artefact / time /
+  decision) for the owner to react to — not a folder questionnaire.
+  `!quiz` exams the owner on what is already in the base. `kb_reflect`
+  returns an exploration slot: up to two disconnected graph pairs with
+  overlap `< 0.8`.
+- **Loop quality (iteration D).** `kb_mutate.py` plants seven L1 defects
+  and scores killed/survivors; `kb_doctor --with-mutation` is opt-in.
+  `kb_reindex` writes `.repomix/audit/<pack>__request.md` for `!audit`
+  (fresh session, `file:line` + quote required). Session summaries gain
+  `## Assumptions`; lint info if one area collects >3 in 30 days.
+  `kb_reflect.py` treats 0 insights as valid, blocks scheduled runs after
+  two zero results, and exposes `meta_insight_allowed`. `!profile-review`
+  plus lint on `profile_review.reviewed_at` (30 days; skip if missing).
+- **`!refactor` (C3) and `instructions_review` (C4).** `17_REFACTOR.md`
+  is a two-step audit-then-rewrite; `--global` reports conflicts with
+  `~/.codex/AGENTS.md` and writes nothing outside the base. Config
+  template has `instructions_review:` (lint already warned when
+  `reviewed_at` was stale). Heal can append the block and flags old
+  AGENTS.md Token-budget / auto-detect leftovers as stage-4 trim.
+- **Catch-up heal after upgrade (iteration F).** `kb_heal.py --plan`
+  writes `review/needs-heal/HEAL_PLAN.md` (doctor + lint +
+  `MIGRATIONS.md` + `.new` sidecars + stale packs); `--apply auto` is
+  idempotent with `.kb-backups/` and rolls back if eval marks a
+  regression; `kb_upgrade.py` runs detect + auto (also when customized
+  > 0; `--dry-run` stays dry; `--no-heal` / `heal.auto_apply: false`
+  disable it); `18_HEAL.md` defines `!heal` and five `heal.stage`
+  steps with trim locked until measure; `kb_doctor` warns if the
+  version moved without heal or a stage stalled. Heal edits
+  `kb.config.yml` line by line so its comments survive, stamps
+  `last_run.version` with the version the upgrade is moving to (it runs
+  before the bump because it needs the old one for the `MIGRATIONS.md`
+  range), lists a locked stage-4 finding once rather than in two
+  sections, and steps aside with a warning instead of aborting the
+  upgrade when the config does not parse.
+- **Instruction invariants and eval lite (iteration B).** `AI-KE:INVARIANT`
+  wrappers around `## Forbidden` and `## Language` (upgrade reports them,
+  never writes or overwrites); six L1 instruction-budget checks in
+  `kb_lint.py` with thresholds in `instructions_lint:` (work-ordering
+  phrases match case-insensitively; the duplicate check exempts text inside
+  INVARIANT blocks, where a copy is the point); `eval/QUESTIONS.md`
+  template plus empty `eval/results/` (not indexed); deploy asks the three
+  typical questions. No `kb_eval.py`.
+- **Codex-first agent environment (iteration A).** Opening-line insurance
+  in `START_HERE.md` (auto-load is explained; the chatbot-era "agent is
+  blind without the line" claim is gone); `finalize.sh` asks about Claude
+  Code and can write a one-line `CLAUDE.md` (`@AGENTS.md`); `kb_doctor`
+  runs six Codex-environment checks (git-root `AGENTS.md`, 10 KiB size,
+  24/32 KiB combined budget with `~/.codex`, `AGENTS.override.md`,
+  `CLAUDE.md` import); `index.window_profile: 400k` (pack ceiling 120K);
+  `MIGRATIONS.md` records the catch-up steps for deployed bases.
+  Opening-line wording aligned in `README.md`, `16_MERGE.md`, and
+  `quick-start/INIT_GUIDE.md` (plus ru translations).
 - **Graph viewer (`!view`) redesigned around base maintenance.**
   - **Health bar + fix queue.** Always-visible, combinable chips for
     orphans / broken links / stale / ambiguous pages (replacing the hidden

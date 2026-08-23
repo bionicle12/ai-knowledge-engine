@@ -38,9 +38,13 @@ def test_init_dirs(kb_root: Path):
     # Sub-folders
     assert (kb_root / "raw" / "documents" / "unsorted").is_dir()
     assert (kb_root / "processed" / "markdown").is_dir()
+    assert (kb_root / "eval" / "results").is_dir()
     assert (kb_root / "knowledge" / "domain").is_dir()
     assert (kb_root / "review" / "needs-ai-decision").is_dir()
+    assert (kb_root / "review" / "needs-heal").is_dir()
     assert (kb_root / "interactions" / "sessions").is_dir()
+    assert (kb_root / "interactions" / "init").is_dir()
+    assert (kb_root / "interactions" / "quiz").is_dir()
 
 
 def test_ingest_simple_md(kb_root: Path):

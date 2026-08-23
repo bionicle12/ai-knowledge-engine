@@ -8,7 +8,8 @@ source repo's `VERSION`, then optionally syncs:
   * Local graph viewer assets (`scripts/kb_viewer/**`)
   * Shell wrappers under `shell/`
   * Small managed blocks in `AGENTS.md`: `!view` commands and pack-index
-    loading rules (with the mid-session context-recovery anchor)
+    loading rules (with the mid-session context-recovery anchor).
+    `AI-KE:INVARIANT` blocks are reported only — never written or replaced.
   * An additive `index:` section in `kb.config.yml` (switches the base from
     the monolithic output.xml to pack-based indexing, see 05_INDEX.md)
 
@@ -44,6 +45,9 @@ from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_SCRIPTS_DIR = REPO_ROOT / "knowledge-base" / "scripts"
+if str(SRC_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_SCRIPTS_DIR))
+import kb_common as kbc  # noqa: E402
 SRC_SHELL_DIR = REPO_ROOT / "knowledge-base" / "shell"
 SRC_TEMPLATES_DIR = REPO_ROOT / "knowledge-base" / "templates"
 VERSION_FILE = REPO_ROOT / "VERSION"
@@ -53,9 +57,11 @@ SCRIPT_FILES = (
     "kb_common.py",
     "kb_doctor.py",
     "kb_export.py",
+    "kb_heal.py",
     "kb_import.py",
     "kb_ingest.py",
     "kb_lint.py",
+    "kb_mutate.py",
     "kb_nlp_batch.py",
     "kb_ocr.py",
     "kb_populate.py",
@@ -63,6 +69,7 @@ SCRIPT_FILES = (
     "kb_reindex.py",
     "kb_route.py",
     "kb_save_session.py",
+    "kb_structure.py",
     "kb_stt.py",
     "kb_update.py",
     "kb_view.py",
@@ -143,7 +150,7 @@ INDEX_YAML_BLOCK = """\
 # every load under a ceiling. compress stays false: wording is the payload.
 index:
   enabled: true
-  window_profile: "256k"            # 256k (ceiling 80K) | 200k (60K) | 1m (150K)
+  window_profile: "256k"            # 400k (Codex, 120K) | 256k (80K) | 200k (60K) | 1m (150K)
   packs: auto
 """
 
@@ -514,6 +521,21 @@ def update_managed_index_block(agents_file: Path, *, dry_run: bool) -> str:
     )
 
 
+def report_invariant_blocks(agents_file: Path) -> tuple[str, str]:
+    """Report INVARIANT presence. Never writes or wraps the file.
+
+    Returns ``(state, action)``. Missing wrappers are left for ``!heal``.
+    """
+    if not agents_file.is_file():
+        return "missing", "left for !heal"
+    text = agents_file.read_text(encoding="utf-8")
+    present = kbc.invariant_ids(text)
+    required = kbc.REQUIRED_INVARIANT_IDS
+    if required <= present and not kbc.invariant_problems(text):
+        return "present", "respected (never overwritten)"
+    return "missing", "left for !heal"
+
+
 def kb_config_index_state(kb_root: Path) -> str:
     cfg_file = kb_root / "kb.config.yml"
     if not cfg_file.is_file():
@@ -574,6 +596,58 @@ def _bump_deployed_version(kb_root: Path, repo_version: str) -> None:
     cfg_file.write_text("".join(new_text), encoding="utf-8")
 
 
+def run_post_upgrade_heal(
+    kb_root: Path,
+    *,
+    dry_run: bool,
+    enabled: bool,
+    target_version: str | None = None,
+) -> None:
+    """Detect (always) and apply the auto bucket unless dry-run / disabled.
+
+    Never fatal: a base with an unreadable `kb.config.yml` still deserves its
+    file sync. Heal reports the problem and steps aside.
+    """
+    if not enabled:
+        print("Heal skipped (--no-heal)")
+        return
+    try:
+        import kb_heal
+    except ImportError:
+        print("[WARN] kb_heal.py not available; skip post-upgrade heal")
+        return
+    try:
+        _run_heal(kb_heal, kb_root, dry_run=dry_run, target_version=target_version)
+    except Exception as exc:  # noqa: BLE001 — heal must not abort the upgrade
+        print(f"[WARN] heal skipped: {type(exc).__name__}: {exc}")
+        print("  Fix kb.config.yml, then run: python3 scripts/kb_heal.py --plan")
+
+
+def _run_heal(
+    kb_heal, kb_root: Path, *, dry_run: bool, target_version: str | None
+) -> None:
+    findings = kb_heal.collect_findings(kb_root)
+    auto = [item for item in findings if item.bucket == "auto"]
+    assisted = [item for item in findings if item.bucket == "assisted"]
+    human = [item for item in findings if item.bucket == "human"]
+    if dry_run:
+        print(
+            f"Heal detect (dry-run, not written): auto={len(auto)} "
+            f"assisted={len(assisted)} human={len(human)}"
+        )
+        print('→ next: скажи агенту "!heal"')
+        return
+    kb_heal.write_plan(kb_root)
+    cfg = kbc.load_config(kb_root)
+    heal_cfg = (cfg.raw.get("heal") or {}) if cfg.raw else {}
+    applied: list = []
+    if heal_cfg.get("auto_apply", True):
+        applied = kb_heal.apply_auto(kb_root, version=target_version)
+        findings = kb_heal.collect_findings(kb_root)
+    stage = int(heal_cfg.get("stage") or 1)
+    print(kb_heal.summarize(findings, applied, stage))
+
+
 def upgrade_one(kb_root: Path, args: argparse.Namespace) -> int:
     if not (kb_root / "kb.config.yml").is_file():
         print(f"[ERROR] {kb_root}: kb.config.yml not found", file=sys.stderr)
@@ -625,6 +699,12 @@ def upgrade_one(kb_root: Path, args: argparse.Namespace) -> int:
         customized += 1
         ai_merge_sidecars.append(index_action.rsplit("→ ", 1)[-1])
 
+    invariant_state, invariant_action = report_invariant_blocks(agents_file)
+    print(
+        f"{'AGENTS.md (INVARIANT blocks)':<46} {invariant_state:<20} "
+        f"{invariant_action}"
+    )
+
     if ai_merge_sidecars:
         print(
             "\nAGENTS.md has local improvements in managed blocks — they were "
@@ -638,6 +718,17 @@ def upgrade_one(kb_root: Path, args: argparse.Namespace) -> int:
     print(f"{'kb.config.yml (index: section)':<46} {index_cfg_state:<20} {index_cfg_action}")
     if index_cfg_state == "missing":
         changed = True
+
+    # Heal runs before the version bump on purpose: it needs the *old*
+    # instructions_version to pick the MIGRATIONS.md range. Pass the version the
+    # base is about to carry, so heal.last_run does not stamp a stale one and
+    # make doctor cry "version moved without heal" on a clean upgrade.
+    run_post_upgrade_heal(
+        kb_root,
+        dry_run=args.dry_run,
+        enabled=not getattr(args, "no_heal", False),
+        target_version=repo_version if customized == 0 else None,
+    )
 
     if args.diff and customized:
         print("\n=== Diffs ===\n")
@@ -702,6 +793,11 @@ def main(argv: list[str] | None = None) -> int:
         "--force",
         action="store_true",
         help="Overwrite every customized reference file",
+    )
+    parser.add_argument(
+        "--no-heal",
+        action="store_true",
+        help="Skip post-upgrade detect / auto-heal (heal.auto_apply still applies otherwise)",
     )
     args = parser.parse_args(argv)
 

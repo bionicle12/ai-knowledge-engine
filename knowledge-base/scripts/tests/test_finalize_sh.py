@@ -71,12 +71,15 @@ def _stage_project(root: Path, *, valid: bool = True) -> Path:
     return kb
 
 
-def _run_finalize(root: Path, *args: str) -> subprocess.CompletedProcess:
+def _run_finalize(
+    root: Path, *args: str, stdin: str = ""
+) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", str(root / "setup" / "shell" / "finalize.sh"), *args],
         capture_output=True,
         text=True,
         check=False,
+        input=stdin,
     )
 
 
@@ -268,3 +271,34 @@ def test_finalize_promotion_does_not_overwrite_existing_root_launcher(tmp_path: 
         "#!/bin/bash\necho USER_CUSTOM\n"
     # shell/ duplicate also kept since promotion was skipped
     assert (tmp_path / "shell" / "watcher-start.command").is_file()
+
+
+def test_finalize_writes_one_line_claude_md_on_yes(tmp_path: Path):
+    _stage_project(tmp_path)
+    result = _run_finalize(tmp_path, stdin="y\n")
+    assert result.returncode == 0, result.stderr + result.stdout
+    claude = tmp_path / "CLAUDE.md"
+    assert claude.is_file()
+    assert claude.read_text(encoding="utf-8") == "@AGENTS.md\n"
+
+
+def test_finalize_skips_claude_md_on_empty_or_no(tmp_path: Path):
+    _stage_project(tmp_path)
+    result = _run_finalize(tmp_path, stdin="n\n")
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert not (tmp_path / "CLAUDE.md").exists()
+
+
+def test_finalize_claude_md_flag_writes_without_prompt(tmp_path: Path):
+    _stage_project(tmp_path)
+    result = _run_finalize(tmp_path, "--claude-md")
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") == "@AGENTS.md\n"
+
+
+def test_finalize_dry_run_does_not_write_claude_md(tmp_path: Path):
+    _stage_project(tmp_path)
+    result = _run_finalize(tmp_path, "--dry-run", "--claude-md")
+    assert result.returncode == 0
+    assert not (tmp_path / "CLAUDE.md").exists()
+    assert not (tmp_path / "knowledge-base" / "CLAUDE.md").exists()

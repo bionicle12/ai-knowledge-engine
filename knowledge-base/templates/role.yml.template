@@ -39,6 +39,17 @@ ai_assistant_tasks:
   - "{{TASK_2}}"
   - "{{TASK_3}}"
 
+# Blind-spot interview (02_INIT, before any knowledge/ folders).
+# First items MUST be ones that change the folder layout. kb_structure.py
+# uses this list as-is; if omitted it derives defaults from entities.
+blind_spots:
+  - "{{Where do paused or abandoned efforts live? (changes knowledge/ layout)}}"
+  - "{{Does each artefact type earn a knowledge/ folder, or stay in raw/?}}"
+  - "{{How should something from two years ago be found? (date / project / decision)}}"
+  - "{{Which records stay immutable versus editable?}}"
+  - "{{What does this role usually forget to capture until it is gone?}}"
+  - "{{What would be expensive if the AI invented it because the base is silent?}}"
+
 # ============================================================================
 # placement_examples
 # ============================================================================

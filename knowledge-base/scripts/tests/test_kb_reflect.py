@@ -114,6 +114,54 @@ def test_marker_not_updated_in_dry_run(tmp_path: Path):
     assert not marker.exists(), "dry-run should not write marker"
 
 
+def test_stagnation_skips_scheduled_after_two_zero_insights(tmp_path: Path):
+    _write_config(tmp_path, threshold=1)
+    name = "x.md"
+    _add_log_entry(tmp_path, "ingest", name)
+    _add_metadata(tmp_path, name, importance=10)
+    _add_log_entry(tmp_path, "reflect", "0 insights — valid")
+    _add_log_entry(tmp_path, "reflect", "insights=0")
+    info = kb_reflect.determine_action(tmp_path, dry_run=True)
+    assert info["decision"] == "SKIP"
+    assert info["stagnation"] is True
+
+
+def test_record_result_zero_is_valid(tmp_path: Path):
+    _write_config(tmp_path)
+    kb_reflect.record_result(tmp_path, 0)
+    log = (tmp_path / "log.md").read_text(encoding="utf-8")
+    assert "0 insights" in log
+    assert "valid" in log
+
+
+def test_meta_insight_requires_new_l0(tmp_path: Path):
+    _write_config(tmp_path, threshold=999, min_interval=7)
+    kb_reflect._write_marker(
+        tmp_path / kb_reflect.REFLECTION_MARKER,
+        dt.datetime.now().astimezone(),
+    )
+    info = kb_reflect.determine_action(tmp_path, dry_run=True)
+    assert info["meta_insight_allowed"] is False
+    assert info["honest_zero_ok"] is True
+    assert info["max_insights_per_run"] == 3
+
+
+def test_exploration_slot_in_determine_action(tmp_path: Path):
+    _write_config(tmp_path)
+    page = tmp_path / "knowledge" / "domain"
+    page.mkdir(parents=True)
+    (page / "alpha.md").write_text(
+        "---\ntags: [alpha]\n---\n# Alpha\n", encoding="utf-8"
+    )
+    (tmp_path / "knowledge" / "projects").mkdir(parents=True)
+    (tmp_path / "knowledge" / "projects" / "beta.md").write_text(
+        "---\ntags: [beta]\n---\n# Beta\n", encoding="utf-8"
+    )
+    info = kb_reflect.determine_action(tmp_path, dry_run=True)
+    assert len(info["exploration"]) == 1
+    assert info["exploration"][0]["a"] == "domain/alpha"
+
+
 def test_marker_updated_when_decision_made(tmp_path: Path):
     _write_config(tmp_path, threshold=1)
     name = "x.md"

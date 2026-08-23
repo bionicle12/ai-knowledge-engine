@@ -1,0 +1,31 @@
+# Eval questions — {{KB_NAME}}
+
+Three typical questions the owner asks this base. Used as a **manual**
+before/after check when instructions change. Not indexed (`eval/**` is
+excluded from Repomix).
+
+How to run: open a **fresh** agent session, ask each question, save the
+answers in `eval/results/<YYYY-MM-DD>__<what-changed>.md` with a
+pass/fail note per bullet. No `kb_eval.py` — this is a human comparison.
+
+Fill the placeholders during deploy (`02_INIT` Q6). Keep rejected
+alternatives in the "must NOT propose" line so a trim of `AGENTS.md`
+cannot silently revive them.
+
+## Q1. {{EVAL_Q1}}
+
+- must cite: {{EVAL_Q1_CITE}}
+- must mention: {{EVAL_Q1_MENTION}}
+- must NOT propose: {{EVAL_Q1_FORBIDDEN}}
+
+## Q2. {{EVAL_Q2}}
+
+- must cite: {{EVAL_Q2_CITE}}
+- must mention: {{EVAL_Q2_MENTION}}
+- must NOT propose: {{EVAL_Q2_FORBIDDEN}}
+
+## Q3. {{EVAL_Q3}}
+
+- must cite: {{EVAL_Q3_CITE}}
+- must mention: {{EVAL_Q3_MENTION}}
+- must NOT propose: {{EVAL_Q3_FORBIDDEN}}

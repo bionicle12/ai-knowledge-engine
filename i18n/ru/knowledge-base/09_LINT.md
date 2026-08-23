@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/09_LINT.md
 source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 
@@ -41,6 +41,18 @@ translator: ai-assisted
 | **Low importance + stale** | `importance < 3` + `lifecycle: temporal` + `last_accessed > 90 дней` → предложить архивировать | ℹ️ info |
 | **Annotation overflow** | Файл имеет > 5 `context_annotations` → предложить создать insight | ℹ️ info |
 | **Expired temporal** | `valid_until != null` + `valid_until < now` + файл не в `_archive/` | 🟡 warning |
+| **Invariants** | В `AGENTS.md` нет обязательного блока `AI-KE:INVARIANT` (`forbidden`, `language`) или маркеры сломаны. Пропускает, если `AGENTS.md` нет | 🔴 error |
+| **AGENTS.md bytes** | **Развёрнутый** `AGENTS.md` больше `instructions_lint.agents_max_bytes` (по умолчанию 10240 / 10 KiB) → предложить `!refactor`. Шаблон намеренно меньше порога: `kb_upgrade` дописывает в развёрнутый файл управляемый блок `!view` | 🟡 warning |
+| **Instruction absolutes** | `always` / `never` / `must` / `forbidden` вне блоков INVARIANT больше `absolute_max_outside_invariants` (по умолчанию 8) | 🟡 warning |
+| **Work-ordering phrases** | Любая фраза из конфига, без учёта регистра (`thoroughly`, `consider all`, `максимально тщательно`, …) — раздувает рассуждения, не точность | 🟡 warning |
+| **Instruction duplicates** | `AGENTS.md` повторяет `privacy.*` или `language_policy` из `kb.config.yml`. Текст **внутри** блоков `AI-KE:INVARIANT` не считается — копия там сделана намеренно, она обязана пережить любое сокращение | ℹ️ info |
+| **Instructions review** | `instructions_review.reviewed_at` старше `review_stale_days` (по умолчанию 90). **Пропускает**, если поля нет. Процедура: `17_REFACTOR.md` | 🟡 warning |
+| **Assumption hotspot** | Больше 3 буллетов `## Assumptions` про одну `knowledge/<area>/` за 30 дней → уточнить `DATA_PLACEMENT_EXAMPLES.md` | ℹ️ info |
+| **Profile review** | `profile_review.reviewed_at` старше 30 дней. **Пропускает**, если поля нет. Процедура: `!profile-review` | 🟡 warning |
+
+Пороги бюджетных проверок инструкций живут в корневом `instructions_lint:`
+в `kb.config.yml`, не в скрипте и не в `mode_profiles.*.lint` (тот блок —
+уровень 2).
 
 ### Уровень 2: AI-ревью (LLM) — mode-aware
 
@@ -181,6 +193,24 @@ echo "- Report: see lint-report.md" >> log.md
 ```bash
 chmod +x lint.sh
 ```
+
+---
+
+## Мутационная проверка (`kb_mutate.py`)
+
+Копирует базу (плюс крошечный seed) во временное дерево, сажает **семь**
+L1-дефектов и считает, что lint убил:
+
+битая wikilink, дубль slug, неверный `source_hash`, протухший
+`last_verified`, сирота, истекший `valid_until`, дырявый frontmatter.
+
+```bash
+python3 scripts/kb_mutate.py
+python3 scripts/kb_doctor.py --with-mutation   # не в обычном прогоне doctor
+```
+
+Строка отчёта: `7 mutations / 7 killed / 0 survivors`. Выжившие — дыра в
+проверке. L2-противоречия сюда не сажаем; это `!audit`.
 
 ---
 

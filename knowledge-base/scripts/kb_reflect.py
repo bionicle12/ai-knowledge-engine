@@ -123,6 +123,47 @@ def _importance_since(
     return count, total
 
 
+_ZERO_INSIGHT_RE = re.compile(r"\b(0|zero)\s+insights?\b", re.IGNORECASE)
+_INSIGHT_COUNT_RE = re.compile(r"insights?=(\d+)", re.IGNORECASE)
+
+
+def _reflect_insight_count(title: str) -> int | None:
+    match = _INSIGHT_COUNT_RE.search(title)
+    if match:
+        return int(match.group(1))
+    if _ZERO_INSIGHT_RE.search(title):
+        return 0
+    return None
+
+
+def _stagnation(log_entries: list[tuple[_dt.datetime, str, str]]) -> bool:
+    reflects = [title for _ts, op, title in log_entries if op == "reflect"]
+    if len(reflects) < 2:
+        return False
+    last_two = [_reflect_insight_count(t) for t in reflects[-2:]]
+    return last_two == [0, 0]
+
+
+def record_result(root: Path, insights: int) -> None:
+    """Log a finished reflection. Zero insights is a valid expected outcome."""
+    title = (
+        "0 insights — valid"
+        if insights <= 0
+        else f"insights={min(insights, 999)}"
+    )
+    kbc.append_log(
+        operation="reflect",
+        title=title,
+        details=[
+            f"insights={max(insights, 0)}",
+            "zero insights is a valid expected outcome"
+            if insights <= 0
+            else "ceiling is max_insights_per_run (not a quota)",
+        ],
+        root=root,
+    )
+
+
 def determine_action(root: Path, *, dry_run: bool = False) -> dict:
     cfg = kbc.load_config(root)
     profile = cfg.profile()
@@ -173,9 +214,16 @@ def determine_action(root: Path, *, dry_run: bool = False) -> dict:
         decision = "ON_DEMAND_DUE"
         reasons.append("super mode + on-demand + interval reached")
 
+    stagnated = _stagnation(log_entries)
+    if decision != "SKIP" and stagnated:
+        reasons.append("stagnation: two consecutive zero-insight reflections")
+        decision = "SKIP"
+
     if decision != "SKIP" and not dry_run:
         _write_marker(marker_path, now)
 
+    max_insights = profile.reflection_max_insights_per_run
+    exploration = exploration_slot(root)
     return {
         "mode": cfg.mode,
         "decision": decision,
@@ -186,7 +234,25 @@ def determine_action(root: Path, *, dry_run: bool = False) -> dict:
         "threshold": threshold,
         "min_interval_days": min_interval_days,
         "last_reflection": last_reflection.isoformat() if last_reflection else None,
+        "max_insights_per_run": max_insights,
+        "honest_zero_ok": True,
+        "meta_insight_allowed": count_changes > 0,
+        "stagnation": stagnated,
+        "exploration": exploration,
     }
+
+
+def exploration_slot(root: Path) -> list[dict]:
+    """1–2 graph gaps for the reflection write-up. Empty is valid."""
+    try:
+        import kb_view
+    except Exception:
+        return []
+    try:
+        graph = kb_view.build_graph(root)
+        return kb_view.exploration_pairs(graph)
+    except Exception:
+        return []
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -201,9 +267,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--generate", action="store_true",
                         help="Placeholder for AI-driven reflection (not implemented in Python)")
+    parser.add_argument(
+        "--record-result",
+        type=int,
+        default=None,
+        metavar="N",
+        help="log a finished reflection with N insights (0 is valid)",
+    )
     args = parser.parse_args(argv)
 
     root = args.root or kbc.find_kb_root()
+    if args.record_result is not None:
+        record_result(root, args.record_result)
+        print(f"recorded insights={args.record_result}")
+        return 0
     info = determine_action(root, dry_run=args.dry_run or args.generate)
 
     if args.count_changes:
@@ -221,8 +298,17 @@ def main(argv: list[str] | None = None) -> int:
                 f"decision={info['decision']}",
                 f"sum_importance={info['sum_importance']}",
                 f"changes_since_last={info['count_changes']}",
+                f"max_insights_per_run={info['max_insights_per_run']} (ceiling, not a quota)",
+                "zero insights is a valid expected outcome",
+                f"meta_insight_allowed={info['meta_insight_allowed']}",
+                f"exploration_pairs={len(info.get('exploration') or [])}",
+                *[
+                    f"exploration: {item.get('prompt')}"
+                    for item in (info.get("exploration") or [])
+                ],
                 "Note: the AI agent must read knowledge/insights/ and generate "
-                "the actual insight files.",
+                "the actual insight files. At most two exploration questions "
+                "(disconnected graph components, overlap < 0.8); skip if none.",
             ],
             root=root,
         )

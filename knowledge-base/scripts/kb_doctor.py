@@ -5,9 +5,11 @@ Verifies that:
   1. Required Python packages are importable
   2. Mandatory directory structure exists
   3. kb.config.yml is parseable and has the expected shape
-  4. (Optional) spaCy model loads
-  5. Frontmatter helpers work on a sample fixture
-  6. Filesystem is writable (log.md append works)
+  4. Codex / Claude Code instruction environment (AGENTS.md placement,
+     32 KiB budget, AGENTS.override.md, CLAUDE.md import)
+  5. (Optional) spaCy model loads
+  6. Frontmatter helpers work on a sample fixture
+  7. Filesystem is writable (log.md append works)
 
 Exit codes:
   0 — all checks passed (or only soft warnings)
@@ -23,8 +25,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import importlib
 import json
+import os
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -133,6 +137,229 @@ def check_structure(root: Path) -> list[CheckResult]:
                     f"Directory missing: {d}/ (will be created by kb_ingest.py on first run)",
                 )
             )
+    return results
+
+
+# Codex loads every AGENTS.md from git-root down to cwd, then stops once the
+# combined size hits project_doc_max_bytes (32 KiB by default). See
+# https://learn.chatgpt.com/docs/agent-configuration/agents-md
+KIB = 1024
+AGENTS_SIZE_WARN_BYTES = 10 * KIB
+CODEX_BUDGET_WARN_BYTES = 24 * KIB   # 75% of the default 32 KiB cap
+CODEX_BUDGET_MAX_BYTES = 32 * KIB
+
+
+def find_git_root(start: Path) -> Path | None:
+    current = start.resolve()
+    for candidate in (current, *current.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def resolve_codex_home(explicit: Path | None = None) -> Path:
+    if explicit is not None:
+        return Path(explicit)
+    env = os.environ.get("CODEX_HOME")
+    if env:
+        return Path(env)
+    return Path.home() / ".codex"
+
+
+def _codex_global_agents(codex_home: Path) -> Path | None:
+    """File Codex actually loads at global scope: override, else AGENTS.md."""
+    override = codex_home / "AGENTS.override.md"
+    if override.is_file() and override.stat().st_size > 0:
+        return override
+    agents = codex_home / "AGENTS.md"
+    if agents.is_file() and agents.stat().st_size > 0:
+        return agents
+    return None
+
+
+def _byte_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def check_agent_env(
+    root: Path,
+    *,
+    codex_home: Path | None = None,
+) -> list[CheckResult]:
+    """Six cheap checks for silent Codex / Claude Code instruction failures."""
+    root = root.resolve()
+    home = resolve_codex_home(codex_home)
+    results: list[CheckResult] = []
+
+    git_root = find_git_root(root)
+    agents_at_root = root / "AGENTS.md"
+    if not agents_at_root.is_file():
+        results.append(
+            CheckResult(
+                "agent-env:agents-at-git-root",
+                "error",
+                "AGENTS.md is missing from the base root — Codex has nothing "
+                "to load for this knowledge base",
+            )
+        )
+    elif git_root is None:
+        results.append(
+            CheckResult(
+                "agent-env:agents-at-git-root",
+                "warn",
+                "not a git repository — Codex will only look in the current "
+                "directory for AGENTS.md",
+            )
+        )
+    elif git_root == root:
+        results.append(
+            CheckResult(
+                "agent-env:agents-at-git-root",
+                "ok",
+                f"AGENTS.md is at git-root ({git_root})",
+            )
+        )
+    elif (git_root / "AGENTS.md").is_file():
+        results.append(
+            CheckResult(
+                "agent-env:agents-at-git-root",
+                "ok",
+                f"AGENTS.md is at git-root ({git_root}) and in this base",
+            )
+        )
+    else:
+        # Pre-finalize layout: base lives in knowledge-base/, git-root is the
+        # project. Codex started from the repo root will miss this file;
+        # finalize.sh promotes it. Warn, do not fail the deploy smoke-test.
+        results.append(
+            CheckResult(
+                "agent-env:agents-at-git-root",
+                "warn",
+                "AGENTS.md is not at the git-root "
+                f"({git_root}) — Codex started from the repo root will not "
+                "load it. After finalize.sh the base should sit at the "
+                "project root",
+            )
+        )
+
+    agents_path = agents_at_root if agents_at_root.is_file() else git_root / "AGENTS.md" if git_root else None
+    agents_bytes = _byte_size(agents_path) if agents_path and agents_path.is_file() else 0
+    if agents_bytes > AGENTS_SIZE_WARN_BYTES:
+        results.append(
+            CheckResult(
+                "agent-env:agents-size",
+                "warn",
+                f"AGENTS.md is {agents_bytes} B (>{AGENTS_SIZE_WARN_BYTES} B / 10 KiB) "
+                "— approaching the Codex instruction budget; consider !refactor",
+            )
+        )
+    else:
+        results.append(
+            CheckResult(
+                "agent-env:agents-size",
+                "ok",
+                f"AGENTS.md is {agents_bytes} B",
+            )
+        )
+
+    global_agents = _codex_global_agents(home)
+    global_bytes = _byte_size(global_agents) if global_agents else 0
+    combined = agents_bytes + global_bytes
+    global_label = str(global_agents) if global_agents else "no global AGENTS.md"
+    if combined > CODEX_BUDGET_WARN_BYTES:
+        results.append(
+            CheckResult(
+                "agent-env:codex-budget-75",
+                "warn",
+                f"combined AGENTS.md size is {combined} B "
+                f"(>{CODEX_BUDGET_WARN_BYTES} B / 75% of 32 KiB) "
+                f"[{global_label} + base]",
+            )
+        )
+    else:
+        results.append(
+            CheckResult(
+                "agent-env:codex-budget-75",
+                "ok",
+                f"combined AGENTS.md size is {combined} B",
+            )
+        )
+    if combined > CODEX_BUDGET_MAX_BYTES:
+        results.append(
+            CheckResult(
+                "agent-env:codex-budget-cap",
+                "error",
+                f"combined AGENTS.md size is {combined} B "
+                f"(>{CODEX_BUDGET_MAX_BYTES} B / 32 KiB) — Codex will stop "
+                "adding instruction files and may drop this base's AGENTS.md",
+            )
+        )
+    else:
+        results.append(
+            CheckResult(
+                "agent-env:codex-budget-cap",
+                "ok",
+                f"combined AGENTS.md size is {combined} B (under 32 KiB)",
+            )
+        )
+
+    override = root / "AGENTS.override.md"
+    if override.is_file():
+        results.append(
+            CheckResult(
+                "agent-env:agents-override",
+                "error",
+                "AGENTS.override.md is in the base root — Codex will load it "
+                "instead of AGENTS.md and ignore this base's instructions",
+            )
+        )
+    else:
+        results.append(
+            CheckResult("agent-env:agents-override", "ok", "no AGENTS.override.md")
+        )
+
+    claude = root / "CLAUDE.md"
+    if claude.is_file():
+        try:
+            claude_text = claude.read_text(encoding="utf-8")
+        except OSError as e:
+            results.append(
+                CheckResult(
+                    "agent-env:claude-md-import",
+                    "warn",
+                    f"CLAUDE.md exists but could not be read: {e}",
+                )
+            )
+        else:
+            if "@AGENTS.md" in claude_text:
+                results.append(
+                    CheckResult(
+                        "agent-env:claude-md-import",
+                        "ok",
+                        "CLAUDE.md imports @AGENTS.md",
+                    )
+                )
+            else:
+                results.append(
+                    CheckResult(
+                        "agent-env:claude-md-import",
+                        "warn",
+                        "CLAUDE.md exists but does not contain @AGENTS.md — "
+                        "Claude Code will not load this base's instructions",
+                    )
+                )
+    else:
+        results.append(
+            CheckResult(
+                "agent-env:claude-md-import",
+                "ok",
+                "no CLAUDE.md (optional; create on finalize if you use Claude Code)",
+            )
+        )
+
     return results
 
 
@@ -396,6 +623,66 @@ def check_sync(root: Path) -> list[CheckResult]:
     return results
 
 
+def check_heal(root: Path) -> list[CheckResult]:
+    """Warn when upgrade moved the version but heal did not run, or a stage stalled."""
+    results: list[CheckResult] = []
+    cfg = kbc.load_config(root)
+    heal = (cfg.raw.get("heal") or {}) if cfg.raw else {}
+    last = heal.get("last_run") or {}
+    if isinstance(last, str):
+        last = {"at": last, "version": ""}
+    last_ver = str(last.get("version") or "").strip().strip('"')
+    current = str(cfg.instructions_version or "").strip().strip('"')
+    if last_ver and current and last_ver != current:
+        results.append(
+            CheckResult(
+                "heal:after-upgrade",
+                "warn",
+                f"instructions_version is {current} but heal.last_run.version "
+                f"is {last_ver} — say !heal (or re-run kb_upgrade without --no-heal)",
+            )
+        )
+    else:
+        results.append(
+            CheckResult(
+                "heal:after-upgrade",
+                "ok",
+                "heal last_run matches instructions_version"
+                if last_ver
+                else "heal last_run not set (fresh base or heal has not run)",
+            )
+        )
+
+    try:
+        stage = int(heal.get("stage") or 1)
+    except (TypeError, ValueError):
+        stage = 1
+    last_at = last.get("at")
+    parsed = None
+    if last_at:
+        try:
+            parsed = _dt.date.fromisoformat(str(last_at)[:10])
+        except ValueError:
+            parsed = None
+    stuck = False
+    if stage in (2, 3, 4) and parsed is not None:
+        stuck = (_dt.date.today() - parsed).days > 14
+    if stuck:
+        results.append(
+            CheckResult(
+                "heal:stage-stuck",
+                "warn",
+                f"heal.stage is {stage} and last_run.at is {last_at} "
+                "(older than 14 days) — resume !heal or close the stage",
+            )
+        )
+    else:
+        results.append(
+            CheckResult("heal:stage-stuck", "ok", f"heal.stage={stage}")
+        )
+    return results
+
+
 def check_repomix_config(root: Path) -> CheckResult:
     p = root / "repomix.config.json"
     if not p.is_file():
@@ -432,6 +719,11 @@ def run_all_checks(
     cfg_res = check_config(root, self_test=self_test)
     results.append(cfg_res)
 
+    # Source-repo self-test is not a deployed base; skip Codex-environment
+    # checks so a missing root AGENTS.md does not fail the smoke test.
+    if not self_test:
+        results.extend(check_agent_env(root))
+
     if not skip_nlp:
         try:
             cfg = kbc.load_config(root)
@@ -446,7 +738,24 @@ def run_all_checks(
     results.extend(check_sync(root))
     results.append(check_repomix_config(root))
     results.append(check_log_writable(root, ephemeral=ephemeral_log))
+    if not self_test:
+        results.extend(check_heal(root))
     return results
+
+
+def check_mutations(root: Path) -> CheckResult:
+    try:
+        import kb_mutate
+    except ImportError:
+        return CheckResult("mutate:l1", "warn", "kb_mutate.py is not importable")
+    report = kb_mutate.run_mutations(root)
+    if report.survivors:
+        return CheckResult(
+            "mutate:l1",
+            "error",
+            f"{report.line} — survivors: {', '.join(report.survivors)}",
+        )
+    return CheckResult("mutate:l1", "ok", report.line)
 
 
 def render_text(results: list[CheckResult]) -> str:
@@ -480,6 +789,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--self-test", action="store_true", help="Run on this script's own repo")
     parser.add_argument("--skip-nlp", action="store_true", help="Skip spaCy model check")
     parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    parser.add_argument(
+        "--with-mutation",
+        action="store_true",
+        help="also run kb_mutate.py (seven L1 defects; slower; not default)",
+    )
     args = parser.parse_args(argv)
 
     if args.self_test:
@@ -496,6 +810,8 @@ def main(argv: list[str] | None = None) -> int:
         ephemeral_log=ephemeral_log,
         self_test=args.self_test,
     )
+    if args.with_mutation and not args.self_test:
+        results.append(check_mutations(root))
 
     # In --self-test we validate that the scripts are wired and importable;
     # warnings about optional deps / missing deployed config are expected and

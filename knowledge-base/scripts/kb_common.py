@@ -96,6 +96,7 @@ REVIEW_DIRS = (
     "needs-redaction",
     "excluded-sensitive",
     "needs-merge",
+    "needs-heal",
 )
 
 # Cross-base sync workspace (see 16_MERGE.md). Never indexed.
@@ -109,6 +110,26 @@ PROCESSED_DIRS = (
     "tables",
     "extracted-metadata",
     "nlp-meta",
+)
+
+# Manual eval lite (iteration B). Never indexed. results/ holds before/after
+# answer dumps; do not gitignore them — they are the measurement artifacts.
+EVAL_ROOT = "eval"
+EVAL_RESULTS_DIR = "results"
+
+REQUIRED_INVARIANT_IDS = frozenset({"forbidden", "language"})
+
+_INVARIANT_BLOCK_RE = re.compile(
+    r"<!--\s*AI-KE:INVARIANT:BEGIN\s+id=\"([^\"]+)\"\s*-->"
+    r"(.*?)"
+    r"<!--\s*AI-KE:INVARIANT:END\s+id=\"\1\"\s*-->",
+    re.DOTALL,
+)
+_INVARIANT_BEGIN_RE = re.compile(
+    r"<!--\s*AI-KE:INVARIANT:BEGIN\s+id=\"([^\"]+)\"\s*-->"
+)
+_INVARIANT_END_RE = re.compile(
+    r"<!--\s*AI-KE:INVARIANT:END\s+id=\"([^\"]+)\"\s*-->"
 )
 
 
@@ -172,6 +193,7 @@ class ModeProfile:
     reflection_importance_threshold: int = 25
     reflection_min_interval_days: int = 7
     reflection_require_changes: bool = True
+    reflection_max_insights_per_run: int = 3
     lint_level2_trigger: str = "manual"
     review_auto_process: bool = False
 
@@ -252,6 +274,11 @@ class KbConfig:
         prof.reflection_require_changes = refl.get(
             "require_changes", prof.reflection_require_changes
         )
+        prof.reflection_max_insights_per_run = int(
+            refl.get(
+                "max_insights_per_run", prof.reflection_max_insights_per_run
+            )
+        )
         lint = chosen.get("lint", {})
         prof.lint_level2_trigger = lint.get("level2_trigger", prof.lint_level2_trigger)
         prof.review_auto_process = lint.get("review_auto_process", prof.review_auto_process)
@@ -302,6 +329,46 @@ def compute_source_hash(filepath: Path | str, prefix_len: int = 16) -> str:
         for chunk in iter(lambda: fh.read(8192), b""):
             sha256.update(chunk)
     return f"sha256:{sha256.hexdigest()[:prefix_len]}"
+
+
+# ---------------------------------------------------------------------------
+# AI-KE:INVARIANT blocks (AGENTS.md)
+# ---------------------------------------------------------------------------
+# These wrappers mark text that no revision — human, !refactor, or an
+# evolving agent — may silently drop. Upgrade never writes or overwrites
+# them; lint errors if a required id is missing or markers are malformed.
+
+
+def iter_invariant_blocks(text: str) -> list[tuple[str, int, int]]:
+    """Return ``(id, start, end)`` for each well-formed INVARIANT span."""
+    return [
+        (match.group(1), match.start(), match.end())
+        for match in _INVARIANT_BLOCK_RE.finditer(text)
+    ]
+
+
+def invariant_ids(text: str) -> set[str]:
+    """Ids of well-formed (BEGIN+matching END) INVARIANT blocks."""
+    return {block_id for block_id, _start, _end in iter_invariant_blocks(text)}
+
+
+def strip_invariant_bodies(text: str) -> str:
+    """Remove well-formed INVARIANT spans so lint can count the rest."""
+    return _INVARIANT_BLOCK_RE.sub("", text)
+
+
+def invariant_problems(text: str) -> list[str]:
+    """Missing required ids and unmatched BEGIN/END markers."""
+    problems: list[str] = []
+    present = invariant_ids(text)
+    for required in sorted(REQUIRED_INVARIANT_IDS):
+        if required not in present:
+            problems.append(f"missing invariant block id={required!r}")
+    begins = _INVARIANT_BEGIN_RE.findall(text)
+    ends = _INVARIANT_END_RE.findall(text)
+    if len(begins) != len(present) or len(ends) != len(present):
+        problems.append("malformed AI-KE:INVARIANT markers (BEGIN/END mismatch)")
+    return problems
 
 
 # ---------------------------------------------------------------------------
@@ -682,6 +749,13 @@ __all__ = [
     "ASSET_DIRS",
     "REVIEW_DIRS",
     "PROCESSED_DIRS",
+    "EVAL_ROOT",
+    "EVAL_RESULTS_DIR",
+    "REQUIRED_INVARIANT_IDS",
+    "iter_invariant_blocks",
+    "invariant_ids",
+    "strip_invariant_bodies",
+    "invariant_problems",
     "ModeProfile",
     "KbConfig",
     "find_kb_root",

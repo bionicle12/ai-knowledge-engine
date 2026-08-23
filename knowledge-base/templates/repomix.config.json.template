@@ -29,6 +29,8 @@
       "assets/**",
       "review/**",
       "interactions/**",
+      "eval/**",
+      ".kb-backups/**",
       "sync/**",
       "setup/**",
       "scripts/**",

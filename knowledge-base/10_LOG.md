@@ -52,6 +52,10 @@ Each entry starts with a level-2 heading in this exact format:
 | `consolidation` | Daily consolidation block ran (see 13_AUTORUN.md) |
 | `reflect` | Reflection trigger fired |
 | `populate` | `DATA_PLACEMENT_EXAMPLES.md` regenerated |
+| `heal` | Catch-up after upgrade (`kb_heal.py` / `!heal`) |
+| `refactor` | Instruction trim (`!refactor` / `17_REFACTOR.md`) |
+| `mutate` | L1 mutation self-check (`kb_mutate.py`) |
+| `quiz` | Owner exam (`!quiz`) — answers in `interactions/quiz/` |
 
 ---
 

@@ -125,6 +125,151 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
     return build_viewer_state(kb_root)[0]
 
 
+_TOKEN_RE = re.compile(r"[a-z0-9а-яё]+", re.IGNORECASE)
+EXPLORATION_OVERLAP_MAX = 0.8
+EXPLORATION_MAX_PAIRS = 2
+
+
+def _token_set(text: str) -> set[str]:
+    return {tok.casefold() for tok in _TOKEN_RE.findall(text or "") if len(tok) > 2}
+
+
+def overlap_score(node_a: dict[str, Any], node_b: dict[str, Any]) -> float:
+    """Jaccard of tags; fall back to title tokens when both tag sets are empty."""
+    tags_a = {str(t).casefold() for t in (node_a.get("tags") or []) if t}
+    tags_b = {str(t).casefold() for t in (node_b.get("tags") or []) if t}
+    if tags_a or tags_b:
+        union = tags_a | tags_b
+        return (len(tags_a & tags_b) / len(union)) if union else 0.0
+    tokens_a = _token_set(str(node_a.get("label") or node_a.get("id") or ""))
+    tokens_b = _token_set(str(node_b.get("label") or node_b.get("id") or ""))
+    union = tokens_a | tokens_b
+    return (len(tokens_a & tokens_b) / len(union)) if union else 0.0
+
+
+def undirected_components(graph: dict[str, Any]) -> list[list[str]]:
+    """Connected components treating wikilinks as undirected."""
+    nodes = [node["id"] for node in graph.get("nodes") or []]
+    adj: dict[str, set[str]] = {page_id: set() for page_id in nodes}
+    for node in graph.get("nodes") or []:
+        page_id = node["id"]
+        for other in list(node.get("outbound") or []) + list(node.get("inbound") or []):
+            if other in adj:
+                adj[page_id].add(other)
+                adj[other].add(page_id)
+    seen: set[str] = set()
+    components: list[list[str]] = []
+    for start in nodes:
+        if start in seen:
+            continue
+        stack = [start]
+        seen.add(start)
+        bucket: list[str] = []
+        while stack:
+            current = stack.pop()
+            bucket.append(current)
+            for nxt in sorted(adj[current]):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    stack.append(nxt)
+        components.append(sorted(bucket))
+    return components
+
+
+def _has_directed_path(
+    outbound: dict[str, list[str]], start: str, goal: str
+) -> bool:
+    if start == goal:
+        return True
+    seen = {start}
+    stack = [start]
+    while stack:
+        current = stack.pop()
+        for nxt in outbound.get(current) or []:
+            if nxt == goal:
+                return True
+            if nxt not in seen:
+                seen.add(nxt)
+                stack.append(nxt)
+    return False
+
+
+def exploration_pairs(
+    graph: dict[str, Any],
+    *,
+    max_pairs: int = EXPLORATION_MAX_PAIRS,
+    overlap_max: float = EXPLORATION_OVERLAP_MAX,
+) -> list[dict[str, Any]]:
+    """1–2 surprising pairs: different components, tag overlap < 0.8.
+
+    Used by ``kb_reflect`` as the exploration slot. Empty list is honest —
+    a fully linked graph has nothing to propose.
+    """
+    nodes = {node["id"]: node for node in graph.get("nodes") or []}
+    if len(nodes) < 2 or max_pairs <= 0:
+        return []
+
+    def _rep(comp: list[str]) -> str:
+        return max(
+            comp,
+            key=lambda page_id: (float(nodes[page_id].get("pagerank") or 0.0), page_id),
+        )
+
+    def _pair(page_a: str, page_b: str, reason: str) -> dict[str, Any] | None:
+        if page_a == page_b:
+            return None
+        score = overlap_score(nodes[page_a], nodes[page_b])
+        if score >= overlap_max:
+            return None
+        left, right = sorted((page_a, page_b))
+        return {
+            "a": left,
+            "b": right,
+            "overlap": round(score, 4),
+            "reason": reason,
+            "prompt": (
+                f"What connects [[{left}]] and [[{right}]] "
+                "that the graph does not show?"
+            ),
+        }
+
+    pairs: list[dict[str, Any]] = []
+    seen_keys: set[tuple[str, str]] = set()
+
+    def _add(item: dict[str, Any] | None) -> None:
+        if item is None:
+            return
+        key = (item["a"], item["b"])
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        pairs.append(item)
+
+    components = [c for c in undirected_components(graph) if c]
+    if len(components) >= 2:
+        ranked = sorted(components, key=lambda comp: (-len(comp), comp[0]))
+        for i, left_comp in enumerate(ranked):
+            for right_comp in ranked[i + 1 :]:
+                _add(_pair(_rep(left_comp), _rep(right_comp), "disconnected-components"))
+                if len(pairs) >= max_pairs:
+                    return pairs
+
+    outbound = {
+        node["id"]: list(node.get("outbound") or []) for node in graph.get("nodes") or []
+    }
+    ids = sorted(nodes)
+    for i, src in enumerate(ids):
+        for dst in ids[i + 1 :]:
+            if _has_directed_path(outbound, src, dst) or _has_directed_path(
+                outbound, dst, src
+            ):
+                continue
+            _add(_pair(src, dst, "no-directed-path"))
+            if len(pairs) >= max_pairs:
+                return pairs
+    return pairs
+
+
 def build_viewer_state(
     kb_root: Path | str,
 ) -> tuple[dict[str, Any], dict[str, str]]:

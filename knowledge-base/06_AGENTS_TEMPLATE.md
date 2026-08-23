@@ -6,9 +6,14 @@
 >
 > **Ownership after deployment:** `AGENTS.md` belongs to the base, not to the
 > engine. Agents evolve it while working; upgrades (`kb_upgrade.py`) maintain
-> only the managed `AI-KE:*` blocks and **never overwrite a block with local
-> edits** — they write a `.new` sidecar and ask an AI agent to merge
-> (see `docs/UPGRADING.md`). No script may replace this file wholesale.
+> the managed `AI-KE:INDEX` and `AI-KE:VIEW` blocks and **never overwrite a
+> block with local edits** — they write a `.new` sidecar and ask an AI agent
+> to merge (see `docs/UPGRADING.md`). `AI-KE:INVARIANT` blocks (`forbidden`,
+> `language`) are never auto-written or overwritten; missing wrappers are a
+> lint error and an assisted heal step. No script may replace this file
+> wholesale. To shrink it, use `!refactor` (`17_REFACTOR.md`) — two steps,
+> owner decisions, eval before/after. Do not grow it by restating
+> `kb.config.yml` or `mode_profiles`.
 
 ---
 
@@ -76,10 +81,9 @@ When the user attaches/uploads a file in chat or gives a local path:
 
 ## Feedback loop
 
-While working with the user the agent captures conclusions:
-- Auto-detects when meaningful material has accumulated
-- Writes a session summary into `interactions/sessions/` (with a "Processed materials" section)
-- On `!save` — saves immediately
+Write a session summary into `interactions/sessions/` on `!save` or when the
+user explicitly asks to save. Do not invent a write because "enough material
+has accumulated".
 
 ### Commands
 
@@ -88,24 +92,19 @@ While working with the user the agent captures conclusions:
 | `!view` | Start or reopen the local read-only knowledge graph viewer | 0 tokens |
 | `!save` | Save session summary + enrichment now | ~2K tokens |
 | `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
-| `!audit` | Run AI base review (lint level 2) | ~50–100K tokens |
+| `!audit` | Per-pack L2 review — `.repomix/audit/<pack>__request.md`, new session | ~5–20K / pack |
 | `!review` | Walk through `review/needs-classification/`, `review/needs-ai-decision/`, and `review/needs-redaction/`, process each item, and report what was extracted, redacted, archived, or deferred | ~5–30K tokens |
 | `!populate` | Regenerate `DATA_PLACEMENT_EXAMPLES.md` (run `python3 scripts/kb_populate.py --role <role> --kb-root .`) | ~50 tokens |
+| `!heal` | Catch up after an upgrade — `18_HEAL.md` | ~0–40K tokens |
+| `!refactor` | Two-step instruction trim — `17_REFACTOR.md`. `--global` reports only | ~5–40K tokens |
+| `!profile-review` | Interview `knowledge/profile/` (3 questions at a time) | ~5–15K tokens |
+| `!quiz` | Five questions about what is already in the base; costliest mistakes first | ~5–15K tokens |
 | `!super` | Toggle mode: default ↔ super | 0 tokens |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |
 
-For `!view`, use the deterministic local tool rather than reading or rebuilding
-the graph with AI:
-
-- `!view` → run `python3 scripts/kb_view.py --background` and report its URL
-- `!view status` → run `python3 scripts/kb_view.py --status`
-- `!view stop` → run `python3 scripts/kb_view.py --stop`
-
-The viewer already covers health triage (orphans / broken / stale / ambiguous
-chips with a fix queue and source-line context), full-text search, 1–3-hop
-focus, and shortest path between pages — point the user there instead of
-answering "what links where" or "what is broken" questions with AI.
+Graph, sync, and heal are the scripts — do not rebuild the graph or invent
+export/import/merge mechanics with AI.
 
 ## Knowledge lifecycle
 
@@ -126,23 +125,9 @@ At the start of a session **read `mode` in `kb.config.yml`** and apply the corre
 | `default` | Python-first, throttled | ~3-4K | Daily work, limited budget |
 | `super` | AI-first, on-demand | ~50-200K+ | Unlimited plan, intensive base build-up |
 
-### default mode
-- Surprise filter: Python NLP overlap (0 tok)
-- Annotations: Python templates (0 tok)
-- Entity resolution: Python fuzzy match (0 tok)
-- Reflection: by threshold (≥25) OR weekly + changes
-- Lint L2: only on `!audit`
-- Review queue: waits for manual processing
-
-### super mode
-- Surprise filter: AI semantic per-ingest (~2-5K tok)
-- Annotations: AI substantive + suggested edits (~1-3K tok)
-- Entity resolution: AI semantic + cross-language (~500-1K tok)
-- Reflection: after every significant ingest (importance ≥5)
-- Lint L2: auto on every consolidation (24h)
-- Review queue: AI auto-processes `review/needs-ai-decision/`
-
 > ⚠️ **Super mode** consumes the maximum possible tokens and can blow through limits. In return — peak speed and learning quality.
+
+Token numbers live in `kb.config.yml` `mode_profiles` — do not restate them here.
 
 ## Context budget
 
@@ -152,33 +137,10 @@ Rules for managing context when reading `knowledge/`:
    (synthesized → raw; like Hindsight — first "what I think", then "what I know")
 2. **Routing first:** always start with the routing table; do not load every domain file
 3. **Loading limit:** at most 7 `knowledge/` files in context simultaneously
-4. If you have loaded > 5 — stop and reassess: are they all needed?
-5. Summarize what you have read before loading the next batch
-6. **Ranking:** all else equal, prefer files with high `importance` and recent `last_accessed`
-7. **Temporal filter:** when the question is about a specific period — filter by `valid_from`/`valid_until`
-8. **Access tracking:** when reading a `knowledge/` file, update `last_accessed` and `access_count += 1`
-
-## Token budget
-
-Depends on `mode` in `kb.config.yml`:
-
-### default mode — at most ~10% of session tokens
-
-- **On ingest:** importance scoring (~500 tok) + review if complex (~5–15K)
-- **On query writeback:** 1 call (~3K tok)
-- **Surprise filter:** Python-only (0 tok); AI only for >3000 words (max 2/day)
-- **Self-editing annotations:** Python-only (0 tok)
-- **Reflection / lint L2:** ONLY on `!reflect` / `!audit` or weekly schedule
-
-### super mode — unlimited
-
-- **On ingest:** AI surprise (~2-5K) + AI annotations (~1-3K) + AI entity resolution (~1K) + importance with reasoning (~1-2K)
-- **On query writeback:** 1 call + auto-update of related pages (~5-8K)
-- **Surprise filter:** AI for every material, no size/frequency limits
-- **Self-editing annotations:** AI substantive + suggested edits
-- **Reflection:** after every significant ingest (importance ≥5)
-- **Lint L2:** auto on every consolidation
-- **Review queue:** auto-processed without waiting for `!audit`
+4. Summarize what you have read before loading the next batch
+5. **Ranking:** all else equal, prefer files with high `importance` and recent `last_accessed`
+6. **Temporal filter:** when the question is about a specific period — filter by `valid_from`/`valid_until`
+7. **Access tracking:** update `last_accessed` and `access_count += 1` only when the page actually influenced the answer — not on every glance
 
 ## Language
 

@@ -20,6 +20,9 @@ __pycache__/
 # Lint reports (regenerated)
 lint-report.md
 
+# Heal snapshots (see 18_HEAL.md)
+.kb-backups/
+
 # Cross-base sync workspace (see 16_MERGE.md). Bundles are large binaries and
 # backups are machine-local; the merge reports are worth keeping if you version
 # the base — drop the last line to do that.

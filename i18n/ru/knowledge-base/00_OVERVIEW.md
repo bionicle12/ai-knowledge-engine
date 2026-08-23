@@ -1,8 +1,8 @@
 ---
 translation_of: knowledge-base/00_OVERVIEW.md
 source_commit: d47821780644a3542a8015dc76b2320e532649a8
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_version: 0.15.0
+translated_at: 2026-08-23
 translator: ai-assisted
 ---
 
@@ -35,21 +35,23 @@ translator: ai-assisted
 |---|--------|----------------|
 | 00 | Этот файл | Получаешь общую картину |
 | 01 | `01_PREREQUISITES.md` | Проверяешь окружение, копируешь `templates/requirements.txt`, ставишь зависимости |
-| 02 | `02_INIT.md` | Уточняешь роль, копируешь `kb.config.yml.template` и параметризуешь, создаёшь папки |
+| 02 | `02_INIT.md` | Уточняешь роль, слепые зоны, четыре эскиза структуры (`kb_structure.py`), копируешь `kb.config.yml.template` и параметризуешь, создаёшь папки |
 | 03 | `03_PIPELINE.md` | Копируешь `scripts/kb_ingest.py` + `scripts/kb_common.py` |
 | 04 | `04_REVIEW.md` | Настраиваешь workflow ревью (без кода) |
 | 05 | `05_INDEX.md` | Копируешь `templates/repomix.config.json.template`, `shell/reindex.sh` + `scripts/kb_reindex.py` |
 | 06 | `06_AGENTS_TEMPLATE.md` | Копируешь и параметризуешь `templates/AGENTS.md.template` |
 | 07 | `07_INTERACTION_LOOP.md` | Объясняешь команды; опционально `scripts/kb_save_session.py` |
 | 08 | `08_PORTABLE.md` | Подключение базы к рабочим проектам |
-| 09 | `09_LINT.md` | Копируешь `scripts/kb_lint.py`, `shell/lint.sh` |
+| 09 | `09_LINT.md` | Копируешь `scripts/kb_lint.py`, `scripts/kb_mutate.py`, `shell/lint.sh` |
 | 10 | `10_LOG.md` | Создаёшь пустой `log.md`, всё остальное делают скрипты |
 | 11 | `11_PROVENANCE.md` | Конвенции frontmatter (без скриптов) |
 | 12 | `12_NLP_PREPROCESS.md` | Ставишь spaCy-модель; NLP запускается из `kb_ingest.py` |
 | 13 | `13_AUTORUN.md` | Копируешь `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`; ставишь git hook |
-| 14 | `14_INITIAL_POPULATION.md` | Генерируешь role-specific `DATA_PLACEMENT_EXAMPLES.md` из `examples/<role>.yml` |
+| 14 | `14_INITIAL_POPULATION.md` | Копируешь `scripts/kb_structure.py`; генерируешь role-specific `DATA_PLACEMENT_EXAMPLES.md` из `examples/<role>.yml` (`kb_populate.py`) |
 | 15 | `15_MEDIA_PROCESSING.md` | Копируешь `scripts/kb_stt.py`, `scripts/kb_ocr.py`, `templates/requirements-media.txt`; настраиваешь `media:` |
 | 16 | `16_MERGE.md` | Копируешь `scripts/kb_export.py`, `scripts/kb_import.py`, `shell/export.sh`, `shell/import.sh`; настраиваешь `sync:` (нужно только если база работает на нескольких машинах) |
+| 17 | `17_REFACTOR.md` | Ужатие инструкций (`!refactor`): двухшаговый разбор, решения владельца, eval; `--global` только отчёт |
+| 18 | `18_HEAL.md` | Копируешь `scripts/kb_heal.py`; догоняющая починка после апгрейда (`!heal`) |
 
 После всех модулей: запусти `bash shell/doctor.sh` (или `python3 scripts/kb_doctor.py`) для финальной проверки.
 
@@ -64,7 +66,7 @@ Layout ДО finalize:
 ```
 {user-project-root}/
 ├── setup/                            ← upstream-инструкции (источник)
-│   ├── 00_OVERVIEW.md … 16_MERGE.md
+│   ├── 00_OVERVIEW.md … 18_HEAL.md (включая 17_REFACTOR.md)
 │   ├── README.md
 │   ├── scripts/, shell/, templates/, examples/
 │   └── shell/finalize.sh             ← запуск в конце
@@ -78,7 +80,7 @@ Layout ДО finalize:
     ├── shell/                        ← POSIX-обёртки + macOS/Windows launcher-ы
     ├── templates/, examples/         ← для повторных прогонов (kb_populate, kb_upgrade)
     └── (структура папок через kb_ingest.py --init-dirs)
-        raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+        raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, eval/
 ```
 
 Layout ПОСЛЕ finalize — плоско в корне проекта:
@@ -93,7 +95,7 @@ Layout ПОСЛЕ finalize — плоско в корне проекта:
 ├── shell/                            ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
 ├── scripts/                          ← Python pipeline
 ├── templates/, examples/
-└── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+└── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, eval/
 ```
 
 > Примечание: `finalize.sh` поднимает `*.command` и `*.bat` из `shell/` в корень. `*.sh` остаются только в `shell/`.
@@ -126,7 +128,9 @@ Layout ПОСЛЕ finalize — плоско в корне проекта:
    - Reflect / NLP batch: `kb_reflect.py`, `kb_nlp_batch.py`
    - STT / OCR: `kb_stt.py`, `kb_ocr.py`
    - Session save (опциональный CLI): `kb_save_session.py`
-   - Common / populate: `kb_common.py`, `kb_populate.py`
+   - Common / populate / structure: `kb_common.py`, `kb_populate.py`, `kb_structure.py`
+   - Mutate (самопроверка L1): `kb_mutate.py`
+   - Heal: `kb_heal.py`
 3. Если скрипта нет — **не выдумывай**; покажи `ls` пользователю.
 
 ---

@@ -441,3 +441,145 @@ def test_main_selective_accept_updates_file_block_and_version(
     assert target.read_text(encoding="utf-8") == "new\n"
     assert 'instructions_version: "0.7.0"' in config.read_text(encoding="utf-8")
     assert up.VIEW_BLOCK_BEGIN in agents.read_text(encoding="utf-8")
+
+
+def test_upgrade_dry_run_does_not_write_heal_plan(
+    tmp_path: Path, monkeypatch, capsys
+):
+    _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ())
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    deployed = tmp_path / "deployed"
+    deployed.mkdir()
+    (deployed / "kb.config.yml").write_text(
+        'instructions_version: "0.0.0"\nknowledge_base:\n  mode: default\n',
+        encoding="utf-8",
+    )
+    (deployed / "AGENTS.md").write_text("# Local\n", encoding="utf-8")
+
+    result = up.main(["--kb-root", str(deployed), "--dry-run"])
+    output = capsys.readouterr().out
+    assert result in (0, 2)
+    assert not (deployed / "review" / "needs-heal" / "HEAL_PLAN.md").is_file()
+    assert "!heal" in output or "heal" in output.lower()
+
+
+def test_upgrade_runs_heal_when_customized(tmp_path: Path, monkeypatch, capsys):
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ("kb_lint.py",))
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    (repo / "knowledge-base" / "scripts" / "kb_lint.py").write_text(
+        "new\n", encoding="utf-8"
+    )
+    deployed = tmp_path / "deployed"
+    (deployed / "scripts").mkdir(parents=True)
+    (deployed / "scripts" / "kb_lint.py").write_text("custom\n", encoding="utf-8")
+    (deployed / "kb.config.yml").write_text(
+        'instructions_version: "0.0.0"\nknowledge_base:\n  mode: default\n',
+        encoding="utf-8",
+    )
+    (deployed / "AGENTS.md").write_text("# Local\n", encoding="utf-8")
+
+    result = up.main(["--kb-root", str(deployed)])
+    output = capsys.readouterr().out
+    assert result == 2
+    assert (deployed / "review" / "needs-heal" / "HEAL_PLAN.md").is_file()
+    assert "!heal" in output
+
+
+def test_upgrade_no_heal_skips_plan(tmp_path: Path, monkeypatch, capsys):
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ("kb_lint.py",))
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    (repo / "knowledge-base" / "scripts" / "kb_lint.py").write_text(
+        "new\n", encoding="utf-8"
+    )
+    deployed = tmp_path / "deployed"
+    (deployed / "scripts").mkdir(parents=True)
+    (deployed / "kb.config.yml").write_text(
+        'instructions_version: "0.0.0"\nknowledge_base:\n  mode: default\n',
+        encoding="utf-8",
+    )
+    (deployed / "AGENTS.md").write_text("# Local\n", encoding="utf-8")
+
+    result = up.main(["--kb-root", str(deployed), "--no-heal"])
+    output = capsys.readouterr().out
+    assert result == 0
+    assert not (deployed / "review" / "needs-heal" / "HEAL_PLAN.md").is_file()
+    assert "Heal skipped" in output or "--no-heal" in output
+
+
+def test_upgrade_never_overwrites_invariant_blocks(tmp_path: Path):
+    agents = tmp_path / "AGENTS.md"
+    custom = (
+        '<!-- AI-KE:INVARIANT:BEGIN id="forbidden" -->\n'
+        "## Forbidden\n- CUSTOM privacy rule\n"
+        '<!-- AI-KE:INVARIANT:END id="forbidden" -->\n'
+        '<!-- AI-KE:INVARIANT:BEGIN id="language" -->\n'
+        "## Language\nru only\n"
+        '<!-- AI-KE:INVARIANT:END id="language" -->\n'
+    )
+    agents.write_text(custom, encoding="utf-8")
+
+    state, action = up.report_invariant_blocks(agents)
+    assert state == "present"
+    assert "never overwritten" in action
+
+    up.update_managed_index_block(agents, dry_run=False)
+    assert agents.read_text(encoding="utf-8").startswith(
+        '<!-- AI-KE:INVARIANT:BEGIN id="forbidden" -->'
+    )
+    assert "CUSTOM privacy rule" in agents.read_text(encoding="utf-8")
+    assert "ru only" in agents.read_text(encoding="utf-8")
+
+
+def test_upgrade_does_not_insert_missing_invariants(tmp_path: Path):
+    agents = tmp_path / "AGENTS.md"
+    agents.write_text("# Local\n## Forbidden\n- x\n", encoding="utf-8")
+    state, action = up.report_invariant_blocks(agents)
+    assert state == "missing"
+    assert "heal" in action.lower()
+    assert "AI-KE:INVARIANT" not in agents.read_text(encoding="utf-8")
+
+
+def test_upgrade_survives_an_unparseable_config(tmp_path: Path, monkeypatch, capsys):
+    """A YAML typo must not abort the file sync with a traceback."""
+    _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ())
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    deployed = tmp_path / "deployed"
+    deployed.mkdir()
+    (deployed / "kb.config.yml").write_text(
+        'instructions_version: "0.0.0"\nknowledge_base:\n  mode: default\n'
+        '  name "unquoted-and-unkeyed"\n',
+        encoding="utf-8",
+    )
+    (deployed / "AGENTS.md").write_text("# Local\n", encoding="utf-8")
+
+    result = up.main(["--kb-root", str(deployed)])
+    output = capsys.readouterr().out
+    assert result in (0, 2)
+    assert "heal skipped" in output.lower()
+    assert "kb.config.yml" in output
+
+
+def test_upgrade_stamps_heal_last_run_with_the_new_version(
+    tmp_path: Path, monkeypatch
+):
+    """Otherwise doctor warns 'version moved without heal' on a clean upgrade."""
+    import yaml
+
+    _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ())
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    deployed = tmp_path / "deployed"
+    deployed.mkdir()
+    (deployed / "kb.config.yml").write_text(
+        'instructions_version: "0.0.0"\nknowledge_base:\n  mode: default\n',
+        encoding="utf-8",
+    )
+    (deployed / "AGENTS.md").write_text("# Local\n", encoding="utf-8")
+
+    assert up.main(["--kb-root", str(deployed)]) == 0
+    cfg = yaml.safe_load((deployed / "kb.config.yml").read_text(encoding="utf-8"))
+    assert cfg["instructions_version"] == cfg["heal"]["last_run"]["version"]

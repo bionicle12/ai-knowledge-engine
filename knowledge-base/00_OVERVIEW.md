@@ -27,21 +27,23 @@ Deploying a **Raw-First Knowledge Pipeline** into a user's project:
 |---|--------|-------------|
 | 00 | This file | Get the big picture |
 | 01 | `01_PREREQUISITES.md` | Verify env, copy `templates/requirements.txt`, install deps |
-| 02 | `02_INIT.md` | Ask about role, copy `kb.config.yml.template` and parameterize, create folders |
+| 02 | `02_INIT.md` | Ask about role, blind-spot pass, four structure sketches (`kb_structure.py`), copy `kb.config.yml.template` and parameterize, create folders |
 | 03 | `03_PIPELINE.md` | Copy `scripts/kb_ingest.py` + `scripts/kb_common.py` |
 | 04 | `04_REVIEW.md` | Set up review workflow (no code needed) |
 | 05 | `05_INDEX.md` | Copy `templates/repomix.config.json.template`, copy `shell/reindex.sh` + `scripts/kb_reindex.py` |
 | 06 | `06_AGENTS_TEMPLATE.md` | Copy `templates/AGENTS.md.template` and parameterize |
 | 07 | `07_INTERACTION_LOOP.md` | Document commands; optional `scripts/kb_save_session.py` for CLI session capture |
 | 08 | `08_PORTABLE.md` | Cross-project usage |
-| 09 | `09_LINT.md` | Copy `scripts/kb_lint.py`, copy `shell/lint.sh` |
+| 09 | `09_LINT.md` | Copy `scripts/kb_lint.py`, `scripts/kb_mutate.py`, copy `shell/lint.sh` |
 | 10 | `10_LOG.md` | Touch `log.md`; the scripts handle the rest |
 | 11 | `11_PROVENANCE.md` | Frontmatter conventions (no scripts) |
 | 12 | `12_NLP_PREPROCESS.md` | Install spaCy model; NLP runs from `kb_ingest.py` |
 | 13 | `13_AUTORUN.md` | Copy `scripts/kb_watch.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`; install git hook |
-| 14 | `14_INITIAL_POPULATION.md` | Generate role-specific `DATA_PLACEMENT_EXAMPLES.md` from `examples/<role>.yml` |
+| 14 | `14_INITIAL_POPULATION.md` | Copy `scripts/kb_structure.py`; generate role-specific `DATA_PLACEMENT_EXAMPLES.md` from `examples/<role>.yml` (`kb_populate.py`) |
 | 15 | `15_MEDIA_PROCESSING.md` | Copy `scripts/kb_stt.py`, `scripts/kb_ocr.py`, `templates/requirements-media.txt`; configure `media:` |
 | 16 | `16_MERGE.md` | Copy `scripts/kb_export.py`, `scripts/kb_import.py`, `shell/export.sh`, `shell/import.sh`; configure `sync:` (only needed if the base runs on more than one machine) |
+| 17 | `17_REFACTOR.md` | Instruction trim (`!refactor`): two-step audit, owner decisions, eval; `--global` reports only |
+| 18 | `18_HEAL.md` | Copy `scripts/kb_heal.py`; catch-up after upgrade (`!heal`) |
 
 After all modules: run `bash shell/doctor.sh` (or `python3 scripts/kb_doctor.py`) to verify.
 
@@ -56,7 +58,7 @@ Layout BEFORE finalize:
 ```
 {user-project-root}/
 ├── setup/                            ← upstream instructions (source)
-│   ├── 00_OVERVIEW.md … 16_MERGE.md
+│   ├── 00_OVERVIEW.md … 18_HEAL.md (incl. 17_REFACTOR.md)
 │   ├── README.md
 │   ├── scripts/, shell/, templates/, examples/
 │   └── shell/finalize.sh             ← run at the end
@@ -70,7 +72,7 @@ Layout BEFORE finalize:
     ├── shell/                        ← POSIX wrappers + macOS/Windows launchers
     ├── templates/, examples/         ← kept for re-runs (kb_populate, kb_upgrade)
     └── (folder structure created by kb_ingest.py --init-dirs)
-        raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+        raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, eval/
 ```
 
 Layout AFTER finalize — flat at the project root, with launchers at the top level and `*.sh` wrappers in `shell/`:
@@ -85,7 +87,7 @@ Layout AFTER finalize — flat at the project root, with launchers at the top le
 ├── shell/                            ← Linux/CLI: watcher.sh, reindex.sh, lint.sh, doctor.sh
 ├── scripts/                          ← Python pipeline
 ├── templates/, examples/
-└── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/
+└── raw/, processed/, knowledge/, assets/, assets-index/, review/, interactions/, eval/
 ```
 
 > Note: `finalize.sh` automatically promotes the `*.command` and `*.bat` launchers from `shell/` up to the project root (so users can double-click them in Finder/Explorer). The `*.sh` files stay only in `shell/` to keep the root tidy.
@@ -123,6 +125,9 @@ Instructions sometimes lag reality. If a step says to run a script that you cann
    - Session save (optional CLI): `setup/scripts/kb_save_session.py`
    - Common utils: `setup/scripts/kb_common.py`
    - Populate (DATA_PLACEMENT_EXAMPLES.md generator): `setup/scripts/kb_populate.py`
+   - Structure sketches (four variants + blind spots): `setup/scripts/kb_structure.py`
+   - Mutate (L1 lint self-check): `setup/scripts/kb_mutate.py`
+   - Heal: `setup/scripts/kb_heal.py`
 3. If a script you expected is missing, **do not invent it** — show the user `ls` output and ask. Older docs or your own memory may reference renamed files (e.g., `install.sh` was renamed to `finalize.sh`); always trust the filesystem over recall.
 
 ---

@@ -11,18 +11,7 @@ Helps AI agents understand the author's context, thinking style, decisions, expe
 
 ## CRITICAL: how the user talks to you
 
-The user opens new chat sessions frequently. **Every fresh session must begin with the user saying something like:**
-
-> *"Read AGENTS.md and use it as the primary instruction for everything that follows."*
-
-When you see that opening line (or any clear request to use this base):
-
-1. Read `kb.config.yml` to get the operating mode and language preference
-2. Skim `knowledge/profile/`, `knowledge/principles/`, and `knowledge/voice/` so you adopt the user's context, principles, and voice
-3. Acknowledge briefly that the base is loaded ("Got it — {{PRIMARY_ROLE}} mode, voice loaded")
-4. Then start handling the user's actual request
-
-If the user issues a `!`-command before that opening line, gently say: *"Read AGENTS.md first so I have your context, then re-issue the command."*
+An opening line that names AGENTS.md means: load this base. Read `kb.config.yml`, skim `knowledge/profile/`, `knowledge/principles/`, `knowledge/voice/`, then confirm briefly ("Got it — {{PRIMARY_ROLE}} mode, voice loaded").
 
 ## Context
 
@@ -77,6 +66,7 @@ When the user attaches/uploads a file in chat or gives a local path:
 7. Update existing `knowledge/` pages before creating duplicates; refresh `last_verified`/`valid_until` when the file changes old facts
 8. If the file is low-signal, noisy, or irrelevant, ask whether to keep it as an asset, archive it, or ignore it
 
+<!-- AI-KE:INVARIANT:BEGIN id="forbidden" -->
 ## Forbidden
 
 - Do not index `raw/`, `assets/`, `review/`, `sync/` directly
@@ -86,13 +76,13 @@ When the user attaches/uploads a file in chat or gives a local path:
 - For sensitive material → `review/needs-redaction/` only
 - Do not resolve a cross-base merge conflict by discarding one side wholesale — a
   fact present in only one version still belongs in the merged page (`16_MERGE.md`)
+<!-- AI-KE:INVARIANT:END id="forbidden" -->
 
 ## Feedback loop
 
-While working with the user the agent captures conclusions:
-- Auto-detects when meaningful material has accumulated
-- Writes a session summary into `interactions/sessions/`
-- On `!save` — saves immediately
+Write a session summary into `interactions/sessions/` on `!save` or when the
+user explicitly asks to save. Do not invent a write because "enough material
+has accumulated".
 
 ### Commands
 
@@ -101,35 +91,22 @@ While working with the user the agent captures conclusions:
 | `!view` | Start or reopen the local read-only knowledge graph viewer | 0 tokens |
 | `!save` | Save session summary + enrichment now | ~2K tokens |
 | `!reflect` | Run reflection: synthesize insights from accumulated facts | ~15K tokens |
-| `!audit` | Run AI lint level 2 (review the entire base) | ~50–100K tokens |
+| `!audit` | Level-2 review in a **new session** per pack: open `.repomix/audit/<pack>__request.md`. Finding without `file:line` + quote is dropped. Cross-pack pass: `CROSS_PACK__request.md` (titles only). | ~5–20K per pack |
 | `!review` | Walk through `review/needs-classification/`, `review/needs-ai-decision/`, `review/needs-redaction/` and process every item: extract durable knowledge into `knowledge/`, redact sensitive material, archive what cannot be used. Explain per item what came in, what you extracted, and where it landed. If you cannot decide without input, ask one specific question per item. Honor long-form-book hints (write takeaways, do not copy prose into `voice/`). | ~5–30K tokens |
 | `!populate` | Regenerate `DATA_PLACEMENT_EXAMPLES.md` (run `python3 scripts/kb_populate.py --role <role> --kb-root .`) | ~50 tokens |
 | `!export` | Pack this base into a bundle for another machine (run `python3 scripts/kb_export.py`) and tell the user where the file landed | ~100 tokens |
 | `!import` | Merge bundles waiting in `sync/inbox/` (run `python3 scripts/kb_import.py`), then summarize the report | ~200 tokens |
 | `!merge` | Finish an import: resolve every package in `review/needs-merge/`, audit the merged pages for contradictions, cross-link the new knowledge, refresh routing, lint and reindex. Full procedure in `16_MERGE.md`. | ~5–40K tokens |
+| `!heal` | Catch up an upgraded base: run `python3 scripts/kb_heal.py --plan`, apply auto, walk assisted items one by one. Procedure in `18_HEAL.md`. Stage 4 (trim) is locked until eval questions exist. | ~0–40K tokens |
+| `!refactor` | Two-step instruction trim: audit `AGENTS.md` (and listed base files), stop for owner decisions, then rewrite from those decisions only. Procedure in `17_REFACTOR.md`. Backup first. `--global` reports conflicts with `~/.codex/AGENTS.md` and writes nothing. | ~5–40K tokens |
+| `!profile-review` | Read `knowledge/profile/`. Ask what is missing (3 questions at a time, important first); then what may be stale. Update pages from answers. Stamp `profile_review.reviewed_at`. | ~5–15K tokens |
+| `!quiz` | Five questions about what is already in the base; costliest mistakes first. Answers → `interactions/quiz/`. | ~5–15K tokens |
 | `!super` | Toggle mode: default ↔ super | 0 tokens |
 | `!super on/off` | Explicitly enable/disable super mode | 0 tokens |
 | `!super status` | Show current mode | 0 tokens |
 
-For `!view`, use the deterministic local tool rather than reading or rebuilding
-the graph with AI:
-
-- `!view` → run `python3 scripts/kb_view.py --background` and report its URL
-- `!view status` → run `python3 scripts/kb_view.py --status`
-- `!view stop` → run `python3 scripts/kb_view.py --stop`
-
-The viewer already covers health triage (orphans / broken / stale / ambiguous
-chips with a fix queue and source-line context), full-text search, 1–3-hop
-focus, and shortest path between pages — point the user there instead of
-answering "what links where" or "what is broken" questions with AI.
-
-Cross-base sync (`!export` / `!import` / `!merge`) is the same idea: the scripts
-do the mechanics, you do the meaning.
-
-- `!export` → `python3 scripts/kb_export.py` (add `--with-assets` only if the user asks)
-- `!import` → `python3 scripts/kb_import.py`, then read the newest file in `sync/reports/`
-- `!merge` → follow the procedure in `16_MERGE.md`; never overwrite a local page
-  without folding in what the incoming version knows
+Graph, sync, and heal are the scripts in the table — do not rebuild the
+graph or invent export/import/merge mechanics with AI.
 
 ## Knowledge lifecycle
 
@@ -150,22 +127,6 @@ At the start of each session, **read `mode` in `kb.config.yml`** and apply the c
 | `default` | Python-first, throttled | ~3-4K | Daily work, limited budget |
 | `super` | AI-first, on-demand | ~50-200K+ | Unlimited plans, intensive learning |
 
-### default mode
-- Surprise filter: Python NLP overlap (0 tok)
-- Annotations: Python templates (0 tok)
-- Entity resolution: Python fuzzy match (0 tok)
-- Reflection: by threshold (≥25) OR weekly + changes
-- Lint L2: only on `!audit`
-- Review queue: waits for manual processing
-
-### super mode
-- Surprise filter: AI semantic per-ingest (~2-5K tok)
-- Annotations: AI substantive + suggested edits (~1-3K tok)
-- Entity resolution: AI semantic + cross-language (~500-1K tok)
-- Reflection: after every significant ingest (importance ≥5)
-- Lint L2: auto on every consolidation (24h)
-- Review queue: AI auto-processes `review/needs-ai-decision/`
-
 > ⚠️ **Super mode** can drain a daily token budget in one active session. Use only with unlimited or high-cap AI plans.
 
 ## Context budget
@@ -173,32 +134,13 @@ At the start of each session, **read `mode` in `kb.config.yml`** and apply the c
 1. Reading priority: insights → opinions → domain → playbooks → raw facts
 2. Routing first: always start with the routing table; don't load every domain file
 3. Loading limit: at most 7 `knowledge/` files in context simultaneously
-4. If you've loaded > 5, stop and reassess
-5. Summarize what you've read before loading more
-6. Ranking: prefer files with high `importance` and recent `last_accessed`
-7. Temporal filter: filter by `valid_from`/`valid_until` if the question is period-specific
-8. Access tracking: when reading a `knowledge/` file, update `last_accessed` and `access_count += 1`
+4. Summarize what you've read before loading more
+5. Ranking: prefer files with high `importance` and recent `last_accessed`
+6. Temporal filter: filter by `valid_from`/`valid_until` if the question is period-specific
+7. Access tracking: update `last_accessed` and `access_count += 1` only when the page actually influenced the answer — not on every glance
 
-## Token budget
-
-Depends on `mode` in `kb.config.yml`:
-
-### default mode — at most ~10% of session tokens
-- Ingest: importance scoring (~500 tok) + review if complex (~5–15K)
-- Query writeback: 1 call (~3K tok)
-- Surprise filter: Python-only (0 tok); AI only for >3000 words (max 2/day)
-- Self-editing annotations: Python-only (0 tok)
-- Reflection / lint L2: only on `!reflect` / `!audit` or weekly schedule
-
-### super mode — unlimited
-- Ingest: AI surprise (~2-5K) + AI annotations (~1-3K) + AI entity resolution (~1K) + importance with reasoning (~1-2K)
-- Query writeback: 1 call + auto-update related pages (~5-8K)
-- Surprise filter: AI for every material, no size/frequency limits
-- Self-editing annotations: AI substantive + suggested edits
-- Reflection: after every significant ingest (importance ≥5)
-- Lint L2: auto on every consolidation
-- Review queue: auto-processed without waiting for `!audit`
-
+<!-- AI-KE:INVARIANT:BEGIN id="language" -->
 ## Language
 
 Primary language: **{{PRIMARY_LANGUAGE}}**. Technical terms, brand names, and product names — keep in original.
+<!-- AI-KE:INVARIANT:END id="language" -->

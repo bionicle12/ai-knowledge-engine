@@ -72,6 +72,24 @@ def test_render_frontmatter_empty_meta_returns_body():
     assert kbc.render_frontmatter({}, "body\n") == "body\n"
 
 
+def test_invariant_ids_and_strip():
+    text = (
+        "outside always\n"
+        "<!-- AI-KE:INVARIANT:BEGIN id=\"forbidden\" -->\n"
+        "## Forbidden\nnever index raw\n"
+        "<!-- AI-KE:INVARIANT:END id=\"forbidden\" -->\n"
+        "<!-- AI-KE:INVARIANT:BEGIN id=\"language\" -->\n"
+        "## Language\n"
+        "<!-- AI-KE:INVARIANT:END id=\"language\" -->\n"
+        "after must\n"
+    )
+    assert kbc.invariant_ids(text) == {"forbidden", "language"}
+    stripped = kbc.strip_invariant_bodies(text)
+    assert "never index raw" not in stripped
+    assert "outside always" in stripped
+    assert "after must" in stripped
+
+
 def test_read_write_frontmatter_file(tmp_path: Path):
     p = tmp_path / "page.md"
     meta_in = {"source": "raw/x.pdf", "tags": ["test"]}

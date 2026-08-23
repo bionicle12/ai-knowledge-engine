@@ -24,7 +24,7 @@
 
 > Read quick-start/INIT_GUIDE.md from <path-to-this-repo> and initialize the
 > Repomix pack index in this project (mode: init). My context window is
-> <256k/200k/1m>. Show me the proposed pack table before writing any configs.
+> <400k/256k/200k/1m>. Show me the proposed pack table before writing any configs.
 
 **Already-initialized project — routine rebuild (update):**
 
@@ -44,7 +44,7 @@
 Russian variants (равнозначны):
 
 > Прочитай quick-start/INIT_GUIDE.md из <путь> и инициализируй пакетный
-> Repomix-индекс в этом проекте (режим init). Окно контекста — <256k/200k/1m>.
+> Repomix-индекс в этом проекте (режим init). Окно контекста — <400k/256k/200k/1m>.
 > Покажи таблицу пакетов до записи конфигов.
 
 > Прочитай quick-start/INIT_GUIDE.md из <путь> и ПЕРЕинициализируй
@@ -73,7 +73,8 @@ XML, or run `repomix --token-count-tree` (see Phase 2).
 
 | Window profile | Pack ceiling | Per-session budget | Catalog target |
 |---------------|-------------|--------------------|----------------|
-| `256k` (default, conservative) | **80K** | catalog + max 1 domain pack | 5–15K |
+| `400k` (Codex) | **120K** | catalog + max 1 domain pack | 5–15K |
+| `256k` (Cursor / conservative default) | **80K** | catalog + max 1 domain pack | 5–15K |
 | `200k` | 60K | catalog + max 1 domain pack | 5–15K |
 | `1m` | 150K | catalog + 1–2 domain packs | 5–15K |
 
@@ -93,7 +94,7 @@ are as bad for routing as one giant one.
 Ask the user (skip what's obvious from the project):
 
 1. **Project type / stack?** (drives include patterns)
-2. **Context window?** (`256k` default / `200k` / `1m`) — sets the pack ceiling
+2. **Context window?** (`400k` Codex / `256k` default / `200k` / `1m`) — sets the pack ceiling
 3. **Legacy / archive folders** to exclude entirely?
 4. **Priority: token economy or completeness?** For **code**, default to
    `compress: true, removeComments: true, removeEmptyLines: true`. For

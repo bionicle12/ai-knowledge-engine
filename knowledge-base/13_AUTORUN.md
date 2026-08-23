@@ -482,6 +482,10 @@ Were there changes?       -  -  -  -  -  -  -  -  ✓  -   ...
 
 The last point matters: in active sessions reflection fires before 7 days, preventing stagnation.
 
+`kb_reflect.py --json` also returns `exploration`: at most two pairs of
+pages from disconnected graph components (overlap `< 0.8`). The agent
+may use them as reflection questions. An empty list is valid.
+
 ### Guarantees
 
 - Consolidation runs **at most once per day** (`.last_consolidation` marker)
@@ -500,7 +504,11 @@ The last point matters: in active sessions reflection fires before 7 days, preve
 | Edit in `knowledge/` | Reindex + quick lint | `./shell/watcher.sh` or git hook |
 | `!save` in AI session | Session capture (with enrichment) → Reindex | AI agent |
 | `!reflect` | Reflection: insight generation (~15K tokens) | AI agent |
-| `!audit` | Lint level 2: AI review (~50–100K tokens) | AI agent |
+| `!audit` | Per-pack L2 review from `.repomix/audit/<pack>__request.md` | AI agent |
+| `!profile-review` | Interview `knowledge/profile/` (3 questions at a time) | AI agent |
+| `!quiz` | Five questions about what is already in the base; costliest mistakes first | AI agent |
+| `!heal` | Catch-up after upgrade (`kb_heal.py --plan` / `--apply auto`) | AI agent |
+| `!refactor` | Two-step instruction trim (`17_REFACTOR.md`) | AI agent |
 | Lint found and fixed issues | Reindex | `kb_lint.py --fix` |
 | AI did query-writeback | Write page → Reindex | AI agent |
 | Git commit | Quick lint + Reindex | git hook |

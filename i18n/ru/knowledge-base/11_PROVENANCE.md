@@ -86,7 +86,7 @@ context_annotations: []                    # эволюция заметки п�
 
 ### Recency decay
 
-Каждое обращение AI к knowledge/ странице «освежает» её:
+Когда страница `knowledge/` реально повлияла на ответ, агент «освежает» её:
 
 ```yaml
 last_accessed: 2026-05-06    # дата последнего чтения
@@ -95,7 +95,7 @@ access_count: 12             # сколько раз читали
 
 ### Обновление
 
-- **AI-агент:** при чтении knowledge/ файла через dynamic context loading обновляет `last_accessed` и `access_count += 1`
+- **AI-агент:** обновляй `last_accessed` и `access_count += 1` только если страница реально повлияла на ответ — не на каждый взгляд и не на каждую загрузку пака
 - **Python-скрипт:** при reindex может вычислять `recency_score` для сортировки
 
 ### Recency score

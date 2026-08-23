@@ -594,3 +594,51 @@ def test_background_cli_is_idempotent_and_can_report_and_stop(
     )
     assert status.returncode == 1
     assert status.stdout.strip() == "Knowledge graph is not running."
+
+
+def test_exploration_pairs_two_components_low_overlap(tmp_path: Path) -> None:
+    _write_page(
+        tmp_path,
+        "domain/alpha.md",
+        "---\ntags: [alpha]\n---\n# Alpha\n\nStandalone.\n",
+    )
+    _write_page(
+        tmp_path,
+        "projects/beta.md",
+        "---\ntags: [beta]\n---\n# Beta\n\nAlso standalone.\n",
+    )
+    graph = kb_view.build_graph(tmp_path)
+    assert kb_view.undirected_components(graph) == [
+        ["domain/alpha"],
+        ["projects/beta"],
+    ]
+    pairs = kb_view.exploration_pairs(graph)
+    assert len(pairs) == 1
+    assert pairs[0]["a"] == "domain/alpha"
+    assert pairs[0]["b"] == "projects/beta"
+    assert pairs[0]["overlap"] == 0.0
+    assert pairs[0]["reason"] == "disconnected-components"
+    assert "[[domain/alpha]]" in pairs[0]["prompt"]
+
+
+def test_exploration_pairs_high_overlap_filtered(tmp_path: Path) -> None:
+    _write_page(
+        tmp_path,
+        "domain/one.md",
+        "---\ntags: [shared, extra]\n---\n# One\n\nA.\n",
+    )
+    _write_page(
+        tmp_path,
+        "domain/two.md",
+        "---\ntags: [shared, extra]\n---\n# Two\n\nB.\n",
+    )
+    graph = kb_view.build_graph(tmp_path)
+    assert kb_view.overlap_score(graph["nodes"][0], graph["nodes"][1]) == 1.0
+    assert kb_view.exploration_pairs(graph) == []
+
+
+def test_exploration_pairs_empty_when_linked(tmp_path: Path) -> None:
+    _write_page(tmp_path, "domain/a.md", "# A\n\nSee [[domain/b]].\n")
+    _write_page(tmp_path, "domain/b.md", "# B\n\nSee [[domain/a]].\n")
+    graph = kb_view.build_graph(tmp_path)
+    assert kb_view.exploration_pairs(graph) == []

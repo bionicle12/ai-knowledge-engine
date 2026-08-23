@@ -155,8 +155,10 @@ python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
 the base (new commands, sharpened rules, role notes). The upgrader therefore
 touches only its managed blocks (`AI-KE:VIEW`, `AI-KE:INDEX`), and even those
 it auto-replaces **only when the deployed block text matches a known reference
-version**. In every other case — local edits inside a managed block, or
-damaged markers — it:
+version**. `AI-KE:INVARIANT` blocks (`forbidden`, `language`) are never
+auto-written or overwritten — upgrade reports `present` / `missing` and
+leaves wrapping to `!heal`. In every other case — local edits inside a
+VIEW/INDEX block, or damaged markers — it:
 
 1. leaves `AGENTS.md` completely untouched;
 2. writes the fresh reference block to a sidecar
@@ -174,6 +176,37 @@ To finish the upgrade, ask the AI agent working in that base:
 Then re-run `kb_upgrade.py` — with the block matching the reference again, the
 version bump proceeds. `--force` does NOT override this: forced runs discard
 script customizations, but AGENTS.md merges always stay AI-mediated.
+
+## After the file sync: heal
+
+The upgrader does **not** rewrite `knowledge/` or locally evolved
+`AGENTS.md` prose. It does, at the end of every `upgrade_one` (including
+when customized files produced `.new` sidecars):
+
+1. `kb_heal.py --plan` → `review/needs-heal/HEAL_PLAN.md`
+2. `kb_heal.py --apply auto` unless you passed `--no-heal` or set
+   `heal.auto_apply: false`
+3. print a summary and `→ next: скажи агенту "!heal"`
+
+`--dry-run` prints the detect counts and does **not** write the plan or
+apply anything.
+
+Heal is never fatal to the upgrade. If `kb.config.yml` does not parse, the
+file sync still completes and you get:
+
+```
+[WARN] heal skipped: ScannerError: while scanning a simple key …
+  Fix kb.config.yml, then run: python3 scripts/kb_heal.py --plan
+```
+
+The auto bucket only touches `kb.config.yml` (edited line by line, comments
+intact) and the `eval/` skeleton, always after a copy into `.kb-backups/`,
+and re-running it changes nothing the second time.
+
+6. In the deployed base, say `!heal` to the agent. That walks the
+   assisted/human buckets (one item at a time, stage 4 locked until
+   eval questions exist). Full cycle: `18_HEAL.md`. Stage 4 trim is
+   `!refactor` (`17_REFACTOR.md`), not the upgrader.
 
 ## Verification
 
