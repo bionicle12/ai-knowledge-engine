@@ -75,7 +75,7 @@ Things you can say to the AI agent in the IDE:
 
 | Command | What it does | Cost | When to use |
 |---------|--------------|------|-------------|
-| `!view` | Start or reopen the local read-only knowledge graph viewer | 0 tokens | Browse pages, links, metadata, and diagnostics without AI |
+| `!view` | Start or reopen the local read-only knowledge graph viewer | 0 tokens | Browse pages, links, metadata, full-text search, and the health panel (orphans, broken links, stale, ambiguous) without AI |
 | `!save` | Save a session summary with conclusions and processed materials | ~2K tokens | At the end of a productive session, or when useful conclusions accumulate |
 | `!reflect` | Reflect: synthesize higher-level insights from accumulated facts | ~15K tokens | When a lot of new material has been added |
 | `!audit` | AI review of the base: contradictions, gaps, merge candidates | ~50–100K tokens | Every 2–4 weeks |
@@ -87,7 +87,7 @@ Things you can say to the AI agent in the IDE:
 
 ### When it makes sense
 
-- **`!view`** — whenever you want to browse what is already in `knowledge/`; use `!view status` to show the URL and `!view stop` to stop the local server
+- **`!view`** — whenever you want to browse what is already in `knowledge/` or triage base health: the health chips + fix queue list every orphan, broken link, stale, or ambiguous page with its source line and an "open file" button; full-text search, 1–3-hop focus, shortest path between two pages, and shareable URL state are built in. Use `!view status` to show the URL and `!view stop` to stop the local server
 - **`!save`** — after any productive 45+ minute session where you discussed documents, made decisions, or analyzed data
 - **`!reflect`** — after a series of additions to the base (5+ new pages), before a major strategic decision, or when the system itself says "time"
 - **`!audit`** — when you haven't checked the base in a while (2+ weeks), or before large work, to ensure the context is clean

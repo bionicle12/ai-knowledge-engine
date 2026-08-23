@@ -18,6 +18,32 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+### Added
+- **Graph viewer (`!view`) redesigned around base maintenance.**
+  - **Health bar + fix queue.** Always-visible, combinable chips for
+    orphans / broken links / stale / ambiguous pages (replacing the hidden
+    radio-button quality lens), backed by a fix queue that shows the exact
+    wikilink source line per issue and opens the offending file in the
+    editor.
+  - **Visual hierarchy.** Node size follows PageRank centrality, entry
+    points (`routing/` pages, `routing-table.md`) render as diamonds, and
+    edge/selection contrast is raised for dark IDE themes.
+  - **Navigation.** Focus depth of 1–3 hops around the selected page, BFS
+    shortest path between two pages with a clickable step banner,
+    back/forward selection history, and UI state (selection, health chips,
+    filters, focus depth, path) serialized in the URL hash for shareable
+    deep links.
+  - **Inspector.** Wikilinks inside the Markdown preview are clickable and
+    navigate the graph; inbound/outbound link lists show the source line
+    where each link appears.
+  - **Full-text search.** New `/api/search` endpoint ranks title, tag, and
+    body matches and returns highlighted snippets; the search box falls
+    back to client-side title/tag matching if the endpoint is unavailable.
+  - **Folder clustering** on distant zoom for bases with 200+ pages.
+- `kb_common.extract_wikilinks_with_context()` returns each wikilink with
+  the source line it appears on; `kb_view.py` uses it for edge and
+  diagnostic context.
+
 ## [0.13.0] - 2026-08-20
 
 ### Added

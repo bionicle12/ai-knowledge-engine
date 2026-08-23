@@ -84,8 +84,51 @@ def _normalise_target(target: str) -> str:
     return value.strip("/")
 
 
+def _context_snippet(line: str, limit: int = 160) -> str:
+    text = " ".join(line.split())
+    return text if len(text) <= limit else f"{text[: limit - 1].rstrip()}…"
+
+
+def _pagerank(
+    order: list[str],
+    outbound: dict[str, set[str]],
+    *,
+    damping: float = 0.85,
+    iterations: int = 60,
+) -> dict[str, float]:
+    """Deterministic PageRank over resolved wikilinks (self-links ignored)."""
+    count = len(order)
+    if not count:
+        return {}
+    links = {
+        page: sorted(target for target in outbound[page] if target != page)
+        for page in order
+    }
+    rank = {page: 1.0 / count for page in order}
+    for _ in range(iterations):
+        dangling = sum(rank[page] for page in order if not links[page])
+        base = (1.0 - damping) / count + damping * dangling / count
+        next_rank = dict.fromkeys(order, base)
+        for page in order:
+            targets = links[page]
+            if not targets:
+                continue
+            share = damping * rank[page] / len(targets)
+            for target in targets:
+                next_rank[target] += share
+        rank = next_rank
+    return {page: round(value, 6) for page, value in rank.items()}
+
+
 def build_graph(kb_root: Path | str) -> dict[str, Any]:
     """Build a deterministic graph from ``knowledge/**/*.md`` in memory."""
+    return build_viewer_state(kb_root)[0]
+
+
+def build_viewer_state(
+    kb_root: Path | str,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Build the graph payload plus page bodies for full-text search."""
     root = Path(kb_root).resolve()
     knowledge_dir = root / "knowledge"
     pages = sorted(knowledge_dir.rglob("*.md")) if knowledge_dir.is_dir() else []
@@ -123,8 +166,9 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
 
     for source in sorted(records):
         emitted = 0
-        for raw_target in kbc.extract_wikilinks(bodies[source]):
+        for raw_target, line in kbc.extract_wikilinks_with_context(bodies[source]):
             target = _normalise_target(raw_target)
+            context = _context_snippet(line)
             if "/" in target:
                 resolved = exact.get(target.casefold())
                 candidates = [resolved] if resolved else []
@@ -132,7 +176,9 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
                 candidates = sorted(by_slug.get(target.casefold(), []))
 
             if not candidates:
-                broken.append({"source": source, "target": target})
+                broken.append(
+                    {"source": source, "target": target, "context": context}
+                )
                 continue
             if len(candidates) > 1:
                 ambiguous.append(
@@ -140,6 +186,7 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
                         "source": source,
                         "target": target,
                         "candidates": candidates,
+                        "context": context,
                     }
                 )
                 continue
@@ -151,6 +198,7 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
                     "from": source,
                     "to": destination,
                     "target": target,
+                    "context": context,
                 }
             )
             emitted += 1
@@ -158,9 +206,11 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
             if destination != source:
                 inbound[destination].add(source)
 
+    order = sorted(records)
+    pagerank = _pagerank(order, outbound)
     nodes: list[dict[str, Any]] = []
     orphans: list[str] = []
-    for page_id in sorted(records):
+    for page_id in order:
         node = records[page_id]
         node_inbound = sorted(inbound[page_id])
         node_outbound = sorted(outbound[page_id])
@@ -178,10 +228,12 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
                 "inDegree": len(node_inbound),
                 "outDegree": len(node_outbound),
                 "orphan": orphan,
+                "entryPoint": entry_point,
+                "pagerank": pagerank[page_id],
             }
         )
 
-    return {
+    graph = {
         "nodes": nodes,
         "edges": edges,
         "diagnostics": {
@@ -197,6 +249,63 @@ def build_graph(kb_root: Path | str) -> dict[str, Any]:
             "ambiguous": len(ambiguous),
         },
     }
+    return graph, bodies
+
+
+def search_pages(
+    graph: dict[str, Any],
+    bodies: dict[str, str],
+    query: str,
+    *,
+    limit: int = 30,
+) -> list[dict[str, Any]]:
+    """Deterministic full-text search over titles, ids, tags, and bodies."""
+    needle = query.strip().casefold()
+    if not needle:
+        return []
+    results: list[dict[str, Any]] = []
+    for node in graph["nodes"]:
+        page_id = node["id"]
+        body = bodies.get(page_id, "")
+        body_folded = body.casefold()
+        occurrences = body_folded.count(needle)
+        in_title = (
+            needle in node["label"].casefold() or needle in page_id.casefold()
+        )
+        in_tags = any(needle in tag.casefold() for tag in node["tags"])
+        if not (in_title or in_tags or occurrences):
+            continue
+        field = "title" if in_title else "tag" if in_tags else "body"
+        snippet = ""
+        index = body_folded.find(needle)
+        if index >= 0:
+            start = max(0, index - 60)
+            end = min(len(body), index + len(needle) + 90)
+            snippet = " ".join(body[start:end].split())
+            if start > 0:
+                snippet = f"…{snippet}"
+            if end < len(body):
+                snippet = f"{snippet}…"
+        results.append(
+            {
+                "id": page_id,
+                "label": node["label"],
+                "path": node["path"],
+                "group": node["group"],
+                "field": field,
+                "matches": occurrences + (1 if in_title or in_tags else 0),
+                "snippet": snippet,
+            }
+        )
+    field_rank = {"title": 0, "tag": 1, "body": 2}
+    results.sort(
+        key=lambda item: (
+            field_rank[item["field"]],
+            -item["matches"],
+            item["id"],
+        )
+    )
+    return results[:limit]
 
 
 def _safe_page_path(kb_root: Path | str, page_id: str) -> tuple[Path, Path]:
@@ -268,11 +377,11 @@ class ViewerServer(ThreadingHTTPServer):
         self.asset_dir = asset_dir.resolve()
         self.opener = opener
         self.shutdown_token = shutdown_token
-        self.graph = build_graph(self.kb_root)
+        self.graph, self.bodies = build_viewer_state(self.kb_root)
         super().__init__(server_address, request_handler)
 
     def refresh(self) -> dict[str, Any]:
-        self.graph = build_graph(self.kb_root)
+        self.graph, self.bodies = build_viewer_state(self.kb_root)
         return self.graph
 
 
@@ -318,6 +427,23 @@ class ViewerRequestHandler(SimpleHTTPRequestHandler):
             return
         if parsed.path == "/api/graph":
             self._send_json(self.server.graph)
+            return
+        if parsed.path == "/api/search":
+            queries = parse_qs(parsed.query).get("q", [])
+            if len(queries) != 1 or not queries[0].strip():
+                self._send_json(
+                    {"error": "Missing search query"}, HTTPStatus.BAD_REQUEST
+                )
+                return
+            query = queries[0][:200]
+            self._send_json(
+                {
+                    "query": query,
+                    "results": search_pages(
+                        self.server.graph, self.server.bodies, query
+                    ),
+                }
+            )
             return
         if parsed.path == "/api/page":
             page_ids = parse_qs(parsed.query).get("id", [])

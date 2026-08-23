@@ -174,7 +174,7 @@ These commands are messages to your AI agent, not shell commands.
 
 | Command | Purpose | Typical AI cost |
 |---|---|---:|
-| `!view` | Open the local read-only knowledge graph viewer | 0 tokens |
+| `!view` | Open the local read-only knowledge graph viewer (health triage, full-text search, path finding) | 0 tokens |
 | `!save` | Capture decisions and insights from a productive session | ~2K tokens |
 | `!reflect` | Synthesize higher-level patterns from accumulated knowledge | ~15K tokens |
 | `!review` | Resolve items waiting in review queues | ~5–30K tokens |

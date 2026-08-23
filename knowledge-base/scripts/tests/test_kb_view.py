@@ -54,6 +54,10 @@ def test_build_graph_reads_metadata_titles_and_exact_wikilinks(tmp_path: Path) -
 
     nodes = {node["id"]: node for node in graph["nodes"]}
     assert sorted(nodes) == ["domain/source", "projects/target"]
+    source_rank = nodes["domain/source"].pop("pagerank")
+    target_rank = nodes["projects/target"].pop("pagerank")
+    assert source_rank == pytest.approx(0.350877, rel=1e-3)
+    assert target_rank == pytest.approx(0.649123, rel=1e-3)
     assert nodes["domain/source"] == {
         "id": "domain/source",
         "label": "Source Page",
@@ -70,6 +74,7 @@ def test_build_graph_reads_metadata_titles_and_exact_wikilinks(tmp_path: Path) -
         "inDegree": 0,
         "outDegree": 1,
         "orphan": True,
+        "entryPoint": False,
     }
     assert nodes["projects/target"]["inbound"] == ["domain/source"]
     assert graph["edges"] == [
@@ -78,6 +83,7 @@ def test_build_graph_reads_metadata_titles_and_exact_wikilinks(tmp_path: Path) -
             "from": "domain/source",
             "to": "projects/target",
             "target": "projects/target",
+            "context": "A useful summary. See [[projects/target|the target]].",
         }
     ]
     assert graph["stats"] == {
@@ -108,22 +114,29 @@ def test_build_graph_reports_broken_ambiguous_and_true_orphans(tmp_path: Path) -
             "from": "a/source",
             "to": "a/source",
             "target": "source",
+            "context": "[[shared]] [[missing]] [[source]]",
         },
         {
             "id": "b/linked::a/source::0",
             "from": "b/linked",
             "to": "a/source",
             "target": "a/source",
+            "context": "[[a/source]]",
         },
     ]
     assert graph["diagnostics"]["broken"] == [
-        {"source": "a/source", "target": "missing"}
+        {
+            "source": "a/source",
+            "target": "missing",
+            "context": "[[shared]] [[missing]] [[source]]",
+        }
     ]
     assert graph["diagnostics"]["ambiguous"] == [
         {
             "source": "a/source",
             "target": "shared",
             "candidates": ["a/shared", "b/shared"],
+            "context": "[[shared]] [[missing]] [[source]]",
         }
     ]
     assert graph["diagnostics"]["orphans"] == [
@@ -155,6 +168,62 @@ def test_build_graph_handles_missing_knowledge_directory(tmp_path: Path) -> None
             "ambiguous": 0,
         },
     }
+
+
+def test_build_graph_flags_entry_points_and_ranks_hubs(tmp_path: Path) -> None:
+    """Routing pages must be entry points and hubs must outrank leaves."""
+    _write_page(
+        tmp_path,
+        "routing/routing-map.md",
+        "# Routing Map\n\n[[a/hub]]\n",
+    )
+    _write_page(tmp_path, "a/hub.md", "# Hub\n\n[[a/leaf-one]] [[a/leaf-two]]\n")
+    _write_page(tmp_path, "a/leaf-one.md", "# Leaf One\n\n[[a/hub]]\n")
+    _write_page(tmp_path, "a/leaf-two.md", "# Leaf Two\n\n[[a/hub]]\n")
+
+    graph = kb_view.build_graph(tmp_path)
+
+    nodes = {node["id"]: node for node in graph["nodes"]}
+    assert nodes["routing/routing-map"]["entryPoint"] is True
+    assert nodes["a/hub"]["entryPoint"] is False
+    assert sum(node["pagerank"] for node in graph["nodes"]) == pytest.approx(
+        1.0, abs=1e-4
+    )
+    assert nodes["a/hub"]["pagerank"] > nodes["a/leaf-one"]["pagerank"]
+    assert nodes["a/hub"]["pagerank"] > nodes["routing/routing-map"]["pagerank"]
+
+
+def test_search_pages_ranks_title_before_tag_before_body(tmp_path: Path) -> None:
+    """Full-text search must stay deterministic and rank by match field."""
+    _write_page(
+        tmp_path,
+        "a/kafka-cluster.md",
+        "# Kafka Cluster\n\nBroker layout and retention settings.\n",
+    )
+    _write_page(
+        tmp_path,
+        "a/event-bus.md",
+        "---\ntags: [kafka]\n---\n# Event Bus\n\nAsync topics.\n",
+    )
+    _write_page(
+        tmp_path,
+        "a/queue-backlog.md",
+        "# Queue Backlog\n\nConsumer lag means the Kafka cluster is behind.\n",
+    )
+    _write_page(tmp_path, "a/unrelated.md", "# Unrelated\n\nNothing here.\n")
+
+    graph, bodies = kb_view.build_viewer_state(tmp_path)
+    results = kb_view.search_pages(graph, bodies, "kafka")
+
+    assert [item["id"] for item in results] == [
+        "a/kafka-cluster",
+        "a/event-bus",
+        "a/queue-backlog",
+    ]
+    assert [item["field"] for item in results] == ["title", "tag", "body"]
+    body_hit = results[2]
+    assert "Kafka" in body_hit["snippet"]
+    assert kb_view.search_pages(graph, bodies, "   ") == []
 
 
 def test_load_page_returns_frontmatter_and_rejects_traversal(tmp_path: Path) -> None:
@@ -275,6 +344,47 @@ def test_server_exposes_graph_page_refresh_and_security_headers(
         )
         assert status == 200
         assert refreshed["stats"]["pages"] == 2
+
+
+def test_server_full_text_search_endpoint(tmp_path: Path) -> None:
+    """/api/search must hit page bodies and refresh with the graph."""
+    _write_page(
+        tmp_path,
+        "domain/one.md",
+        "# One\n\nThe retention window is 7 days.\n",
+    )
+    assets = tmp_path / "viewer-assets"
+    assets.mkdir()
+    (assets / "index.html").write_text("<h1>viewer</h1>", encoding="utf-8")
+
+    with _running_server(tmp_path, assets) as (base_url, _server):
+        status, _headers, payload = _request_json(
+            f"{base_url}/api/search?q=retention"
+        )
+        assert status == 200
+        assert payload["query"] == "retention"
+        assert [item["id"] for item in payload["results"]] == ["domain/one"]
+        assert payload["results"][0]["field"] == "body"
+        assert "retention" in payload["results"][0]["snippet"]
+
+        status, _headers, error = _request_json(f"{base_url}/api/search")
+        assert status == 400
+        assert error == {"error": "Missing search query"}
+
+        _write_page(
+            tmp_path,
+            "domain/two.md",
+            "# Two\n\nDunning flow retries three times.\n",
+        )
+        status, _headers, _refreshed = _request_json(
+            f"{base_url}/api/refresh", method="POST"
+        )
+        assert status == 200
+        status, _headers, payload = _request_json(
+            f"{base_url}/api/search?q=dunning"
+        )
+        assert status == 200
+        assert [item["id"] for item in payload["results"]] == ["domain/two"]
 
 
 def test_server_serves_only_configured_static_assets(tmp_path: Path) -> None:

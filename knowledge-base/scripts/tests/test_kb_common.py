@@ -181,6 +181,21 @@ def test_extract_wikilinks_none():
     assert kbc.extract_wikilinks("plain text [link](url)") == []
 
 
+def test_extract_wikilinks_with_context_returns_source_lines():
+    text = "intro\nsee [[caching]] for speed\n\n- both [[a]] and [[b|B]] here\n"
+    assert kbc.extract_wikilinks_with_context(text) == [
+        ("caching", "see [[caching]] for speed"),
+        ("a", "- both [[a]] and [[b|B]] here"),
+        ("b", "- both [[a]] and [[b|B]] here"),
+    ]
+
+
+def test_extract_wikilinks_with_context_matches_extract_wikilinks_order():
+    text = "x [[one]]\ny [[two|alias]] z [[three]]"
+    pairs = kbc.extract_wikilinks_with_context(text)
+    assert [target for target, _line in pairs] == kbc.extract_wikilinks(text)
+
+
 def test_scan_knowledge_slugs(tmp_path: Path):
     knowledge = tmp_path / "knowledge"
     (knowledge / "domain").mkdir(parents=True)

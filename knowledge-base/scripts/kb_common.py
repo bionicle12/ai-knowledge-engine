@@ -557,6 +557,23 @@ def extract_wikilinks(text: str) -> list[str]:
     return _WIKILINK_RE.findall(text)
 
 
+def extract_wikilinks_with_context(text: str) -> list[tuple[str, str]]:
+    """Return ``(target, source_line)`` for each wikilink, in document order.
+
+    ``source_line`` is the stripped line containing the link's opening
+    brackets — enough context to show *why* one page links to another.
+    Target order matches :func:`extract_wikilinks` exactly.
+    """
+    results: list[tuple[str, str]] = []
+    for match in _WIKILINK_RE.finditer(text):
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        line_end = text.find("\n", match.start())
+        if line_end == -1:
+            line_end = len(text)
+        results.append((match.group(1), text[line_start:line_end].strip()))
+    return results
+
+
 def scan_knowledge_slugs(knowledge_dir: Path) -> dict[str, list[Path]]:
     """Map slug (filename without .md) → list of paths.
 
@@ -687,6 +704,7 @@ __all__ = [
     "write_json",
     "read_json",
     "extract_wikilinks",
+    "extract_wikilinks_with_context",
     "scan_knowledge_slugs",
     "print_err",
     "detect_python_executable",

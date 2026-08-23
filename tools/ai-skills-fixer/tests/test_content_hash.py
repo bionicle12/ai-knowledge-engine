@@ -42,10 +42,9 @@ def test_matches_documented_manifest_algorithm(tmp_path):
     def file_sha(text):
         return hashlib.sha256(text.encode()).hexdigest()
 
-    manifest = (
-        f"a/deep.md\n{file_sha('deep\n')}\n"
-        f"b.md\n{file_sha('bee\n')}\n"
-    )
+    deep_sha = file_sha("deep\n")
+    bee_sha = file_sha("bee\n")
+    manifest = f"a/deep.md\n{deep_sha}\nb.md\n{bee_sha}\n"
     expected = hashlib.sha256(manifest.encode()).hexdigest()
     assert content_hash(skill) == expected
 

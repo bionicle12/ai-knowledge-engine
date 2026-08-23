@@ -102,6 +102,11 @@ the graph with AI:
 - `!view status` → run `python3 scripts/kb_view.py --status`
 - `!view stop` → run `python3 scripts/kb_view.py --stop`
 
+The viewer already covers health triage (orphans / broken / stale / ambiguous
+chips with a fix queue and source-line context), full-text search, 1–3-hop
+focus, and shortest path between pages — point the user there instead of
+answering "what links where" or "what is broken" questions with AI.
+
 ## Knowledge lifecycle
 
 - `knowledge/decisions/` — immutable (log style, do not edit historical entries)

@@ -14,6 +14,21 @@
     "#7d9e68",
   ];
 
+  const STALE_MS = 180 * 24 * 60 * 60 * 1000;
+  const HEALTH_COLORS = {
+    orphans: "#e4a72f",
+    broken: "#ef665f",
+    stale: "#b48ce8",
+    ambiguous: "#4fb3c6",
+  };
+  const HEALTH_ORDER = ["broken", "orphans", "stale", "ambiguous"];
+  const PATH_COLOR = "#67e0b2";
+  const FIX_QUEUE_LIMIT = 40;
+  const CLUSTER_MIN_PAGES = 200;
+  const CLUSTER_SCALE = 0.42;
+  const CLUSTER_PREFIX = "cluster::";
+  const WIKILINK_RE = /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g;
+
   const state = {
     graph: null,
     nodesById: new Map(),
@@ -24,9 +39,30 @@
     selectedFolder: null,
     selectedTag: null,
     lifecycles: new Set(),
-    lens: "none",
+    health: new Set(),
     focus: false,
+    focusDepth: 1,
+    pathMode: false,
+    pathFrom: null,
+    path: null,
+    history: [],
+    historyIndex: -1,
+    historyNavigating: false,
+    clustered: false,
     groupColors: new Map(),
+    exactIndex: new Map(),
+    slugIndex: new Map(),
+    adjacency: new Map(),
+    edgeIdByPair: new Map(),
+    edgeContextByPair: new Map(),
+    staleIds: new Set(),
+    brokenSources: new Set(),
+    ambiguousSources: new Set(),
+    prMax: 0,
+    restoringHash: false,
+    hashApplied: false,
+    searchTimer: null,
+    searchSeq: 0,
     toastTimer: null,
   };
 
@@ -45,24 +81,33 @@
       "sidebar",
       "search-input",
       "search-results",
+      "back-button",
+      "forward-button",
       "fit-button",
       "focus-button",
+      "depth-picker",
+      "path-button",
       "refresh-button",
       "stat-pages",
       "stat-links",
-      "stat-orphans",
-      "stat-broken",
+      "health-chips",
+      "count-orphans",
+      "count-broken",
+      "count-stale",
+      "count-ambiguous",
+      "clear-health",
+      "fix-queue",
       "folder-filters",
       "tag-filters",
       "lifecycle-filters",
-      "quality-filters",
-      "lens-orphans",
-      "lens-broken",
       "clear-folder",
       "clear-tag",
       "clear-all-filters",
       "full-graph-button",
       "selection-crumb",
+      "path-banner",
+      "path-steps",
+      "path-close",
       "graph",
       "canvas-empty",
       "graph-legend",
@@ -95,16 +140,38 @@
     el["inspector-close"].addEventListener("click", () => {
       document.body.classList.remove("inspector-open");
     });
+    el["back-button"].addEventListener("click", () => goHistory(-1));
+    el["forward-button"].addEventListener("click", () => goHistory(1));
     el["fit-button"].addEventListener("click", fitGraph);
     el["focus-button"].addEventListener("click", () => {
       if (!state.selectedId) return;
-      state.focus = !state.focus;
-      el["focus-button"].setAttribute("aria-pressed", String(state.focus));
-      applyGraphState();
-      if (state.focus) focusSelected();
+      setFocus(!state.focus);
     });
+    el["depth-picker"].addEventListener("click", (event) => {
+      const button = event.target.closest("[data-depth]");
+      if (!button) return;
+      state.focusDepth = Number(button.dataset.depth);
+      syncDepthPicker();
+      if (state.focus) {
+        applyGraphState();
+        focusSelected();
+      }
+    });
+    el["path-button"].addEventListener("click", togglePathMode);
+    el["path-close"].addEventListener("click", clearPath);
     el["refresh-button"].addEventListener("click", refreshGraph);
     el["full-graph-button"].addEventListener("click", clearFocus);
+    el["health-chips"].addEventListener("click", (event) => {
+      const chip = event.target.closest("[data-health]");
+      if (!chip) return;
+      toggleHealth(chip.dataset.health);
+    });
+    el["clear-health"].addEventListener("click", () => {
+      state.health.clear();
+      syncHealthControls();
+      renderFixQueue();
+      applyGraphState();
+    });
     el["clear-folder"].addEventListener("click", () => {
       state.selectedFolder = null;
       syncFilterControls();
@@ -116,13 +183,7 @@
       applyGraphState();
     });
     el["clear-all-filters"].addEventListener("click", clearAllFilters);
-    el["quality-filters"].addEventListener("change", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      state.lens = target.value;
-      applyGraphState();
-    });
-    el["search-input"].addEventListener("input", renderSearchResults);
+    el["search-input"].addEventListener("input", scheduleSearch);
     el["search-input"].addEventListener("keydown", handleSearchKeys);
     document.addEventListener("click", (event) => {
       if (!event.target.closest(".search")) {
@@ -133,14 +194,25 @@
       if (event.key === "Escape") {
         el["search-results"].hidden = true;
         document.body.classList.remove("sidebar-open");
-        if (state.focus) clearFocus();
+        if (state.pathMode || state.path) clearPath();
+        else if (state.focus) clearFocus();
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         el["search-input"].focus();
       }
+      if (event.altKey && event.key === "ArrowLeft") {
+        event.preventDefault();
+        goHistory(-1);
+      }
+      if (event.altKey && event.key === "ArrowRight") {
+        event.preventDefault();
+        goHistory(1);
+      }
     });
-    el["open-file-button"].addEventListener("click", openSelectedFile);
+    el["open-file-button"].addEventListener("click", () => {
+      if (state.selectedId) openSourceFile(state.selectedId, el["open-file-button"]);
+    });
     setupInspectorResize();
   }
 
@@ -169,14 +241,29 @@
     state.graph = graph;
     state.nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
     assignGroupColors(graph.nodes);
+    buildIndexes(graph);
     state.lifecycles = new Set(
       graph.nodes.map((node) => node.lifecycle || "evolving")
     );
+    if (state.path) {
+      if (state.path.ids.every((id) => state.nodesById.has(id))) {
+        state.path.edgeIds = pathEdgeIds(state.path.ids);
+      } else {
+        state.path = null;
+        state.pathFrom = null;
+        renderPathBanner();
+      }
+    }
     renderStats();
     renderFilters();
     renderLegend();
     createOrUpdateNetwork();
+    renderFixQueue();
     setStatus(`${graph.stats.pages} pages · ${graph.stats.links} links`);
+    if (!state.hashApplied) {
+      state.hashApplied = true;
+      await applyHashFromUrl();
+    }
   }
 
   function assignGroupColors(nodes) {
@@ -187,14 +274,61 @@
     });
   }
 
+  function buildIndexes(graph) {
+    state.exactIndex = new Map(
+      graph.nodes.map((node) => [node.id.toLowerCase(), node.id])
+    );
+    state.slugIndex = new Map();
+    state.adjacency = new Map();
+    graph.nodes.forEach((node) => {
+      const slug = node.id.split("/").pop().toLowerCase();
+      if (!state.slugIndex.has(slug)) state.slugIndex.set(slug, []);
+      state.slugIndex.get(slug).push(node.id);
+      state.adjacency.set(
+        node.id,
+        new Set([...node.inbound, ...node.outbound])
+      );
+    });
+    state.slugIndex.forEach((ids) => ids.sort());
+    state.edgeIdByPair = new Map();
+    state.edgeContextByPair = new Map();
+    graph.edges.forEach((edge) => {
+      const key = `${edge.from}::${edge.to}`;
+      if (!state.edgeIdByPair.has(key)) state.edgeIdByPair.set(key, edge.id);
+      if (edge.context && !state.edgeContextByPair.has(key)) {
+        state.edgeContextByPair.set(key, edge.context);
+      }
+    });
+    state.prMax = Math.max(
+      0,
+      ...graph.nodes.map((node) => Number(node.pagerank) || 0)
+    );
+    state.staleIds = new Set(
+      graph.nodes.filter(isStale).map((node) => node.id)
+    );
+    state.brokenSources = new Set(
+      graph.diagnostics.broken.map((item) => item.source)
+    );
+    state.ambiguousSources = new Set(
+      graph.diagnostics.ambiguous.map((item) => item.source)
+    );
+  }
+
+  function isStale(node) {
+    if (!node.lastVerified) return true;
+    const timestamp = Date.parse(node.lastVerified);
+    if (Number.isNaN(timestamp)) return true;
+    return Date.now() - timestamp > STALE_MS;
+  }
+
   function renderStats() {
     const { stats } = state.graph;
     el["stat-pages"].textContent = String(stats.pages);
     el["stat-links"].textContent = String(stats.links);
-    el["stat-orphans"].textContent = String(stats.orphans);
-    el["stat-broken"].textContent = String(stats.broken);
-    el["lens-orphans"].textContent = String(stats.orphans);
-    el["lens-broken"].textContent = String(stats.broken);
+    el["count-orphans"].textContent = String(stats.orphans);
+    el["count-broken"].textContent = String(stats.broken);
+    el["count-stale"].textContent = String(state.staleIds.size);
+    el["count-ambiguous"].textContent = String(stats.ambiguous);
   }
 
   function renderFilters() {
@@ -202,6 +336,7 @@
     renderTagFilters();
     renderLifecycleFilters();
     syncFilterControls();
+    syncHealthControls();
   }
 
   function renderFolderFilters() {
@@ -316,6 +451,152 @@
     });
   }
 
+  function syncHealthControls() {
+    el["health-chips"].querySelectorAll("[data-health]").forEach((chip) => {
+      chip.setAttribute(
+        "aria-pressed",
+        String(state.health.has(chip.dataset.health))
+      );
+    });
+    el["clear-health"].hidden = state.health.size === 0;
+  }
+
+  function toggleHealth(kind) {
+    if (state.health.has(kind)) state.health.delete(kind);
+    else state.health.add(kind);
+    syncHealthControls();
+    renderFixQueue();
+    applyGraphState();
+  }
+
+  function renderFixQueue() {
+    const container = el["fix-queue"];
+    if (!state.graph || state.health.size === 0) {
+      container.hidden = true;
+      container.replaceChildren();
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    const groups = {
+      orphans: () =>
+        renderFixGroup(
+          fragment,
+          "orphans",
+          "Orphan pages",
+          state.graph.diagnostics.orphans.map((id) => ({
+            nodeId: id,
+            title: state.nodesById.get(id)?.label || id,
+            context: state.nodesById.get(id)?.group || "",
+          }))
+        ),
+      broken: () =>
+        renderFixGroup(
+          fragment,
+          "broken",
+          "Broken links",
+          state.graph.diagnostics.broken.map((item) => ({
+            nodeId: item.source,
+            title: `${state.nodesById.get(item.source)?.label || item.source} → [[${item.target}]]`,
+            context: item.context || "",
+          }))
+        ),
+      stale: () =>
+        renderFixGroup(
+          fragment,
+          "stale",
+          "Stale pages",
+          [...state.staleIds].sort().map((id) => {
+            const node = state.nodesById.get(id);
+            return {
+              nodeId: id,
+              title: node?.label || id,
+              context: staleAge(node),
+            };
+          })
+        ),
+      ambiguous: () =>
+        renderFixGroup(
+          fragment,
+          "ambiguous",
+          "Ambiguous links",
+          state.graph.diagnostics.ambiguous.map((item) => ({
+            nodeId: item.source,
+            title: `${state.nodesById.get(item.source)?.label || item.source} → [[${item.target}]]`,
+            context: `matches: ${item.candidates.join(", ")}`,
+          }))
+        ),
+    };
+    ["orphans", "broken", "stale", "ambiguous"].forEach((kind) => {
+      if (state.health.has(kind)) groups[kind]();
+    });
+    container.replaceChildren(fragment);
+    container.hidden = false;
+  }
+
+  function staleAge(node) {
+    if (!node?.lastVerified) return "never verified";
+    const timestamp = Date.parse(node.lastVerified);
+    if (Number.isNaN(timestamp)) return "never verified";
+    const days = Math.floor((Date.now() - timestamp) / (24 * 60 * 60 * 1000));
+    return `verified ${days} days ago`;
+  }
+
+  function renderFixGroup(fragment, kind, heading, items) {
+    const group = document.createElement("div");
+    group.className = "fix-group";
+    const title = document.createElement("h3");
+    const dot = document.createElement("span");
+    dot.className = "chip-dot";
+    dot.style.setProperty("--chip-color", HEALTH_COLORS[kind]);
+    title.append(dot, `${heading} · ${items.length}`);
+    group.append(title);
+    items.slice(0, FIX_QUEUE_LIMIT).forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "fix-item";
+      const main = document.createElement("button");
+      main.type = "button";
+      main.className = "fix-item-main";
+      const label = document.createElement("span");
+      label.className = "fix-item-title";
+      label.textContent = item.title;
+      main.append(label);
+      if (item.context) {
+        const context = document.createElement("span");
+        context.className = "fix-item-context";
+        context.textContent = item.context;
+        main.append(context);
+      }
+      main.addEventListener("click", () => selectNode(item.nodeId));
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "icon-button fix-item-open";
+      open.title = "Open file";
+      open.setAttribute("aria-label", "Open file");
+      open.innerHTML =
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+        '<path d="M3 7h7l2 2h9v10H3z"></path><path d="M3 7V5h7l2 2"></path></svg>';
+      open.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openSourceFile(item.nodeId, open);
+      });
+      row.append(main, open);
+      group.append(row);
+    });
+    if (items.length > FIX_QUEUE_LIMIT) {
+      const more = document.createElement("div");
+      more.className = "fix-more";
+      more.textContent = `+${items.length - FIX_QUEUE_LIMIT} more`;
+      group.append(more);
+    }
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "fix-more";
+      empty.textContent = "Nothing to fix";
+      group.append(empty);
+    }
+    fragment.append(group);
+  }
+
   function renderLegend() {
     const fragment = document.createDocumentFragment();
     [...state.groupColors.entries()].slice(0, 9).forEach(([group, color]) => {
@@ -332,6 +613,17 @@
     el["graph-legend"].replaceChildren(fragment);
   }
 
+  function nodeSize(node, selected) {
+    let magnitude;
+    if (state.prMax > 0 && Number(node.pagerank) > 0) {
+      magnitude = Math.sqrt(Number(node.pagerank) / state.prMax);
+    } else {
+      magnitude = Math.min(1, Math.sqrt(node.inDegree + node.outDegree) / 6);
+    }
+    const base = 7 + magnitude * 15;
+    return selected ? Math.min(26, base + 4) : base;
+  }
+
   function createOrUpdateNetwork() {
     const networkNodes = state.graph.nodes.map(toNetworkNode);
     const networkEdges = state.graph.edges.map((edge) => ({
@@ -340,16 +632,17 @@
       to: edge.to,
       arrows: { to: { enabled: true, scaleFactor: 0.35 } },
       color: {
-        color: "rgba(118, 139, 153, 0.22)",
-        highlight: "rgba(73, 167, 255, 0.72)",
-        hover: "rgba(148, 175, 193, 0.5)",
+        color: "rgba(136, 158, 175, 0.34)",
+        highlight: "rgba(73, 167, 255, 0.78)",
+        hover: "rgba(160, 185, 205, 0.6)",
       },
-      width: 0.8,
+      width: 1,
       selectionWidth: 1.8,
       smooth: { enabled: true, type: "continuous", roundness: 0.18 },
     }));
 
     if (state.network) {
+      openAllClusters();
       state.nodeData.clear();
       state.edgeData.clear();
       state.nodeData.add(networkNodes);
@@ -408,18 +701,27 @@
     );
 
     state.network.on("selectNode", ({ nodes }) => {
-      if (nodes.length) selectNode(nodes[0], { move: false });
+      if (!nodes.length) return;
+      const nodeId = nodes[0];
+      if (typeof nodeId === "string" && nodeId.startsWith(CLUSTER_PREFIX)) {
+        state.network.openCluster(nodeId);
+        return;
+      }
+      if (state.pathMode) {
+        handlePathPick(nodeId);
+        return;
+      }
+      selectNode(nodeId, { move: false });
     });
     state.network.on("deselectNode", () => {
-      if (!state.focus) clearSelection();
+      if (!state.focus && !state.pathMode) clearSelection();
     });
     state.network.on("doubleClick", ({ nodes }) => {
       if (!nodes.length) return;
-      selectNode(nodes[0], { move: false });
-      state.focus = true;
-      el["focus-button"].setAttribute("aria-pressed", "true");
-      applyGraphState();
-      focusSelected();
+      const nodeId = nodes[0];
+      if (typeof nodeId === "string" && nodeId.startsWith(CLUSTER_PREFIX)) return;
+      selectNode(nodeId, { move: false });
+      setFocus(true);
     });
     state.network.on("stabilizationProgress", ({ iterations, total }) => {
       setStatus(`Laying out graph · ${Math.round((iterations / total) * 100)}%`);
@@ -428,24 +730,27 @@
       state.network.setOptions({ physics: false });
       setStatus(`${state.graph.stats.pages} pages · ${state.graph.stats.links} links`);
     });
-    state.network.on("zoom", ({ scale }) => updateLabelDensity(scale));
+    state.network.on("zoom", ({ scale }) => {
+      updateLabelDensity(scale);
+      maybeClusterFolders(scale);
+    });
   }
 
   function toNetworkNode(node) {
     const color = state.groupColors.get(node.group) || palette[0];
-    const degree = node.inDegree + node.outDegree;
     return {
       id: node.id,
       label: node.label,
       title: `${node.label}\n${node.path}`,
-      size: Math.min(17, 8 + Math.sqrt(degree) * 2.2),
+      shape: node.entryPoint ? "diamond" : "dot",
+      size: nodeSize(node, false),
       color: {
         background: color,
-        border: "#17212a",
+        border: node.entryPoint ? "#8fb7d9" : "#17212a",
         highlight: { background: color, border: "#70bdff" },
         hover: { background: color, border: "#9acfff" },
       },
-      borderWidth: 1,
+      borderWidth: node.entryPoint ? 2 : 1,
       font: {
         color: "#aebbc4",
         size: 11,
@@ -459,10 +764,11 @@
   }
 
   function updateLabelDensity(scale) {
-    if (!state.nodeData || !state.graph) return;
+    if (!state.nodeData || !state.graph || state.clustered) return;
     const updates = state.graph.nodes.map((node) => {
       const selected = node.id === state.selectedId;
-      const important = node.inDegree + node.outDegree >= 4;
+      const important =
+        node.inDegree + node.outDegree >= 4 || node.entryPoint;
       return {
         id: node.id,
         label: scale >= 0.62 || selected || important ? node.label : "",
@@ -471,102 +777,205 @@
     state.nodeData.update(updates);
   }
 
-  function nodePassesFilters(node) {
+  function clusteringEligible() {
+    return (
+      state.graph &&
+      state.graph.stats.pages >= CLUSTER_MIN_PAGES &&
+      !state.selectedFolder &&
+      !state.selectedTag &&
+      state.health.size === 0 &&
+      !state.focus &&
+      !state.path &&
+      !state.pathMode
+    );
+  }
+
+  function maybeClusterFolders(scale) {
+    if (!state.network) return;
+    if (!state.clustered && scale < CLUSTER_SCALE && clusteringEligible()) {
+      clusterFolders();
+    } else if (state.clustered && scale >= CLUSTER_SCALE) {
+      openAllClusters();
+    }
+  }
+
+  function clusterFolders() {
+    state.clustered = true;
+    [...state.groupColors.keys()].forEach((group) => {
+      const members = state.graph.nodes.filter((node) => node.group === group);
+      if (members.length < 2) return;
+      state.network.cluster({
+        joinCondition: (nodeOptions) => nodeOptions.groupName === group,
+        clusterNodeProperties: {
+          id: `${CLUSTER_PREFIX}${group}`,
+          label: `${group} · ${members.length}`,
+          shape: "dot",
+          size: Math.min(46, 20 + Math.sqrt(members.length) * 3.4),
+          color: {
+            background: state.groupColors.get(group),
+            border: "#8fb7d9",
+          },
+          borderWidth: 2,
+          font: {
+            color: "#dbe5ec",
+            size: 14,
+            face: 'Inter, "Segoe UI", sans-serif',
+            strokeWidth: 4,
+            strokeColor: "#0b1117",
+          },
+        },
+      });
+    });
+  }
+
+  function openAllClusters() {
+    if (!state.network || !state.clustered) return;
+    [...state.groupColors.keys()].forEach((group) => {
+      const clusterId = `${CLUSTER_PREFIX}${group}`;
+      if (state.network.isCluster(clusterId)) {
+        state.network.openCluster(clusterId);
+      }
+    });
+    state.clustered = false;
+  }
+
+  function neighborhood(rootId, depth) {
+    const seen = new Set([rootId]);
+    let frontier = [rootId];
+    for (let hop = 0; hop < depth; hop += 1) {
+      const next = [];
+      frontier.forEach((id) => {
+        (state.adjacency.get(id) || []).forEach((neighbor) => {
+          if (!seen.has(neighbor)) {
+            seen.add(neighbor);
+            next.push(neighbor);
+          }
+        });
+      });
+      frontier = next;
+    }
+    return seen;
+  }
+
+  function nodePassesFilters(node, focusSet) {
     if (state.selectedFolder && node.group !== state.selectedFolder) return false;
     if (state.selectedTag && !node.tags.includes(state.selectedTag)) return false;
     if (!state.lifecycles.has(node.lifecycle || "evolving")) return false;
-    if (state.focus && state.selectedId) {
-      const selected = state.nodesById.get(state.selectedId);
-      const neighborhood = new Set([
-        state.selectedId,
-        ...selected.inbound,
-        ...selected.outbound,
-      ]);
-      if (!neighborhood.has(node.id)) return false;
-    }
+    if (focusSet && !focusSet.has(node.id)) return false;
     return true;
   }
 
-  function nodeMatchesLens(node) {
-    if (state.lens === "none") return true;
-    if (state.lens === "orphans") return node.orphan;
-    if (state.lens === "broken") {
-      return state.graph.diagnostics.broken.some((item) => item.source === node.id);
+  function healthKindForNode(node) {
+    for (const kind of HEALTH_ORDER) {
+      if (!state.health.has(kind)) continue;
+      if (kind === "orphans" && node.orphan) return kind;
+      if (kind === "broken" && state.brokenSources.has(node.id)) return kind;
+      if (kind === "stale" && state.staleIds.has(node.id)) return kind;
+      if (kind === "ambiguous" && state.ambiguousSources.has(node.id)) {
+        return kind;
+      }
     }
-    if (state.lens === "important") return Number(node.importance || 0) >= 8;
-    if (state.lens === "stale") {
-      if (!node.lastVerified) return true;
-      const timestamp = Date.parse(node.lastVerified);
-      if (Number.isNaN(timestamp)) return true;
-      return Date.now() - timestamp > 180 * 24 * 60 * 60 * 1000;
-    }
-    return true;
+    return null;
   }
 
   function applyGraphState() {
     if (!state.graph || !state.nodeData || !state.edgeData) return;
+    openAllClusters();
+    const focusSet =
+      state.focus && state.selectedId
+        ? neighborhood(state.selectedId, state.focusDepth)
+        : null;
+    const pathIds = state.path ? new Set(state.path.ids) : null;
     const visible = new Set();
     const updates = state.graph.nodes.map((node) => {
-      const shown = nodePassesFilters(node);
+      let shown = nodePassesFilters(node, focusSet);
+      if (pathIds?.has(node.id)) shown = true;
       if (shown) visible.add(node.id);
       const selected = node.id === state.selectedId;
-      const lensMatch = nodeMatchesLens(node);
-      const color = nodeColorForState(node, lensMatch);
       return {
         id: node.id,
         hidden: !shown,
-        size: selected
-          ? Math.min(23, 14 + Math.sqrt(node.inDegree + node.outDegree) * 2.4)
-          : Math.min(17, 8 + Math.sqrt(node.inDegree + node.outDegree) * 2.2),
-        borderWidth: selected ? 3 : lensMatch && state.lens !== "none" ? 2 : 1,
-        color,
+        size: nodeSize(node, selected),
+        borderWidth: selected ? 3 : node.entryPoint ? 2 : 1,
+        color: nodeColorForState(node, pathIds),
       };
     });
     state.nodeData.update(updates);
 
     const edgeUpdates = state.graph.edges.map((edge) => {
+      const onPath = state.path?.edgeIds.has(edge.id) || false;
       const touchesSelection =
         state.selectedId &&
         (edge.from === state.selectedId || edge.to === state.selectedId);
+      let color = "rgba(136, 158, 175, 0.34)";
+      let width = 1;
+      if (onPath) {
+        color = PATH_COLOR;
+        width = 2.6;
+      } else if (state.path) {
+        color = "rgba(136, 158, 175, 0.12)";
+      } else if (touchesSelection) {
+        color = "rgba(73, 167, 255, 0.75)";
+        width = 2;
+      }
       return {
         id: edge.id,
-        hidden: !visible.has(edge.from) || !visible.has(edge.to),
-        width: touchesSelection ? 1.8 : 0.8,
+        hidden: (!visible.has(edge.from) || !visible.has(edge.to)) && !onPath,
+        width,
         color: {
-          color: touchesSelection
-            ? "rgba(73, 167, 255, 0.7)"
-            : "rgba(118, 139, 153, 0.22)",
-          highlight: "rgba(73, 167, 255, 0.82)",
-          hover: "rgba(148, 175, 193, 0.5)",
+          color,
+          highlight: "rgba(73, 167, 255, 0.85)",
+          hover: "rgba(160, 185, 205, 0.6)",
         },
       };
     });
     state.edgeData.update(edgeUpdates);
     el["canvas-empty"].hidden = visible.size !== 0;
-    setStatus(
-      `${visible.size} of ${state.graph.stats.pages} pages · ${state.graph.stats.links} links`
-    );
+    if (!state.pathMode) {
+      setStatus(
+        `${visible.size} of ${state.graph.stats.pages} pages · ${state.graph.stats.links} links`
+      );
+    }
+    updateHash();
   }
 
-  function nodeColorForState(node, lensMatch) {
+  function nodeColorForState(node, pathIds) {
     const base = state.groupColors.get(node.group) || palette[0];
-    if (state.lens === "none") {
-      return {
-        background: base,
-        border: node.id === state.selectedId ? "#70bdff" : "#17212a",
-        highlight: { background: base, border: "#70bdff" },
-        hover: { background: base, border: "#9acfff" },
-      };
+    const selectedBorder = node.id === state.selectedId ? "#70bdff" : null;
+    if (pathIds) {
+      if (pathIds.has(node.id)) {
+        return {
+          background: base,
+          border: selectedBorder || PATH_COLOR,
+          highlight: { background: base, border: PATH_COLOR },
+          hover: { background: base, border: PATH_COLOR },
+        };
+      }
+      return dimmedColor(base);
     }
-    if (lensMatch) {
-      const issueColor = state.lens === "broken" ? "#e4a72f" : "#66b7f2";
-      return {
-        background: issueColor,
-        border: node.id === state.selectedId ? "#d5ecff" : issueColor,
-        highlight: { background: issueColor, border: "#ffffff" },
-        hover: { background: issueColor, border: "#ffffff" },
-      };
+    if (state.health.size > 0) {
+      const kind = healthKindForNode(node);
+      if (kind) {
+        const issueColor = HEALTH_COLORS[kind];
+        return {
+          background: issueColor,
+          border: selectedBorder || issueColor,
+          highlight: { background: issueColor, border: "#ffffff" },
+          hover: { background: issueColor, border: "#ffffff" },
+        };
+      }
+      return dimmedColor(base);
     }
+    return {
+      background: base,
+      border:
+        selectedBorder || (node.entryPoint ? "#8fb7d9" : "#17212a"),
+      highlight: { background: base, border: "#70bdff" },
+      hover: { background: base, border: "#9acfff" },
+    };
+  }
+
+  function dimmedColor(base) {
     return {
       background: "rgba(86, 101, 113, 0.28)",
       border: "rgba(86, 101, 113, 0.35)",
@@ -575,46 +984,89 @@
     };
   }
 
-  function renderSearchResults() {
+  // --- Search -------------------------------------------------------------
+
+  function scheduleSearch() {
+    clearTimeout(state.searchTimer);
+    state.searchTimer = setTimeout(runSearch, 200);
+  }
+
+  async function runSearch() {
     if (!state.graph) return;
-    const query = el["search-input"].value.trim().toLocaleLowerCase();
+    const query = el["search-input"].value.trim();
     if (!query) {
       el["search-results"].hidden = true;
+      state.searchSeq += 1;
       return;
     }
-    const matches = state.graph.nodes
+    const seq = ++state.searchSeq;
+    let results;
+    try {
+      const payload = await request(
+        `/api/search?q=${encodeURIComponent(query)}`
+      );
+      results = payload.results;
+    } catch (_error) {
+      results = localSearch(query);
+    }
+    if (seq !== state.searchSeq) return;
+    renderSearchResults(query, results);
+  }
+
+  function localSearch(query) {
+    const needle = query.toLocaleLowerCase();
+    return state.graph.nodes
       .filter((node) =>
         `${node.label} ${node.id} ${node.tags.join(" ")}`
           .toLocaleLowerCase()
-          .includes(query)
+          .includes(needle)
       )
       .sort((left, right) => {
-        const leftStarts = left.label.toLocaleLowerCase().startsWith(query) ? 0 : 1;
-        const rightStarts = right.label.toLocaleLowerCase().startsWith(query) ? 0 : 1;
+        const leftStarts = left.label.toLocaleLowerCase().startsWith(needle)
+          ? 0
+          : 1;
+        const rightStarts = right.label.toLocaleLowerCase().startsWith(needle)
+          ? 0
+          : 1;
         return leftStarts - rightStarts || left.label.localeCompare(right.label);
       })
-      .slice(0, 10);
+      .slice(0, 10)
+      .map((node) => ({
+        id: node.id,
+        label: node.label,
+        path: node.path,
+        field: "title",
+        snippet: "",
+      }));
+  }
 
+  function renderSearchResults(query, results) {
     const fragment = document.createDocumentFragment();
-    matches.forEach((node, index) => {
+    results.slice(0, 12).forEach((result, index) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "search-result";
-      button.dataset.nodeId = node.id;
+      button.dataset.nodeId = result.id;
       button.setAttribute("aria-selected", String(index === 0));
       const title = document.createElement("strong");
-      title.textContent = node.label;
+      title.textContent = result.label;
       const path = document.createElement("span");
-      path.textContent = node.path;
+      path.textContent = result.path;
       button.append(title, path);
+      if (result.snippet) {
+        const snippet = document.createElement("span");
+        snippet.className = "search-snippet";
+        appendHighlighted(snippet, result.snippet, query);
+        button.append(snippet);
+      }
       button.addEventListener("click", () => {
-        selectNode(node.id);
+        selectNode(result.id);
         el["search-results"].hidden = true;
         el["search-input"].value = "";
       });
       fragment.append(button);
     });
-    if (!matches.length) {
+    if (!results.length) {
       const empty = document.createElement("div");
       empty.className = "search-no-results";
       empty.textContent = "No matching pages";
@@ -622,6 +1074,24 @@
     }
     el["search-results"].replaceChildren(fragment);
     el["search-results"].hidden = false;
+  }
+
+  function appendHighlighted(parent, text, query) {
+    const lower = text.toLocaleLowerCase();
+    const needle = query.toLocaleLowerCase();
+    let index = 0;
+    while (index < text.length) {
+      const found = lower.indexOf(needle, index);
+      if (found === -1 || !needle) {
+        parent.append(text.slice(index));
+        return;
+      }
+      if (found > index) parent.append(text.slice(index, found));
+      const mark = document.createElement("mark");
+      mark.textContent = text.slice(found, found + needle.length);
+      parent.append(mark);
+      index = found + needle.length;
+    }
   }
 
   function handleSearchKeys(event) {
@@ -635,13 +1105,17 @@
     }
   }
 
-  async function selectNode(nodeId, { move = true } = {}) {
+  // --- Selection, focus, history -------------------------------------------
+
+  async function selectNode(nodeId, { move = true, recordHistory = true } = {}) {
     const node = state.nodesById.get(nodeId);
     if (!node) return;
+    if (recordHistory && !state.historyNavigating) pushHistory(nodeId);
     state.selectedId = nodeId;
     el["focus-button"].disabled = false;
     el["selection-crumb"].textContent = node.label;
     el["selection-crumb"].hidden = false;
+    openAllClusters();
     state.network.selectNodes([nodeId]);
     if (move) {
       state.network.focus(nodeId, {
@@ -654,6 +1128,159 @@
     await showInspector(node);
   }
 
+  function pushHistory(nodeId) {
+    if (state.history[state.historyIndex] === nodeId) return;
+    state.history = state.history.slice(0, state.historyIndex + 1);
+    state.history.push(nodeId);
+    if (state.history.length > 100) state.history.shift();
+    state.historyIndex = state.history.length - 1;
+    syncHistoryButtons();
+  }
+
+  function goHistory(delta) {
+    const index = state.historyIndex + delta;
+    if (index < 0 || index >= state.history.length) return;
+    state.historyIndex = index;
+    syncHistoryButtons();
+    state.historyNavigating = true;
+    selectNode(state.history[index], { recordHistory: false }).finally(() => {
+      state.historyNavigating = false;
+    });
+  }
+
+  function syncHistoryButtons() {
+    el["back-button"].disabled = state.historyIndex <= 0;
+    el["forward-button"].disabled =
+      state.historyIndex >= state.history.length - 1;
+  }
+
+  function setFocus(enabled) {
+    state.focus = enabled;
+    el["focus-button"].setAttribute("aria-pressed", String(enabled));
+    el["depth-picker"].hidden = !enabled;
+    syncDepthPicker();
+    applyGraphState();
+    if (enabled) focusSelected();
+  }
+
+  function syncDepthPicker() {
+    el["depth-picker"].querySelectorAll("[data-depth]").forEach((button) => {
+      button.setAttribute(
+        "aria-pressed",
+        String(Number(button.dataset.depth) === state.focusDepth)
+      );
+    });
+  }
+
+  // --- Shortest path --------------------------------------------------------
+
+  function togglePathMode() {
+    if (state.pathMode || state.path) {
+      clearPath();
+      return;
+    }
+    state.pathMode = true;
+    state.pathFrom = state.selectedId;
+    el["path-button"].setAttribute("aria-pressed", "true");
+    setStatus(
+      state.pathFrom
+        ? `Path: from “${state.nodesById.get(state.pathFrom)?.label}” — pick the target page`
+        : "Path: pick the first page"
+    );
+  }
+
+  function handlePathPick(nodeId) {
+    if (!state.pathFrom) {
+      state.pathFrom = nodeId;
+      setStatus(
+        `Path: from “${state.nodesById.get(nodeId)?.label}” — pick the target page`
+      );
+      return;
+    }
+    if (nodeId === state.pathFrom) return;
+    const ids = shortestPath(state.pathFrom, nodeId);
+    if (!ids) {
+      showToast("No path between these pages", true);
+      return;
+    }
+    state.path = { ids, edgeIds: pathEdgeIds(ids) };
+    state.pathMode = false;
+    renderPathBanner();
+    applyGraphState();
+    state.network.fit({
+      nodes: ids,
+      animation: { duration: 420, easingFunction: "easeInOutQuad" },
+    });
+  }
+
+  function shortestPath(from, to) {
+    const previous = new Map([[from, null]]);
+    const queue = [from];
+    while (queue.length) {
+      const current = queue.shift();
+      if (current === to) break;
+      for (const next of state.adjacency.get(current) || []) {
+        if (!previous.has(next)) {
+          previous.set(next, current);
+          queue.push(next);
+        }
+      }
+    }
+    if (!previous.has(to)) return null;
+    const ids = [];
+    for (let cursor = to; cursor !== null; cursor = previous.get(cursor)) {
+      ids.unshift(cursor);
+    }
+    return ids;
+  }
+
+  function pathEdgeIds(ids) {
+    const edgeIds = new Set();
+    for (let index = 0; index < ids.length - 1; index += 1) {
+      const forward = state.edgeIdByPair.get(`${ids[index]}::${ids[index + 1]}`);
+      const backward = state.edgeIdByPair.get(`${ids[index + 1]}::${ids[index]}`);
+      if (forward) edgeIds.add(forward);
+      else if (backward) edgeIds.add(backward);
+    }
+    return edgeIds;
+  }
+
+  function renderPathBanner() {
+    if (!state.path) {
+      el["path-banner"].hidden = true;
+      el["path-steps"].replaceChildren();
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    state.path.ids.forEach((id, index) => {
+      if (index > 0) {
+        const arrow = document.createElement("span");
+        arrow.className = "path-arrow";
+        arrow.textContent = "→";
+        fragment.append(arrow);
+      }
+      const step = document.createElement("button");
+      step.type = "button";
+      step.className = "path-step";
+      step.textContent = state.nodesById.get(id)?.label || id;
+      step.addEventListener("click", () => selectNode(id));
+      fragment.append(step);
+    });
+    el["path-steps"].replaceChildren(fragment);
+    el["path-banner"].hidden = false;
+  }
+
+  function clearPath() {
+    state.pathMode = false;
+    state.pathFrom = null;
+    state.path = null;
+    el["path-button"].setAttribute("aria-pressed", "false");
+    renderPathBanner();
+    applyGraphState();
+  }
+
+  // --- Inspector -------------------------------------------------------------
+
   async function showInspector(node) {
     el["inspector-empty"].hidden = true;
     el["inspector-content"].hidden = false;
@@ -662,8 +1289,8 @@
     el["markdown-preview"].replaceChildren(
       Object.assign(document.createElement("p"), { textContent: "Loading…" })
     );
-    renderNeighborList("inbound", node.inbound);
-    renderNeighborList("outbound", node.outbound);
+    renderNeighborList("inbound", node.inbound, node.id);
+    renderNeighborList("outbound", node.outbound, node.id);
     try {
       const page = await request(`/api/page?id=${encodeURIComponent(node.id)}`);
       if (state.selectedId !== node.id) return;
@@ -724,7 +1351,7 @@
     el["metadata-list"].replaceChildren(fragment);
   }
 
-  function renderNeighborList(direction, ids) {
+  function renderNeighborList(direction, ids, currentId) {
     const list = el[`${direction}-list`];
     el[`${direction}-count`].textContent = `(${ids.length})`;
     const fragment = document.createDocumentFragment();
@@ -734,11 +1361,24 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = "neighbor-button";
+      const head = document.createElement("span");
+      head.className = "neighbor-head";
       const label = document.createElement("span");
       label.textContent = node.label;
       const group = document.createElement("span");
       group.textContent = node.group;
-      button.append(label, group);
+      head.append(label, group);
+      button.append(head);
+      const context =
+        direction === "inbound"
+          ? state.edgeContextByPair.get(`${id}::${currentId}`)
+          : state.edgeContextByPair.get(`${currentId}::${id}`);
+      if (context) {
+        const line = document.createElement("span");
+        line.className = "neighbor-context";
+        line.textContent = context;
+        button.append(line);
+      }
       button.addEventListener("click", () => selectNode(id));
       fragment.append(button);
     });
@@ -751,6 +1391,65 @@
     list.replaceChildren(fragment);
   }
 
+  // --- Markdown preview with clickable wikilinks -----------------------------
+
+  function resolveWikilink(raw) {
+    let value = String(raw).trim().replace(/\\/g, "/");
+    const anchorIndex = value.indexOf("#");
+    if (anchorIndex >= 0) value = value.slice(0, anchorIndex).trim();
+    if (/^knowledge\//i.test(value)) value = value.slice("knowledge/".length);
+    if (/\.md$/i.test(value)) value = value.slice(0, -3);
+    while (value.startsWith("./")) value = value.slice(2);
+    value = value.replace(/^\/+|\/+$/g, "");
+    const lower = value.toLowerCase();
+    if (!lower) return {};
+    if (lower.includes("/")) {
+      const id = state.exactIndex.get(lower);
+      return id ? { id } : {};
+    }
+    const candidates = state.slugIndex.get(lower) || [];
+    if (candidates.length === 1) return { id: candidates[0] };
+    if (candidates.length > 1) return { candidates };
+    return {};
+  }
+
+  function wikilinkElement(target, alias) {
+    const resolved = resolveWikilink(target);
+    const text = alias || target;
+    if (resolved.id) {
+      const link = document.createElement("a");
+      link.className = "wikilink";
+      link.textContent = text;
+      link.href = `#sel=${encodeURIComponent(resolved.id)}`;
+      link.title = resolved.id;
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        selectNode(resolved.id);
+      });
+      return link;
+    }
+    const span = document.createElement("span");
+    span.textContent = text;
+    if (resolved.candidates) {
+      span.className = "wikilink wikilink-ambiguous";
+      span.title = `Ambiguous: ${resolved.candidates.join(", ")}`;
+    } else {
+      span.className = "wikilink wikilink-broken";
+      span.title = "No page with this name";
+    }
+    return span;
+  }
+
+  function appendInline(parent, text) {
+    let last = 0;
+    for (const match of text.matchAll(WIKILINK_RE)) {
+      if (match.index > last) parent.append(text.slice(last, match.index));
+      parent.append(wikilinkElement(match[1], match[2]));
+      last = match.index + match[0].length;
+    }
+    if (last < text.length) parent.append(text.slice(last));
+  }
+
   function renderMarkdown(container, markdown) {
     const fragment = document.createDocumentFragment();
     const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
@@ -761,7 +1460,7 @@
     const flushParagraph = () => {
       if (!paragraph.length) return;
       const p = document.createElement("p");
-      p.textContent = paragraph.join(" ");
+      appendInline(p, paragraph.join(" "));
       fragment.append(p);
       paragraph = [];
     };
@@ -801,7 +1500,7 @@
         flushParagraph();
         if (!list || list.tagName !== "UL") list = document.createElement("ul");
         const item = document.createElement("li");
-        item.textContent = bullet[1];
+        appendInline(item, bullet[1]);
         list.append(item);
         return;
       }
@@ -810,7 +1509,7 @@
         flushParagraph();
         if (!list || list.tagName !== "OL") list = document.createElement("ol");
         const item = document.createElement("li");
-        item.textContent = ordered[1];
+        appendInline(item, ordered[1]);
         list.append(item);
         return;
       }
@@ -819,7 +1518,7 @@
         flushParagraph();
         flushList();
         const blockquote = document.createElement("blockquote");
-        blockquote.textContent = quote[1];
+        appendInline(blockquote, quote[1]);
         fragment.append(blockquote);
         return;
       }
@@ -836,11 +1535,89 @@
     container.replaceChildren(fragment);
   }
 
+  // --- URL hash state ---------------------------------------------------------
+
+  function updateHash() {
+    if (state.restoringHash) return;
+    const params = new URLSearchParams();
+    if (state.selectedId) params.set("sel", state.selectedId);
+    if (state.focus) params.set("focus", String(state.focusDepth));
+    if (state.health.size) params.set("health", [...state.health].join(","));
+    if (state.selectedFolder) params.set("folder", state.selectedFolder);
+    if (state.selectedTag) params.set("tag", state.selectedTag);
+    if (state.path) {
+      params.set(
+        "path",
+        `${state.path.ids[0]}~${state.path.ids[state.path.ids.length - 1]}`
+      );
+    }
+    const hash = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      hash
+        ? `#${hash}`
+        : window.location.pathname + window.location.search
+    );
+  }
+
+  async function applyHashFromUrl() {
+    const raw = window.location.hash.replace(/^#/, "");
+    if (!raw) return;
+    const params = new URLSearchParams(raw);
+    state.restoringHash = true;
+    try {
+      const folder = params.get("folder");
+      if (folder && state.groupColors.has(folder)) {
+        state.selectedFolder = folder;
+      }
+      const tag = params.get("tag");
+      if (tag) state.selectedTag = tag;
+      const health = params.get("health");
+      if (health) {
+        health
+          .split(",")
+          .filter((kind) => kind in HEALTH_COLORS)
+          .forEach((kind) => state.health.add(kind));
+      }
+      syncFilterControls();
+      syncHealthControls();
+      renderFixQueue();
+      const selected = params.get("sel");
+      if (selected && state.nodesById.has(selected)) {
+        await selectNode(selected);
+        const focusDepth = Number(params.get("focus"));
+        if (focusDepth >= 1 && focusDepth <= 3) {
+          state.focusDepth = focusDepth;
+          setFocus(true);
+        }
+      }
+      const path = params.get("path");
+      if (path) {
+        const [from, to] = path.split("~");
+        if (state.nodesById.has(from) && state.nodesById.has(to)) {
+          const ids = shortestPath(from, to);
+          if (ids) {
+            state.path = { ids, edgeIds: pathEdgeIds(ids) };
+            renderPathBanner();
+          }
+        }
+      }
+      applyGraphState();
+    } finally {
+      state.restoringHash = false;
+      updateHash();
+    }
+  }
+
+  // --- Misc actions ------------------------------------------------------------
+
   function clearSelection() {
     state.selectedId = null;
     state.focus = false;
     el["focus-button"].disabled = true;
     el["focus-button"].setAttribute("aria-pressed", "false");
+    el["depth-picker"].hidden = true;
     el["selection-crumb"].hidden = true;
     el["inspector-content"].hidden = true;
     el["inspector-empty"].hidden = false;
@@ -851,6 +1628,7 @@
   function clearFocus() {
     state.focus = false;
     el["focus-button"].setAttribute("aria-pressed", "false");
+    el["depth-picker"].hidden = true;
     applyGraphState();
     fitGraph();
   }
@@ -858,11 +1636,7 @@
   function focusSelected() {
     if (!state.selectedId) return;
     state.network.fit({
-      nodes: [
-        state.selectedId,
-        ...state.nodesById.get(state.selectedId).inbound,
-        ...state.nodesById.get(state.selectedId).outbound,
-      ],
+      nodes: [...neighborhood(state.selectedId, state.focusDepth)],
       animation: { duration: 420, easingFunction: "easeInOutQuad" },
     });
   }
@@ -873,13 +1647,19 @@
     state.lifecycles = new Set(
       state.graph.nodes.map((node) => node.lifecycle || "evolving")
     );
-    state.lens = "none";
+    state.health.clear();
     state.focus = false;
-    const neutral = el["quality-filters"].querySelector('[value="none"]');
-    if (neutral) neutral.checked = true;
+    state.pathMode = false;
+    state.path = null;
+    state.pathFrom = null;
     renderLifecycleFilters();
     syncFilterControls();
+    syncHealthControls();
+    renderFixQueue();
+    renderPathBanner();
     el["focus-button"].setAttribute("aria-pressed", "false");
+    el["depth-picker"].hidden = true;
+    el["path-button"].setAttribute("aria-pressed", "false");
     applyGraphState();
     fitGraph();
   }
@@ -908,11 +1688,10 @@
     }
   }
 
-  async function openSelectedFile() {
-    if (!state.selectedId) return;
-    el["open-file-button"].disabled = true;
+  async function openSourceFile(nodeId, button) {
+    if (button) button.disabled = true;
     try {
-      await request(`/api/open?id=${encodeURIComponent(state.selectedId)}`, {
+      await request(`/api/open?id=${encodeURIComponent(nodeId)}`, {
         method: "POST",
         headers: { "X-KB-Viewer": "1" },
       });
@@ -920,7 +1699,7 @@
     } catch (error) {
       showToast(error.message, true);
     } finally {
-      el["open-file-button"].disabled = false;
+      if (button) button.disabled = false;
     }
   }
 
