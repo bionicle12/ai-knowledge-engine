@@ -70,17 +70,33 @@ When you change a file in `knowledge-base/`:
 1. Note the file in the CHANGELOG under "Translation impact".
 2. `python3 scripts/check_translations.py` — see which `i18n/*/...` files became stale.
 3. (Recommended) Update the impacted translations in the same PR. If not, mark them as known-stale.
-4. After updating translations to match, bump their `source_commit` to the new HEAD:
+4. After updating translations to match, bump their `source_commit`:
 
    ```bash
    git commit -m "..."          # commit canonical EN changes
-   python3 scripts/sync_translations.py --to-head --lang ru
-   git commit -am "i18n: sync RU to HEAD"
+   python3 scripts/sync_translations.py --to-source --lang ru
+   git commit -am "i18n: sync RU to the EN sources"
    python3 scripts/check_translations.py --update-status
    ```
 
    Steps 2–4 can also be done as a single atomic PR if you update the
    translations and run `sync_translations.py` before the first commit.
+
+### Use `--to-source`, not `--to-head`
+
+`check_translations.py` calls a file in sync when its `source_commit` equals
+the commit that **last touched that EN source file**. `--to-head` stamps the
+tip instead, which is the same thing only while the commit that changed the
+sources is still the tip. Land anything on top of it — a follow-up docs
+commit, a merge — and every file gets stamped with a commit that never touched
+it, and the report reads `⚠️ stale … (0 commits)`: marked, but not actually in
+sync.
+
+`--to-source` resolves that commit per file from `translation_of:`, which is
+the same question the checker asks, so it is right regardless of what landed
+afterwards. It is also idempotent — re-running it changes no `source_commit`
+that is already correct. When you need one explicit revision for the whole
+batch, use `--to-commit <rev>` (accepts a sha, tag, or `HEAD~2`).
 
 ## What to translate vs. keep verbatim
 

@@ -18,6 +18,21 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 
 ## [Unreleased]
 
+### Fixed
+- **`sync_translations.py --to-head` stamped the wrong commit whenever
+  anything landed on top of the one that changed the sources.**
+  `check_translations.py` calls a file in sync when its `source_commit`
+  equals the commit that last touched that EN source, so a follow-up docs
+  commit or a merge left every translation marked with a commit that never
+  touched it — reported as `⚠️ stale … (0 commits)`. New `--to-source`
+  resolves that commit per file from `translation_of:`, which is the same
+  question the checker asks, and is idempotent on markers that are already
+  right; `--to-commit <rev>` takes one explicit revision (sha, tag,
+  `HEAD~2`) and refuses one git cannot resolve. The three are mutually
+  exclusive, `docs/TRANSLATING.md` now recommends `--to-source`, and the
+  dry-run summary counts the files it would actually change instead of every
+  file it looked at.
+
 ## [0.15.0] - 2026-08-23
 
 ### Changed
