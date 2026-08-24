@@ -19,6 +19,17 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
 ## [Unreleased]
 
 ### Fixed
+- **`ai-skills-fixer` now reconciles skills cross-platform.** Local source IDs
+  accept both path separators; Windows selects privilege-free directory
+  junctions instead of materialized copies, inventories them explicitly, and
+  preserves them through update and rollback. Failed source clones are cleaned
+  up even when `.git` contains Windows read-only files. POSIX keeps symbolic
+  links, including macOS and Linux.
+- **Live 0.15.0 upgrade/heal acceptance fixes.** Upgrade now deploys
+  `17_REFACTOR.md` and `18_HEAL.md`, refreshes `HEAL_PLAN.md` after auto-heal,
+  and stamps the target version correctly. Auto-heal reindexes stale packs with
+  the deployed script, avoids duplicate invariant findings, keeps trim locked
+  until eval exists, and no longer creates backup/log noise for a current no-op.
 - **`sync_translations.py --to-head` stamped the wrong commit whenever
   anything landed on top of the one that changed the sources.**
   `check_translations.py` calls a file in sync when its `source_commit`
@@ -32,6 +43,8 @@ On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
   exclusive, `docs/TRANSLATING.md` now recommends `--to-source`, and the
   dry-run summary counts the files it would actually change instead of every
   file it looked at.
+
+Translation impact: none; no canonical EN instruction text changed.
 
 ## [0.15.0] - 2026-08-23
 

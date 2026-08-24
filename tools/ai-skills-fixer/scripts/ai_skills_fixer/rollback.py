@@ -12,6 +12,12 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .filesystem import (
+    FilesystemError,
+    managed_link_type,
+    materialize_directory,
+    remove_managed_link,
+)
 from .provenance import content_hash
 from .store import store_lock
 
@@ -21,8 +27,11 @@ class RollbackError(Exception):
 
 
 def _remove_managed(dest: Path, op_result: dict) -> None:
-    if dest.is_symlink():
-        dest.unlink()
+    if managed_link_type(dest) is not None:
+        try:
+            remove_managed_link(dest)
+        except FilesystemError as exc:
+            raise RollbackError(str(exc)) from exc
         return
     if dest.is_dir():
         expected = op_result.get("release_hash")
@@ -54,13 +63,20 @@ def undo_operation(store_root: Path, op_result: dict) -> None:
             raise RollbackError(
                 f"no previous link target recorded for update of {dest}"
             )
-        if dest.is_symlink():
-            dest.unlink()
+        if managed_link_type(dest) is not None:
+            try:
+                remove_managed_link(dest)
+            except FilesystemError as exc:
+                raise RollbackError(str(exc)) from exc
         elif dest.exists():
             raise RollbackError(
                 f"{dest} is no longer a managed link; refusing to replace it"
             )
-        dest.symlink_to(previous)
+        strategy = op_result.get("previous_strategy") or op_result.get("strategy")
+        try:
+            materialize_directory(Path(previous), dest, strategy)
+        except (FilesystemError, OSError) as exc:
+            raise RollbackError(str(exc)) from exc
     elif op_type == "quarantine":
         if backup is None or not backup.is_dir():
             raise RollbackError(

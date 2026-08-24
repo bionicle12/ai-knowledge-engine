@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .discovery import SkillRoot
+from .filesystem import managed_link_type
 from .frontmatter import read_skill_file
 from .provenance import content_hash
 from .sources import SourceSkill
@@ -27,7 +28,7 @@ class InstalledSkill:
     directory: str  # path relative to the discovery root (posix)
     path: Path
     real_path: Path
-    entry_type: str  # directory | symlink
+    entry_type: str  # directory | symlink | junction
     has_skill_md: bool
     name: str | None = None
     description: str | None = None
@@ -109,7 +110,7 @@ def _git_facts(path: Path) -> dict | None:
 
 def _make_record(root: SkillRoot, skill_dir: Path, entry: Path) -> InstalledSkill:
     directory = skill_dir.relative_to(root.path).as_posix()
-    entry_type = "symlink" if entry.is_symlink() else "directory"
+    entry_type = managed_link_type(entry) or "directory"
     skill_md = skill_dir / "SKILL.md"
     has_skill_md = skill_md.is_file()
 

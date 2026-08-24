@@ -54,10 +54,10 @@ def test_rollback_restores_adopted_copy_byte_identical(env):
 
     plan = build_plan(store, "m1", home=home)
     record = apply_plan(store, plan["plan_id"])
-    assert dest.is_symlink()
+    assert dest.resolve() != dest.absolute()
 
     rolled = rollback_apply(store, record["apply_id"])
-    assert not dest.is_symlink() and dest.is_dir()
+    assert dest.resolve() == dest.absolute() and dest.is_dir()
     assert content_hash(dest) == original_hash
     assert rolled["rolled_back_at"]
     assert all(r["status"] in ("rolled-back", "noop", "skipped-manual-review")
@@ -70,7 +70,7 @@ def test_rollback_removes_installed_link(env):
     plan = build_plan(store, "m1", home=home)
     record = apply_plan(store, plan["plan_id"])
     dest = home / ".claude" / "skills" / "foo"
-    assert dest.is_symlink()
+    assert dest.resolve() != dest.absolute()
 
     rollback_apply(store, record["apply_id"])
     assert not dest.exists() and not dest.is_symlink()
@@ -121,4 +121,6 @@ def test_rollback_refuses_when_backup_is_missing(env):
 
     with pytest.raises(RollbackError):
         rollback_apply(store, record["apply_id"])
-    assert dest.is_symlink(), "destination must stay untouched when backup is gone"
+    assert dest.resolve() != dest.absolute(), (
+        "destination must stay untouched when backup is gone"
+    )

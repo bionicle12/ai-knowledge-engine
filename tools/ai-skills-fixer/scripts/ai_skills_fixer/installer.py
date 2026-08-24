@@ -15,6 +15,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from . import gitops
+from .filesystem import (
+    FilesystemError,
+    managed_link_type,
+    materialize_directory,
+    remove_managed_link,
+)
 from .planner import ValidationError, _skill_suffix
 from .provenance import content_hash
 from .releases import create_release
@@ -93,13 +99,10 @@ def _ensure_release(store_root: Path, lock_entry: dict) -> tuple[Path, str]:
 
 
 def _materialize(release: Path, dest: Path, strategy: str) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if strategy == "symlink":
-        dest.symlink_to(release, target_is_directory=True)
-    elif strategy == "copy":
-        shutil.copytree(release, dest, symlinks=True)
-    else:
-        raise DriftError(f"unsupported installation strategy {strategy!r}")
+    try:
+        materialize_directory(release, dest, strategy)
+    except (FilesystemError, OSError) as exc:
+        raise DriftError(str(exc)) from exc
 
 
 def _validate_installed(dest: Path, digest: str) -> None:
@@ -127,6 +130,7 @@ def _apply_op(
         "backup_path": None,
         "release_hash": None,
         "previous_target": None,
+        "previous_strategy": None,
         "status": None,
     }
     dest = Path(op["destination"])
@@ -157,18 +161,25 @@ def _apply_op(
         result.update(status="applied", release_hash=digest)
     elif op_type == "update":
         expected_target = op["precondition"]["target"]
-        if not dest.is_symlink() or str(dest.resolve()) != str(
+        previous_strategy = managed_link_type(dest)
+        if previous_strategy is None or str(dest.resolve()) != str(
             Path(expected_target).resolve()
         ):
             raise DriftError(
                 f"{dest} is no longer the managed link the plan expected"
             )
         release, digest = _ensure_release(store_root, lock_by_id[op["skill_id"]])
-        dest.unlink()
+        try:
+            remove_managed_link(dest)
+        except FilesystemError as exc:
+            raise DriftError(str(exc)) from exc
         _materialize(release, dest, op["strategy"])
         _validate_installed(dest, digest)
         result.update(
-            status="applied", release_hash=digest, previous_target=expected_target
+            status="applied",
+            release_hash=digest,
+            previous_target=expected_target,
+            previous_strategy=previous_strategy,
         )
     elif op_type == "quarantine":
         expected = op["precondition"]["content_hash"]

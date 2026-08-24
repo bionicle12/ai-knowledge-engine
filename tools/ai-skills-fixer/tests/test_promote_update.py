@@ -63,7 +63,7 @@ def test_promote_moves_checkout_to_candidate(env):
     assert "v2" in (checkout / "skills" / "foo" / "SKILL.md").read_text()
 
 
-def test_stale_managed_link_becomes_update_op(env):
+def test_stale_managed_link_becomes_update_op(env, directory_link):
     store, origin, home = env
     set_profile_state(store, "awesome:foo", "enabled", targets=["claude"])
 
@@ -71,7 +71,7 @@ def test_stale_managed_link_becomes_update_op(env):
     old_commit = current_commit(store / "sources" / "awesome")
     old_release = create_release(store, "awesome", "foo", src, old_commit)
     dest = home / ".claude" / "skills" / "foo"
-    dest.symlink_to(old_release)
+    directory_link(dest, old_release)
 
     bump_origin(origin)
     refresh_source(store, "awesome")
@@ -99,14 +99,14 @@ def test_cli_source_promote(env, capsys):
     assert "v2" in (checkout / "skills" / "foo" / "SKILL.md").read_text()
 
 
-def test_apply_update_relinks_and_rollback_restores(env):
+def test_apply_update_relinks_and_rollback_restores(env, directory_link):
     store, origin, home = env
     set_profile_state(store, "awesome:foo", "enabled", targets=["claude"])
     src = store / "sources" / "awesome" / "skills" / "foo"
     old_commit = current_commit(store / "sources" / "awesome")
     old_release = create_release(store, "awesome", "foo", src, old_commit)
     dest = home / ".claude" / "skills" / "foo"
-    dest.symlink_to(old_release)
+    directory_link(dest, old_release)
 
     bump_origin(origin)
     refresh_source(store, "awesome")
@@ -115,7 +115,7 @@ def test_apply_update_relinks_and_rollback_restores(env):
     plan = build_plan(store, "m1", home=home)
     record = apply_plan(store, plan["plan_id"])
 
-    assert dest.is_symlink()
+    assert dest.resolve() != dest.absolute()
     assert dest.resolve() != old_release
     assert "v2" in (dest / "SKILL.md").read_text()
     assert content_hash(dest) == content_hash(src)

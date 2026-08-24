@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import os
+from pathlib import Path
 
 import pytest
 
@@ -60,9 +62,9 @@ def test_install_op_for_missing_skill(env):
     assert op["type"] == "install"
     assert op["skill_id"] == "awesome:foo"
     assert op["host"] == "claude"
-    assert op["strategy"] == "symlink"
-    assert op["destination"].endswith(".claude/skills/foo")
-    assert "releases/awesome/foo/" in op["source"]
+    assert op["strategy"] == ("junction" if os.name == "nt" else "symlink")
+    assert Path(op["destination"]).parts[-3:] == (".claude", "skills", "foo")
+    assert Path(op["source"]).parts[-4:-1] == ("releases", "awesome", "foo")
     assert op["precondition"] == {"destination": "absent"}
 
 
@@ -106,13 +108,13 @@ def test_quarantine_op_for_excluded_installed(env):
     assert op["backup"] is not None
 
 
-def test_noop_for_managed_link_on_current_release(env):
+def test_noop_for_managed_link_on_current_release(env, directory_link):
     store, home, _ = env
     set_profile_state(store, "awesome:foo", "enabled", targets=["claude"])
     src = store / "sources" / "awesome" / "skills" / "foo"
     commit = current_commit(store / "sources" / "awesome")
     release = create_release(store, "awesome", "foo", src, commit)
-    (home / ".claude" / "skills" / "foo").symlink_to(release)
+    directory_link(home / ".claude" / "skills" / "foo", release)
 
     plan = build_plan(store, "m1", home=home)
     (op,) = plan["operations"]

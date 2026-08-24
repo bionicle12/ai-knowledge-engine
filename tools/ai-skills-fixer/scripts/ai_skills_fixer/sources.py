@@ -10,7 +10,6 @@ the catalog with an error.
 from __future__ import annotations
 
 import json
-import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,6 +17,7 @@ from pathlib import Path
 import yaml
 
 from . import gitops
+from .filesystem import remove_tree
 from .frontmatter import read_skill_file
 
 
@@ -162,7 +162,7 @@ def save_registry(store_root: Path, specs: dict[str, SourceSpec]) -> None:
 
 
 def _default_source_id(url: str) -> str:
-    tail = url.rstrip("/").split("/")[-1]
+    tail = url.replace("\\", "/").rstrip("/").split("/")[-1]
     return tail[:-4] if tail.endswith(".git") else tail
 
 
@@ -194,7 +194,10 @@ def add_source(
         layout = detect_layout(dest)
         scan_source(source_id, dest, layout)  # validate before registering
     except (CatalogError, gitops.GitError):
-        shutil.rmtree(dest, ignore_errors=True)
+        try:
+            remove_tree(dest)
+        except OSError:
+            pass
         raise
 
     spec = SourceSpec(source_id=source_id, url=url, ref=ref, layout=layout)

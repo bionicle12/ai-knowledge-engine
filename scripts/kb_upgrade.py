@@ -7,6 +7,8 @@ source repo's `VERSION`, then optionally syncs:
   * Reference Python scripts (`scripts/kb_*.py`)
   * Local graph viewer assets (`scripts/kb_viewer/**`)
   * Shell wrappers under `shell/`
+  * Agent command procedures used after deployment (`17_REFACTOR.md`,
+    `18_HEAL.md`)
   * Small managed blocks in `AGENTS.md`: `!view` commands and pack-index
     loading rules (with the mid-session context-recovery anchor).
     `AI-KE:INVARIANT` blocks are reported only — never written or replaced.
@@ -83,6 +85,11 @@ SHELL_FILES = (
     "doctor.sh",
     "export.sh",
     "import.sh",
+)
+
+MODULE_FILES = (
+    "17_REFACTOR.md",
+    "18_HEAL.md",
 )
 
 VIEW_BLOCK_BEGIN = "<!-- AI-KE:VIEW:BEGIN — managed by kb_upgrade.py -->"
@@ -356,6 +363,15 @@ def collect_plans(
         plans.append(
             plan
         )
+    for fname in MODULE_FILES:
+        plan = compute_plan(
+            src=REPO_ROOT / "knowledge-base" / fname,
+            dst=kb_root / fname,
+            prev_version=prev_version,
+            force=force or _plan_is_accepted(fname, accepted_names),
+        )
+        plan.name = fname
+        plans.append(plan)
     return plans
 
 
@@ -644,6 +660,7 @@ def _run_heal(
     if heal_cfg.get("auto_apply", True):
         applied = kb_heal.apply_auto(kb_root, version=target_version)
         findings = kb_heal.collect_findings(kb_root)
+        kb_heal.write_plan(kb_root)
     stage = int(heal_cfg.get("stage") or 1)
     print(kb_heal.summarize(findings, applied, stage))
 

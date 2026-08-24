@@ -54,7 +54,7 @@ def test_apply_install_creates_release_and_symlink(env):
     record = apply_plan(store, plan["plan_id"])
 
     dest = home / ".claude" / "skills" / "foo"
-    assert dest.is_symlink()
+    assert dest.resolve() != dest.absolute()
     assert (dest / "SKILL.md").is_file()
     assert str(dest.resolve()).startswith(str(store / "releases"))
     assert record["success"] is True
@@ -75,7 +75,7 @@ def test_apply_adopt_backs_up_original_and_links(env):
     plan = build_plan(store, "m1", home=home)
     record = apply_plan(store, plan["plan_id"])
 
-    assert dest.is_symlink()
+    assert dest.resolve() != dest.absolute()
     assert content_hash(dest) == original_hash
     (op_result,) = record["operations"]
     backup = store / op_result["backup_path"]

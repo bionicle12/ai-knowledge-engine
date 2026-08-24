@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -67,6 +68,31 @@ def test_collect_plans_keeps_posix_wrappers_in_shell_directory(
 
     assert reindex.dst == target
     assert reindex.state == "up_to_date"
+
+
+def test_collect_plans_includes_agent_command_modules_at_deployed_root(
+    tmp_path: Path, monkeypatch
+):
+    """A finalized base must receive the procedures referenced by ! commands."""
+    repo = _setup_fake_repo(tmp_path, monkeypatch)
+    monkeypatch.setattr(up, "SCRIPT_FILES", ())
+    monkeypatch.setattr(up, "SHELL_FILES", ())
+    source_root = repo / "knowledge-base"
+    (source_root / "17_REFACTOR.md").write_text("# Refactor\n", encoding="utf-8")
+    (source_root / "18_HEAL.md").write_text("# Heal\n", encoding="utf-8")
+    deployed = tmp_path / "deployed"
+
+    plans = up.collect_plans(deployed, prev_version="0.7.0", force=False)
+    module_plans = {
+        plan.name: plan.dst.relative_to(deployed).as_posix()
+        for plan in plans
+        if plan.name in {"17_REFACTOR.md", "18_HEAL.md"}
+    }
+
+    assert module_plans == {
+        "17_REFACTOR.md": "17_REFACTOR.md",
+        "18_HEAL.md": "18_HEAL.md",
+    }
 
 
 def test_collect_plans_can_accept_one_customized_file_only(
@@ -256,6 +282,10 @@ def _setup_fake_repo(tmp_path: Path, monkeypatch) -> Path:
     """Create a fake source repo layout so kb_upgrade can resolve paths."""
     (tmp_path / "knowledge-base" / "scripts").mkdir(parents=True)
     (tmp_path / "knowledge-base" / "shell").mkdir(parents=True)
+    for name in up.MODULE_FILES:
+        (tmp_path / "knowledge-base" / name).write_text(
+            f"# {name}\n", encoding="utf-8"
+        )
     (tmp_path / "VERSION").write_text("0.7.0\n", encoding="utf-8")
     monkeypatch.setattr(up, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(up, "SRC_SCRIPTS_DIR", tmp_path / "knowledge-base" / "scripts")
@@ -583,3 +613,46 @@ def test_upgrade_stamps_heal_last_run_with_the_new_version(
     assert up.main(["--kb-root", str(deployed)]) == 0
     cfg = yaml.safe_load((deployed / "kb.config.yml").read_text(encoding="utf-8"))
     assert cfg["instructions_version"] == cfg["heal"]["last_run"]["version"]
+
+
+def test_post_upgrade_plan_is_refreshed_after_auto_apply(
+    tmp_path: Path,
+):
+    """HEAL_PLAN must describe remaining work, not already-applied auto work."""
+    root = tmp_path / "deployed"
+    root.mkdir()
+    (root / "kb.config.yml").write_text(
+        'instructions_version: "0.14.0"\nheal:\n  auto_apply: true\n  stage: 1\n',
+        encoding="utf-8",
+    )
+    findings = [SimpleNamespace(id="packs-stale", bucket="auto")]
+
+    class FakeHeal:
+        @staticmethod
+        def collect_findings(_root):
+            return list(findings)
+
+        @staticmethod
+        def write_plan(plan_root):
+            dest = plan_root / "review" / "needs-heal" / "HEAL_PLAN.md"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(
+                ",".join(item.id for item in findings) or "no findings",
+                encoding="utf-8",
+            )
+            return dest
+
+        @staticmethod
+        def apply_auto(_root, *, version=None):
+            applied = list(findings)
+            findings.clear()
+            return applied
+
+        @staticmethod
+        def summarize(_findings, _applied, _stage):
+            return "summary"
+
+    up._run_heal(FakeHeal, root, dry_run=False, target_version="0.15.0")
+
+    plan = root / "review" / "needs-heal" / "HEAL_PLAN.md"
+    assert plan.read_text(encoding="utf-8") == "no findings"

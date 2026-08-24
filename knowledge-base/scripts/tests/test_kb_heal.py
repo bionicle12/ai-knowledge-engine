@@ -153,6 +153,43 @@ def test_plan_lists_stale_packs_as_auto(tmp_path: Path):
     assert stale and stale[0].bucket == "auto"
 
 
+def test_apply_auto_rebuilds_stale_packs_with_deployed_reindexer(tmp_path: Path):
+    """The packs-stale auto item must actually disappear after auto apply."""
+    root = _base(tmp_path)
+    knowledge = root / "knowledge" / "domain"
+    knowledge.mkdir(parents=True)
+    page = knowledge / "note.md"
+    page.write_text("# current knowledge\n", encoding="utf-8")
+    packs = root / ".repomix"
+    packs.mkdir()
+    pack = packs / "core.xml"
+    pack.write_text("<old/>\n", encoding="utf-8")
+    import os
+
+    older = page.stat().st_mtime - 120
+    os.utime(pack, (older, older))
+    scripts = root / "scripts"
+    scripts.mkdir()
+    (scripts / "kb_reindex.py").write_text(
+        "from pathlib import Path\n"
+        "import argparse, time\n"
+        "p=argparse.ArgumentParser(); p.add_argument('--root', type=Path); "
+        "p.add_argument('--index-only', action='store_true'); "
+        "p.add_argument('--force', action='store_true'); a=p.parse_args()\n"
+        "target=a.root/'.repomix'/'core.xml'; "
+        "target.write_text('<fresh/>\\n', encoding='utf-8'); "
+        "now=time.time()+2; import os; os.utime(target, (now, now))\n",
+        encoding="utf-8",
+    )
+
+    applied = kb_heal.apply_auto(root, migrations_text="")
+
+    assert "packs-stale" in {item.id for item in applied}
+    assert "packs-stale" not in {
+        item.id for item in kb_heal.collect_findings(root, migrations_text="")
+    }
+
+
 def test_apply_auto_is_idempotent_and_skips_other_buckets(tmp_path: Path):
     root = _base(tmp_path)
     first = kb_heal.apply_auto(root, migrations_text=MIGRATIONS_FIXTURE)
@@ -166,6 +203,20 @@ def test_apply_auto_is_idempotent_and_skips_other_buckets(tmp_path: Path):
     assert "AI-KE:INVARIANT" not in agents
     second = kb_heal.apply_auto(root, migrations_text=MIGRATIONS_FIXTURE)
     assert not any(a.id == "instruction-lint-config" for a in second)
+
+
+def test_repeated_auto_with_no_work_creates_no_backup_or_log_entry(tmp_path: Path):
+    """A no-op auto pass must not manufacture machine state."""
+    root = _base(tmp_path)
+    kb_heal.apply_auto(root, migrations_text=MIGRATIONS_FIXTURE)
+    backup_names = sorted(path.name for path in (root / ".kb-backups").iterdir())
+    log_before = (root / "log.md").read_text(encoding="utf-8")
+
+    applied = kb_heal.apply_auto(root, migrations_text=MIGRATIONS_FIXTURE)
+
+    assert applied == []
+    assert sorted(path.name for path in (root / ".kb-backups").iterdir()) == backup_names
+    assert (root / "log.md").read_text(encoding="utf-8") == log_before
 
 
 def test_apply_auto_sets_codex_window_profile(tmp_path: Path):
@@ -219,6 +270,37 @@ def test_stage_4_locked_until_measure(tmp_path: Path):
     trim2 = [f for f in unlocked if f.stage == 4]
     assert trim2
     assert all(not f.locked for f in trim2)
+
+
+def test_plan_shows_trim_gate_locked_even_when_no_trim_finding(tmp_path: Path):
+    """Owners must see the physical eval gate even when trim has no finding yet."""
+    root = _base(tmp_path)
+    plan = kb_heal.render_plan(
+        root, kb_heal.collect_findings(root, migrations_text="")
+    )
+    assert "stage 4 trim gate: locked" in plan
+
+    (root / "eval").mkdir()
+    (root / "eval" / "QUESTIONS.md").write_text(
+        "## Q1. a\n## Q2. b\n## Q3. c\n", encoding="utf-8"
+    )
+    open_plan = kb_heal.render_plan(
+        root, kb_heal.collect_findings(root, migrations_text="")
+    )
+    assert "stage 4 trim gate: open" in open_plan
+
+
+def test_migration_invariant_finding_suppresses_duplicate_lint_item(
+    tmp_path: Path,
+):
+    """One broken invariant must require one human decision, not two."""
+    root = _base(tmp_path)
+    findings = kb_heal.collect_findings(
+        root, migrations_text=MIGRATIONS_FIXTURE
+    )
+    ids = {item.id for item in findings}
+    assert "agents-md-invariants" in ids
+    assert "lint:invariants:AGENTS.md" not in ids
 
 
 def test_heal_module_locks_trim_behind_measure():

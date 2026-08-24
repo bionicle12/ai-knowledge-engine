@@ -37,7 +37,7 @@
           "directory": {"type": "string"},
           "path": {"type": "string"},
           "real_path": {"type": "string"},
-          "entry_type": {"type": "string", "enum": ["directory", "symlink"]},
+          "entry_type": {"type": "string", "enum": ["directory", "symlink", "junction"]},
           "has_skill_md": {"type": "boolean"},
           "name": {"type": ["string", "null"]},
           "description": {"type": ["string", "null"]},

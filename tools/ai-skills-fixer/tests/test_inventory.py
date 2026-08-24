@@ -1,6 +1,8 @@
 """Tests for installed-skill inventory, duplicates, and provenance (spec §9)."""
 from __future__ import annotations
 
+import os
+
 from ai_skills_fixer.discovery import SkillRoot
 from ai_skills_fixer.inventory import find_duplicates, match_provenance, scan_installed_root
 from ai_skills_fixer.sources import scan_source
@@ -40,13 +42,13 @@ def test_scan_finds_flat_skills_and_unknown_artifacts(tmp_path):
     assert skills["alpha"].host == "claude"
 
 
-def test_scan_records_symlink_entry_type(tmp_path):
+def test_scan_records_managed_link_entry_type(tmp_path, directory_link):
     target = write_skill(tmp_path / "elsewhere", "linked-skill")
     root = make_root(tmp_path / "skills")
-    (root.path / "linked-skill").symlink_to(target)
+    directory_link(root.path / "linked-skill", target)
 
     (found,) = scan_installed_root(root)
-    assert found.entry_type == "symlink"
+    assert found.entry_type == ("junction" if os.name == "nt" else "symlink")
     assert found.real_path == target.resolve()
     assert found.has_skill_md
 

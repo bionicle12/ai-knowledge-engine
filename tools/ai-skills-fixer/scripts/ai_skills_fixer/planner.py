@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from . import gitops
+from .filesystem import default_install_strategy
 from .discovery import discover_roots
 from .inventory import scan_installed_root
 from .provenance import content_hash
@@ -270,7 +270,7 @@ def build_plan(
     overrides = machine_cfg["profile_overrides"]
     disabled_skills = set(overrides.get("disable", []))
     additional_targets = overrides.get("additional_targets", {}) or {}
-    default_strategy = "symlink" if os.name == "posix" else "copy"
+    default_strategy = default_install_strategy()
 
     operations: list[dict] = []
     occasional_fallbacks: dict[str, str] = {}
@@ -373,7 +373,10 @@ def build_plan(
                     "risk": "low",
                     "approval_required": True,
                 })
-            elif inst.entry_type == "symlink" and inst.real_path == release_path.resolve():
+            elif (
+                inst.entry_type in ("symlink", "junction")
+                and inst.real_path == release_path.resolve()
+            ):
                 operations.append({
                     "skill_id": pskill.skill_id,
                     "host": host,
@@ -391,7 +394,7 @@ def build_plan(
                     "risk": "none",
                     "approval_required": False,
                 })
-            elif inst.entry_type == "symlink" and _under_releases(
+            elif inst.entry_type in ("symlink", "junction") and _under_releases(
                 store_root, inst.real_path
             ):
                 operations.append({

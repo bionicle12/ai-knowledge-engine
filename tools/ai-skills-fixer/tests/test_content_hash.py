@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
+
+import pytest
 
 from ai_skills_fixer.provenance import content_hash
 
@@ -10,7 +13,7 @@ def make_skill(root, files):
     for rel, content in files.items():
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content, encoding="utf-8")
+        p.write_bytes(content.encode("utf-8"))
 
 
 def test_identical_trees_hash_equal(tmp_path):
@@ -53,6 +56,11 @@ def test_symlink_contributes_target_string(tmp_path):
     a, b = tmp_path / "a", tmp_path / "b"
     make_skill(a, {"SKILL.md": "s\n"})
     make_skill(b, {"SKILL.md": "s\n"})
-    (a / "link.md").symlink_to("SKILL.md")
-    (b / "link.md").symlink_to("other-target.md")
+    try:
+        (a / "link.md").symlink_to("SKILL.md")
+        (b / "link.md").symlink_to("other-target.md")
+    except OSError as exc:
+        if os.name == "nt":
+            pytest.skip(f"file symlinks require Windows developer mode: {exc}")
+        raise
     assert content_hash(a) != content_hash(b)

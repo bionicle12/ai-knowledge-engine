@@ -16,6 +16,7 @@ import datetime as _dt
 import os
 import re
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -83,6 +84,15 @@ _HYGIENE_LINT = {
 }
 _TRIM_LINT = {"agents-bytes", "instruction-absolutes", "work-ordering"}
 _CONTENT_LINT = {"instructions-review", "profile-review"}
+_AUTO_APPLY_IDS = {
+    "instruction-lint-config",
+    "heal-config",
+    "instructions-review-config",
+    "agents-max-bytes-10kib",
+    "eval-skeleton",
+    "codex-window-profile",
+    "packs-stale",
+}
 
 
 @dataclass
@@ -540,6 +550,8 @@ def collect_findings(
     for finding in _sidecars(root):
         add(finding)
     for finding in _lint_findings(root):
+        if finding.id == "lint:invariants:AGENTS.md" and "agents-md-invariants" in seen:
+            continue
         add(finding)
     for finding in _doctor_findings(root):
         add(finding)
@@ -560,6 +572,7 @@ def render_plan(root: Path, findings: list[Finding]) -> str:
     assisted = [f for f in findings if f.bucket == "assisted" and not f.locked]
     human = [f for f in findings if f.bucket == "human" and not f.locked]
     locked = [f for f in findings if f.locked]
+    trim_gate = "open" if measure_closed(root) else "locked (eval/QUESTIONS.md missing)"
     shown, deferred = assisted[:batch], assisted[batch:]
     today = _dt.date.today().isoformat()
     lines = [
@@ -574,6 +587,7 @@ def render_plan(root: Path, findings: list[Finding]) -> str:
         f"- assisted: {len(assisted)} (showing {len(shown)}, {len(deferred)} deferred)",
         f"- human: {len(human)}",
         f"- locked (stage 4 trim): {len(locked)}",
+        f"- stage 4 trim gate: {trim_gate}",
         "",
     ]
     if not findings:
@@ -818,7 +832,22 @@ def _apply_one(root: Path, finding: Finding) -> bool:
         _set_window_profile(root, "400k")
         return True
     if finding.id == "packs-stale":
-        return False
+        script = root / "scripts" / "kb_reindex.py"
+        if not script.is_file():
+            return False
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--root",
+                str(root),
+                "--index-only",
+                "--force",
+            ],
+            cwd=str(root),
+            check=False,
+        )
+        return result.returncode == 0 and not _packs_stale(root)
     if finding.id == "doctor-codex-env":
         return False
     return False
@@ -832,14 +861,28 @@ def apply_auto(
     version: str | None = None,
 ) -> list[Finding]:
     root = root.resolve()
-    create_backup(root)
     findings = collect_findings(
         root, migrations_text=migrations_text, migrations_path=migrations_path
     )
+    candidates = [
+        finding
+        for finding in findings
+        if finding.bucket == "auto"
+        and not finding.locked
+        and finding.id in _AUTO_APPLY_IDS
+    ]
+    settings = _heal_settings(root)
+    expected_version = version or settings["instructions_version"]
+    last_run = settings["last_run"]
+    stamp_current = (
+        str(last_run.get("at") or "") == _dt.date.today().isoformat()
+        and str(last_run.get("version") or "") == str(expected_version)
+    )
+    if not candidates and stamp_current:
+        return []
+    create_backup(root)
     applied: list[Finding] = []
-    for finding in findings:
-        if finding.bucket != "auto" or finding.locked:
-            continue
+    for finding in candidates:
         if _apply_one(root, finding):
             applied.append(finding)
     _touch_last_run(root, version=version)

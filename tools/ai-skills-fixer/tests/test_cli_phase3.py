@@ -54,11 +54,11 @@ def test_cli_adopt_apply_and_rollback_flow(tmp_path, capsys):
     assert rc == 0
     record = json.loads(capsys.readouterr().out)
     assert record["success"] is True
-    assert dest.is_symlink()
+    assert dest.resolve() != dest.absolute()
 
     rc = main(["rollback", record["apply_id"], *base])
     assert rc == 0
-    assert not dest.is_symlink() and dest.is_dir()
+    assert dest.resolve() == dest.absolute() and dest.is_dir()
 
 
 def test_cli_apply_drift_returns_3(tmp_path, capsys):

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -60,9 +61,9 @@ def test_prune_quarantines_unprofiled_exact_copies_only(env):
     set_profile_state(store, "awesome:keep-me", "enabled", targets=["claude"])
     plan = build_plan(store, "m1", home=home, prune=True)
 
-    quarantined = {op["destination"].split("/")[-1] for op in ops_of(plan, "quarantine")}
+    quarantined = {Path(op["destination"]).name for op in ops_of(plan, "quarantine")}
     assert quarantined == {"prune-me", "occasional-one"}
-    assert [op["destination"].split("/")[-1] for op in ops_of(plan, "adopt")] == ["keep-me"]
+    assert [Path(op["destination"]).name for op in ops_of(plan, "adopt")] == ["keep-me"]
     assert "unknown-orig" in plan["notes"]["prune_skipped"]["claude"]
 
 
@@ -72,7 +73,7 @@ def test_prune_keeps_occasional_out_of_hosts_but_quarantines_installed_copy(env)
     set_profile_state(store, "awesome:occasional-one", "occasional", targets=["claude"])
     plan = build_plan(store, "m1", home=home, prune=True)
 
-    quarantined = {op["destination"].split("/")[-1] for op in ops_of(plan, "quarantine")}
+    quarantined = {Path(op["destination"]).name for op in ops_of(plan, "quarantine")}
     assert "occasional-one" in quarantined, (
         "occasional means catalog-only exposure; the installed copy goes away"
     )
@@ -82,5 +83,5 @@ def test_without_prune_unprofiled_skills_are_untouched(env):
     store, home = env
     set_profile_state(store, "awesome:keep-me", "enabled", targets=["claude"])
     plan = build_plan(store, "m1", home=home)
-    quarantined = {op["destination"].split("/")[-1] for op in ops_of(plan, "quarantine")}
+    quarantined = {Path(op["destination"]).name for op in ops_of(plan, "quarantine")}
     assert quarantined == set()

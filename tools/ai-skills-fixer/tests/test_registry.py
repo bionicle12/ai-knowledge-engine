@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 from ai_skills_fixer.sources import (
-    CatalogError, add_source, load_registry, refresh_source,
+    CatalogError, _default_source_id, add_source, load_registry, refresh_source,
 )
 from ai_skills_fixer.store import init_store
 
@@ -55,6 +55,19 @@ def test_add_source_clones_and_registers(store, tmp_path):
 
     registry = load_registry(store)
     assert registry["origin-repo"].url == str(origin)
+
+
+@pytest.mark.parametrize(
+    ("location", "expected"),
+    [
+        ("/srv/skills/origin-repo", "origin-repo"),
+        (r"C:\skills\origin-repo", "origin-repo"),
+        (r"C:\skills\origin-repo.git", "origin-repo"),
+        ("https://example.test/team/origin-repo.git", "origin-repo"),
+    ],
+)
+def test_default_source_id_accepts_portable_path_separators(location, expected):
+    assert _default_source_id(location) == expected
 
 
 def test_add_source_with_explicit_id_and_ref(store, tmp_path):
