@@ -69,5 +69,11 @@ def discover_roots(
     roots.append(_root("cursor", home / ".cursor" / "skills-cursor", "system"))
 
     roots.append(_root("antigravity", home / ".antigravity" / "skills", "user"))
+    gemini_config = (
+        Path(env["GEMINI_CONFIG_DIR"])
+        if env.get("GEMINI_CONFIG_DIR")
+        else home / ".gemini" / "config"
+    )
+    roots.append(_root("antigravity", gemini_config / "plugins", "plugin"))
 
     return sorted(roots, key=lambda r: (r.host, r.kind, str(r.path)))
