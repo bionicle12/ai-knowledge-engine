@@ -1,8 +1,8 @@
 ---
 translation_of: README.md
-source_commit: e497375d391668b75c4fefdddae3dde4d3e200c5
-source_version: 0.15.0
-translated_at: 2026-08-23
+source_commit: 6efb2d083c3a372d1bc37a4cd9ab32bd356117b3
+source_version: 0.16.0
+translated_at: 2026-10-11
 translator: ai-assisted
 ---
 
@@ -11,7 +11,7 @@ translator: ai-assisted
 </p>
 
 <p align="center">
-  <a href="../../VERSION"><img src="https://img.shields.io/badge/версия-0.15.0-62D8FF?style=flat-square" alt="Версия 0.15.0"></a>
+  <a href="../../VERSION"><img src="https://img.shields.io/badge/версия-0.16.0-62D8FF?style=flat-square" alt="Версия 0.16.0"></a>
   <a href="#требования"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 или новее"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/лицензия-MIT-7EE787?style=flat-square" alt="Лицензия MIT"></a>
   <img src="https://img.shields.io/badge/хранение-локальный%20Markdown-8A9BB5?style=flat-square" alt="Локальное хранение в Markdown">
@@ -37,7 +37,7 @@ AI-ассистенты отлично работают с текущим диа
 
 На схеме показана реальная модель хранения, а не условная облачная архитектура:
 
-- `raw/`, `processed/`, `review/` и `interactions/` не попадают в сгенерированный AI-индекс.
+- `raw/`, `processed/`, `review/` и `interactions/` не попадают в сгенерированный AI-индекс и по умолчанию в git.
 - `knowledge/` содержит проверенный, повторно используемый Markdown, который разрешено индексировать.
 - `assets-index/` хранит доступные для поиска описания, пока исходные бинарные файлы остаются приватными.
 - `.repomix/*.xml` — пересобираемые пакеты контекста (core + по одному на секцию знаний), а не источник истины.
@@ -48,7 +48,7 @@ AI-ассистенты отлично работают с текущим диа
 |---|---|---|
 | Начать здесь | [`quick-start/`](../../quick-start/) | [`knowledge-base/`](../../knowledge-base/) |
 | Подходит для | Надёжной карты проекта для AI-агента | Долговременной персональной или командной системы знаний |
-| Что вы получите | Доменные пакеты индекса с потолками токенов, проверку секретов, закалённые Git-хуки (commit/push/pull) | Raw-first ingest, NLP, provenance, очереди проверки, рефлексию, linting и watchers |
+| Что вы получите | Доменные пакеты индекса с потолками токенов, проверку секретов, закалённые Git-хуки (commit, push, pull/merge, rebase, переключение веток) | Raw-first ingest, NLP, provenance, очереди проверки, рефлексию, linting и watchers |
 | Обычное время настройки | Около 5 минут | Около 30 минут |
 | Среда выполнения | Repomix + Node.js | Python-конвейер + индексатор; Repomix включён по умолчанию |
 
@@ -75,7 +75,7 @@ cd /path/to/your-project
 чтобы перенести готовую базу в корень проекта.
 ```
 
-Агент уточнит вашу роль, настроит конвейер, создаст подходящую структуру знаний, проверит её через `kb_doctor.py` и перенесёт готовую систему в корень проекта.
+Агент уточнит вашу роль, настроит конвейер, создаст подходящую структуру знаний, проверит её через `kb_doctor.py` («успешно» означает код выхода 0; одни предупреждения не проваливают проверку) и перенесёт готовую систему в корень проекта. Модули инструкций остаются в базе как `kb-docs/`, куда ссылаются `AGENTS.md` и скрипты.
 
 <details>
 <summary><strong>Команды копирования для PowerShell</strong></summary>
@@ -104,15 +104,15 @@ cp -R ai-knowledge-engine/quick-start /path/to/your-project/docs/ai-init
 Прочитай docs/ai-init/INIT_GUIDE.md и инициализируй пакетный Repomix-индекс в этом проекте (режим init). Покажи предлагаемую таблицу пакетов до записи конфигов.
 ```
 
-Гайд заставит агента замерить кодовую базу, нарезать её на **семантические доменные пакеты** (каждый под потолком токенов — один гигантский `output.xml` на реальных проектах перестаёт влезать в окно контекста), поставить закалённые кроссплатформенные git-хуки (commit/push/pull, с PATH-бутстрапом и логированием) и вписать короткую таблицу маршрутизации в `AGENTS.md`. Результат — не один файл: это `.repomix/catalog.xml` плюс доменные пакеты из `repomix.packs.json`, свежие размеры — в `.repomix/PACKS_STATUS.md`.
+Гайд заставит агента замерить кодовую базу, нарезать её на **семантические доменные пакеты** (каждый под потолком токенов — один гигантский `output.xml` на реальных проектах перестаёт влезать в окно контекста), поставить закалённые кроссплатформенные git-хуки (commit, push, pull/merge, rebase и переключение веток, с настройкой PATH, блокировкой и логированием) и вписать короткую таблицу маршрутизации в `AGENTS.md`. Результат — не один файл: это `.repomix/catalog.xml` плюс доменные пакеты из `repomix.packs.json`, размеры, флаги OVER/FAILED и проблемы покрытия — в `.repomix/PACKS_STATUS.md`.
 
-**Уже инициализировано?** Обычные пересборки идут сами через git-хуки; вручную — `scripts/update-repomix-index.sh` (`--force` для полной пересборки). Если проект разворачивался со старым единым `output.xml` — или нарезка перестала соответствовать выросшей кодовой базе — скажите агенту:
+**Уже инициализировано?** Обычные пересборки идут сами через git-хуки; вручную — `scripts/update-repomix-index.sh` (`--force` для полной пересборки, `--check` только для обновления `PACKS_STATUS.md`). Если проект разворачивался со старым единым `output.xml` — или нарезка перестала соответствовать выросшей кодовой базе — скажите агенту:
 
 ```text
 Прочитай docs/ai-init/INIT_GUIDE.md и ПЕРЕинициализируй Repomix-индекс в этом проекте (режим reinit): померь всё с нуля, предложи новую нарезку на пакеты, покажи diff с текущей схемой, сделай backup старых конфигов и мигрируй.
 ```
 
-Готовые промпты для всех трёх режимов (`init` / `update` / `reinit`) — в начале гайда.
+Готовые промпты для всех трёх режимов (`init` / `update` / `reinit`) на английском и русском — в начале гайда.
 
 ## Чем система отличается
 
@@ -144,20 +144,22 @@ Repomix работает из коробки, но индексатор нахо
     ↓
 raw/                     неизменяемые оригиналы, не индексируются
     ↓  kb_ingest.py
-processed/               Markdown + метаданные извлечения, не индексируются
-    ↓  маршрутизация и проверка
+processed/               Markdown + метаданные извлечения, не индексируются;
+    ↓  !review           каждый файл ждёт (extraction: pending), пока агент извлечёт знания
 knowledge/               чистые связанные заметки, индексируются
 assets-index/            доступные для поиска описания бинарных файлов
     ↓  индексатор контекста
 .repomix/*.xml           пересобираемые пакеты AI-контекста (каждый под потолком токенов)
+STATUS.md                ожидающая работа; переписывается каждым reindex, читается в начале сессии
 ```
 
-Вокруг этого маршрута работают пять механизмов контроля:
+Вокруг этого маршрута работают шесть механизмов контроля:
 
 - **Provenance** — хеши и ссылки на источники связывают знания с их происхождением.
-- **Очереди проверки** — неоднозначные, неуверенно распознанные и чувствительные материалы останавливаются до принятия решения.
+- **Очереди проверки** — файлы, которые не удалось конвертировать или классифицировать, триггеры AI-проверки, приватные материалы и материалы с секретами останавливаются до принятия решения.
+- **Передача состояния** — `STATUS.md` перечисляет ожидающие проверку и извлечение, срок рефлексии, пункты heal и проблемы индекса; для каждого указана команда решения.
 - **Health checks** — linting находит устаревшие страницы, битые ссылки, сироты и отклонения структуры.
-- **Рефлексия** — накопленные факты можно синтезировать в более общие выводы по расписанию или команде.
+- **Рефлексия** — накопленные факты можно синтезировать в более общие выводы когда накопилось достаточно изменений (проверяется при каждом reindex) или по команде.
 - **Обновления** — `kb_upgrade.py` обновляет эталонные файлы и по возможности сохраняет пользовательские изменения.
 
 Полная последовательность развёртывания и системные инварианты описаны в [обзоре архитектуры](../../docs/ARCHITECTURE.md).
@@ -172,7 +174,8 @@ assets-index/            доступные для поиска описания
 | Архивы | ZIP- и TAR-архивы распаковываются с ограничением размера и повторно отправляются в ingest |
 | NLP | Сущности, ключевые слова и подсказки маршрутизации извлекаются до AI-проверки |
 | Граф знаний | Markdown-страницы используют `[[wikilinks]]`, routing tables, lifecycle-метаданные и provenance |
-| Автоматизация | Кроссплатформенная переиндексация, watchers, health checks и триггеры рефлексии по важности |
+| Автоматизация | Кроссплатформенная переиндексация, watchers, git post-commit hook, health checks и триггеры рефлексии по важности |
+| Приватность | По умолчанию файлы из `raw/chats/` и `raw/personal-context/`, а также файлы со строками, похожими на учётные данные, направляются в `review/needs-redaction/`; экспорт отказывается от файлов с признаками секретов без явного разрешения |
 | Переносимость | Вся система состоит из файлов и папок, которые можно копировать, синхронизировать, версионировать и проверять напрямую |
 | Несколько машин | Две базы обмениваются знаниями через архивы: дедупликация по хешу содержимого, fast-forward и конфликты, уходящие в очередь проверки |
 
@@ -182,10 +185,12 @@ assets-index/            доступные для поиска описания
 
 | Команда | Назначение | Обычная стоимость AI |
 |---|---|---:|
-| `!view` | Открыть локальный read-only просмотрщик графа знаний (разбор здоровья, полнотекстовый поиск, поиск пути) | 0 токенов |
+| `!status` | Сообщить, что ожидает работы (из `STATUS.md`): очереди проверки и извлечения, срок рефлексии, пункты heal, проблемы индекса | ~0.5K токенов |
+| `!view` | Открыть локальный просмотрщик графа знаний только для чтения (разбор здоровья, полнотекстовый поиск, поиск пути); `!view status` показывает URL, `!view stop` останавливает его | 0 токенов |
 | `!save` | Сохранить решения и инсайты продуктивной сессии | ~2K токенов |
 | `!reflect` | Синтезировать общие закономерности из накопленных знаний | ~15K токенов |
-| `!review` | Разобрать материалы, ожидающие решения в очередях проверки | ~5–30K токенов |
+| `!meta-review` | Найти повторяющиеся паттерны в ещё не разобранных сохранённых итогах сессий | ~5–15K токенов |
+| `!review` | Разобрать материалы в очередях проверки и извлечь знания из конвертированных файлов, ещё ожидающих в `processed/` | ~5–30K токенов |
 | `!audit` | Глубокая проверка противоречий и пробелов — по одному паку, в свежей сессии, находка без `file:line` и цитаты не принимается | ~5–20K токенов на пак |
 | `!heal` | Догнать базу после апгрейда: собрать всё, что осталось сломанным, применить безопасные правки, остальное разобрать по одному пункту | ~0–40K токенов |
 | `!refactor` | Сократить инструкции: разобрать `AGENTS.md` по строкам, остановиться на ваших решениях, переписать только по ним | ~5–40K токенов |
@@ -202,7 +207,9 @@ assets-index/            доступные для поиска описания
 | Режим | Поведение | Ожидаемый расход при активной работе |
 |---|---|---:|
 | `default` | Python-first обработка с ограниченными AI-решениями | ~3–4K токенов/день |
-| `super` | AI-анализ новизны, аннотаций, сущностей и частых проверок | ~50–200K+ токенов/день |
+| `super` | Агент свободно тратит токены: содержательные аннотации, важность с обоснованием, рефлексия после небольших изменений, предложение `!review` в начале сессии, когда в `needs-ai-decision` есть элементы (запуск после согласия) | ~50–200K+ токенов/день |
+
+Режим хранится в `knowledge_base.mode`. При смене режима скрипты меняют только триггер рефлексии; остальное — поведение агента из `mode_profiles`. Фильтр неожиданности пока не реализован ([планы](../../docs/ROADMAP.md)).
 
 Числа приведены для планирования и не являются бенчмарками. Реальный расход зависит от объёма документов, активности, модели и поведения агента.
 
@@ -262,10 +269,10 @@ sync:
 Полезные флаги (добавляются в терминале или запрашиваются у агента):
 
 ```bash
-./shell/export.sh --since 2026-06-01    # только знания, обновлённые с этой даты
-./shell/export.sh --with-assets         # вместе с бинарными оригиналами
-./shell/export.sh --only knowledge      # только страницы знаний, ничего больше
-./shell/export.sh --dry-run             # показать, что попадёт в архив
+./shell/export.sh --since 2026-06-01    # only knowledge touched since a date
+./shell/export.sh --with-assets         # include the binary originals too
+./shell/export.sh --only knowledge      # knowledge pages and nothing else
+./shell/export.sh --dry-run             # show what would be packed
 ```
 
 ### Шаг 2 — перенести файл
@@ -330,6 +337,7 @@ sync:
   `--with-assets`; без них записи в импортированном `assets-index/` получают
   пометку «оригинала нет в этой базе», а не битую ссылку.
 - **`sync/` исключена** из AI-индекса и из git.
+- **Файлы с признаками секретов отклоняются.** Экспорт останавливается, когда файл совпадает с шаблоном учётных данных (токены, `password=`, приватные ключи), и перечисляет совпадения; `--allow-secrets` позволяет продолжить после их проверки.
 - `--dry-run` всё классифицирует и ничего не пишет.
 - Делитесь базой с кем-то ещё? Выгружайте с `--only knowledge` и сначала
   просмотрите результат: в `interactions/` лежит история сессий, а в
@@ -344,6 +352,7 @@ sync:
 | «No bundle to import» | Архива нет в `sync/inbox/` **на этой** машине. |
 | Обе машины делают архивы с одинаковым именем | У них совпадает `sync.label`. Задайте каждой свой. |
 | Хочется сначала посмотреть, что будет | Запустите импорт с `--dry-run`. |
+| Хотите отменить импорт | `python3 scripts/kb_import.py --undo sync/reports/<report>.md` отменяет его; файлы, изменённые после импорта, сохраняются. |
 
 ## Обновление развёрнутых баз знаний
 
@@ -354,28 +363,28 @@ sync:
 ### Windows
 
 ```powershell
-python C:\путь\к\ai-knowledge-engine\scripts\kb_upgrade.py `
-  --kb-root C:\путь\к\kb-name --dry-run
-python C:\путь\к\ai-knowledge-engine\scripts\kb_upgrade.py `
-  --kb-root C:\путь\к\kb-name
+python C:\path\to\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --kb-root C:\path\to\kb-name --dry-run
+python C:\path\to\ai-knowledge-engine\scripts\kb_upgrade.py `
+  --kb-root C:\path\to\kb-name
 ```
 
 ### macOS
 
 ```bash
-python3 ~/путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
-  --kb-root ~/путь/к/kb-name --dry-run
-python3 ~/путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
-  --kb-root ~/путь/к/kb-name
+python3 ~/path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root ~/path/to/kb-name --dry-run
+python3 ~/path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root ~/path/to/kb-name
 ```
 
 ### Linux
 
 ```bash
-python3 /путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
-  --kb-root /путь/к/kb-name --dry-run
-python3 /путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
-  --kb-root /путь/к/kb-name
+python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root /path/to/kb-name --dry-run
+python3 /path/to/ai-knowledge-engine/scripts/kb_upgrade.py \
+  --kb-root /path/to/kb-name
 ```
 
 Первое обновление устанавливает в KB файл `scripts/kb_update.py`. После этого
@@ -384,11 +393,7 @@ python3 /путь/к/ai-knowledge-engine/scripts/kb_upgrade.py \
 Launcher автоматически находит исходный репозиторий; для нестандартного пути
 есть `--repo-root PATH` и `AI_KNOWLEDGE_ENGINE_HOME`.
 
-Для нескольких баз используйте `--all-root /путь/к/родительской-папке`:
-обрабатываются непосредственные подпапки `kb-*`. Для подтверждения замены
-конкретного файла используйте повторяемый `--accept FILE`, а не глобальный
-`--force`. Подробности и правила безопасности — в
-[гайде по обновлению](../../docs/UPGRADING.md).
+Для нескольких баз используйте `--all-root /path/to/parent` (непосредственные подпапки `kb-*`). Если файл изменили и вы, и движок, ваша копия сохраняется, а новая версия появляется рядом как `<file>.new`. Объедините нужное и сохраните свою версию через `--accept-local FILE` либо возьмите версию движка через `--accept FILE` (сначала создаётся резервная копия вашей); `--force` принимает все изменённые пользователем файлы. Обновление также освежает модули инструкций в `kb-docs/` и управляемые блоки `AGENTS.md`. Примеры и правила безопасности — в [гайде по обновлению](../../docs/UPGRADING.md).
 
 ### Апгрейд синхронизирует только файлы — содержимое догоняет `!heal`
 
@@ -460,27 +465,28 @@ AI-агенту в корне этого репозитория. Вставьт�
 обратимо.
 
 ```bash
-# разовая настройка на машине
+# one-time setup on a machine
 python3 tools/ai-skills-fixer/scripts/run.py init
-python3 tools/ai-skills-fixer/scripts/run.py source add <url-или-путь-репозитория-скиллов>
+python3 tools/ai-skills-fixer/scripts/run.py source add <skill-repo-url-or-path>
 
-# что установлено и откуда пришло
+# see what is installed and where it came from
 python3 tools/ai-skills-fixer/scripts/run.py inventory
 
-# решаете, что оставить (по скиллу, или доверьте опросник агенту)
+# decide what you keep (repeat per skill, or let your agent run the questionnaire;
+# a single-skill source's ID is just <source>)
 python3 tools/ai-skills-fixer/scripts/run.py profile set <source>:<skill> enabled \
     --targets claude codex cursor antigravity
 
-# сухой прогон, просмотр точного плана, применение по ID
+# dry run, review the exact plan, then apply it by ID
 python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune
 python3 tools/ai-skills-fixer/scripts/run.py reconcile --apply <plan-id>
 
-# позже — обновление скиллов до новой версии источника
+# update skills to a new upstream version later
 python3 tools/ai-skills-fixer/scripts/run.py source refresh
 python3 tools/ai-skills-fixer/scripts/run.py source promote <source-id>
-python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune   # затем --apply <plan-id>
+python3 tools/ai-skills-fixer/scripts/run.py reconcile --prune   # then --apply <plan-id>
 
-# откат любого применения, байт-в-байт
+# undo any apply, byte-for-byte
 python3 tools/ai-skills-fixer/scripts/run.py rollback <apply-id>
 ```
 
@@ -500,7 +506,7 @@ python3 tools/ai-skills-fixer/scripts/run.py rollback <apply-id>
 ai-knowledge-engine/
 ├── quick-start/                 Lite mode: гайд по индексации кодовой базы
 ├── knowledge-base/
-│   ├── 00_…16_*.md             17 последовательных модулей инструкций
+│   ├── 00_…18_*.md             19 последовательных модулей инструкций (kb-docs/ в развёрнутой базе)
 │   ├── scripts/                эталонный Python-конвейер и тесты
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              шаблоны конфигов, агента, структуры и зависимостей
@@ -520,7 +526,7 @@ ai-knowledge-engine/
 | Git | Любая современная версия | Версионирование и необязательные hooks |
 | AI coding agent | Доступ к Markdown, файлам и shell | Управляемое развёртывание и AI-команды |
 
-Основные зависимости Python перечислены в [`requirements.txt`](../../knowledge-base/templates/requirements.txt). Speech-to-text и OCR намеренно вынесены в отдельный [`requirements-media.txt`](../../knowledge-base/templates/requirements-media.txt).
+Основные зависимости Python перечислены в [`requirements.txt`](../../knowledge-base/templates/requirements.txt). Ключевые слова KeyBERT, подтягивающие PyTorch, необязательны и вынесены в [`requirements-nlp.txt`](../../knowledge-base/templates/requirements-nlp.txt); speech-to-text и OCR намеренно вынесены в отдельный [`requirements-media.txt`](../../knowledge-base/templates/requirements-media.txt). Virtualenv находится в корне проекта (`.venv/`), который после finalize становится корнем базы.
 
 Инструкции рассчитаны на Claude, Codex, GPT, Gemini, Cursor и других Markdown-совместимых агентов, которые умеют просматривать файлы и запускать команды. Конкретное поведение всё равно зависит от разрешений и доступных инструментов host-приложения.
 

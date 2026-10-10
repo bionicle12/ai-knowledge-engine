@@ -1,266 +1,206 @@
 ---
 translation_of: knowledge-base/12_NLP_PREPROCESS.md
-source_commit: 1237e839a201180ed4cfa249a370365be0f63c37
-source_version: 0.12.0
-translated_at: 2026-08-13
+source_commit: 6efb2d083c3a372d1bc37a4cd9ab32bd356117b3
+source_version: 0.16.0
+translated_at: 2026-10-11
 translator: ai-assisted
 ---
 
-# 12 — NLP-предобработка: NER и keyword extraction перед LLM
+# 12 — NLP-предобработка: NER и извлечение ключевых слов до LLM
 
-> Перед отправкой материала в LLM для анализа — прогоняем дешёвый NLP-пайплайн. LLM получает pre-resolved entities, связанные с существующими knowledge/ страницами.
+> Прежде чем агент анализирует материал, приём запускает недорогой NLP-пайплайн. Агент получает уже сопоставленные сущности со ссылками на существующие страницы `knowledge/`.
 
 ---
 
 ## Зачем
 
-- **Дешевле:** NER + keyword extraction на CPU, без API-вызовов
-- **Точнее:** Entity resolution сводит вариации («Docker Swarm» / «docker swarm» / «Swarm») к каноническому имени
-- **Быстрее:** LLM получает структурированный input вместо raw text
-- **Связность:** NLP автоматически находит ссылки на существующие knowledge/ страницы
+- **Дешевле:** NER и извлечение ключевых слов работают на CPU без API-вызовов
+- **Точнее:** разрешение сущностей сводит варианты ("Docker Swarm" / "docker swarm") к одной существующей странице
+- **Быстрее:** агент получает структурированный ввод вместо сырого текста
+- **Связи:** NLP обнаруживает упоминания существующих страниц `knowledge/`
 
 ---
 
-## Место в pipeline
+## Место в пайплайне
 
 ```text
-raw/file → [Конвертация в MD] → processed/ → [NLP enrichment] → nlp-meta/ → [AI review / auto-extract]
+raw/file → [convert to MD] → processed/ → [NLP enrichment] → processed/nlp-meta/ → [agent: !review]
 ```
 
-NLP-шаг добавляется **после** конвертации в markdown и **до** AI-ревью.
+NLP-шаг выполняется внутри `kb_ingest.py` **после** преобразования в Markdown и **до** маршрутизации (шаг 7 в `kb-docs/03_PIPELINE.md`). `kb_nlp_batch.py` повторяет его для файлов, уже находящихся в `processed/`, и записывает новый `nlp_meta_path` в метаданные каждого файла под блокировкой пайплайна, сохраняя результат параллельного `--mark-extracted`.
+
+Шаг пропускается при `kb_ingest.py --no-nlp`, `nlp.enabled: false`, для расширений из `nlp.skip_extensions` (сам файл всё равно принимается и преобразуется) и для архивов.
 
 ---
 
 ## Зависимости
 
-Добавить в `requirements.txt`:
-
-```txt
-# NLP pre-processing
-spacy>=3.7
-rake-nltk>=1.0
-keybert>=0.8
-```
+- **spaCy** и **rake-nltk** входят в `requirements.txt`.
+- **KeyBERT** необязателен: без него ключевые слова извлекает RAKE. Он подтягивает PyTorch (сотни MB); файл зависимостей для его установки указан в `01_PREREQUISITES.md`.
 
 Установка модели spaCy:
 
 ```bash
-# Русский
+# Russian
 python3 -m spacy download ru_core_news_md
 
-# Английский (если нужен)
+# English (if needed)
 python3 -m spacy download en_core_web_md
 
-# Мультиязычный (универсальный, но менее точный)
+# Multilingual (universal but less accurate)
 python3 -m spacy download xx_ent_wiki_sm
 ```
 
+RAKE один раз требует данные NLTK:
+
+```bash
+python3 -m nltk.downloader stopwords punkt punkt_tab
+```
+
+Всё работает с ограничениями вместо аварийного завершения: без spaCy нет сущностей, без KeyBERT и RAKE — ключевых слов. Отсутствие модели spaCy или данных NLTK вызывает одно предупреждение за запуск с командой для исправления.
+
 ---
 
-## Контракт NLP-этапа
+## Контракт NLP-шага
 
 ```python
-def nlp_enrich(text: str, knowledge_dir: str, lang: str = "auto") -> dict:
-    """
-    NLP-обогащение текста перед отправкой в LLM.
-    
-    Этапы:
-    1. Language detection (если lang="auto")
-    2. NER — Named Entity Recognition (spaCy)
-    3. Keyword extraction — RAKE + KeyBERT
-    4. Entity resolution — fuzzy match с существующими knowledge/ pages
-    5. Complexity estimation
-    
-    Returns:
-        dict с entities, keywords, canonical_matches, complexity
+def nlp_enrich(text: str, cfg: kbc.KbConfig, knowledge_dir: Path) -> dict:
+    """Best-effort NLP enrichment of converted text (kb_ingest.py).
+
+    Stages:
+    1. NER — spaCy (nlp.spacy_model, else nlp.spacy_model_fallback)
+    2. Entity resolution — slug / fuzzy match against knowledge/ file names
+    3. Keywords — KeyBERT when installed, else RAKE
+    4. Complexity estimation
+
+    Models load once per process. Returns the dict written to
+    processed/nlp-meta/<name>.yml (see below).
     """
 ```
 
-### 1. NER (Named Entity Recognition)
+Определения языка нет: `language` равно `language_policy.primary`, которое также выбирает список стоп-слов RAKE (`russian` для `ru`, иначе `english`).
 
-```python
-import spacy
+### 1. NER (распознавание именованных сущностей)
 
-nlp = spacy.load("ru_core_news_md")  # или en_core_web_md
-doc = nlp(text)
-
-entities = []
-for ent in doc.ents:
-    entities.append({
-        "text": ent.text,
-        "type": ent.label_,   # PER, ORG, LOC, DATE, PRODUCT, etc.
-        "start": ent.start_char,
-        "end": ent.end_char,
-    })
-```
-
-### 2. Keyword Extraction
-
-```python
-from rake_nltk import Rake
-from keybert import KeyBERT
-
-# RAKE — быстрый, rule-based
-rake = Rake(language="russian")
-rake.extract_keywords_from_text(text)
-rake_keywords = rake.get_ranked_phrases_with_scores()[:20]
-
-# KeyBERT — embedding-based, точнее
-kw_model = KeyBERT()
-keybert_keywords = kw_model.extract_keywords(
-    text, keyphrase_ngram_range=(1, 3), top_n=20
-)
-```
-
-### 3. Entity Resolution (mode-aware)
-
-#### `mode: default` — Python fuzzy match (0 токенов)
-
-```python
-from difflib import SequenceMatcher
-
-def resolve_entities(entities: list, knowledge_dir: str) -> list:
-    """
-    Для каждой найденной entity — ищем совпадение
-    с существующими knowledge/ страницами.
-    
-    Используем:
-    - Exact match по slug
-    - Fuzzy match (SequenceMatcher ratio > 0.8)
-    - Словарь алиасов (если есть)
-    """
-    knowledge_slugs = scan_knowledge_slugs(knowledge_dir)
-    
-    for entity in entities:
-        slug = slugify(entity["text"])
-        # Exact match
-        if slug in knowledge_slugs:
-            entity["canonical"] = slug
-            entity["existing_page"] = knowledge_slugs[slug]
-        # Fuzzy match
-        else:
-            best_match = find_best_fuzzy_match(slug, knowledge_slugs)
-            if best_match and best_match[1] > 0.8:
-                entity["canonical"] = best_match[0]
-                entity["existing_page"] = knowledge_slugs[best_match[0]]
-            else:
-                entity["canonical"] = entity["text"]
-                entity["existing_page"] = None  # кандидат на новую страницу
-    
-    return entities
-```
-
-> **Ограничения:** не понимает синонимы (`Dragonfly` ↔ `DragonflyDB` ↔ `Redis-совместимый кеш`), не обрабатывает мультиязычные варианты (`база данных` ↔ `database`).
-
-#### `mode: super` — AI семантический (~500-1K токенов)
-
-AI-агент дополнительно:
-1. **Семантическое совпадение:** понимает, что `«кеш-слой»` = `«caching layer»` = `«DragonflyDB»` в контексте проекта
-2. **Иерархическая привязка:** entity может быть привязана к нескольким страницам на разных уровнях
-3. **Cross-language resolution:** `«база данных»` ↔ `«database»` ↔ `«БД»` без словарей
-4. **Context-aware:** понимает, что `«Redis»` в контексте кеширования → `[[caching]]`, а в контексте pub/sub → `[[messaging]]`
+spaCy обрабатывает первый 1 000 000 символов. Каждая сущность получает вид:
 
 ```yaml
-# В kb.config.yml — управляется через mode_profiles:
-entity_resolution:
-  # default: engine: "python"
-  # super:   engine: "ai"     # AI primary + Python verification
+- text: "Docker Swarm"
+  type: "PRODUCT"          # spaCy label: PER, ORG, LOC, DATE, PRODUCT, …
+  canonical: "docker-swarm"
+  existing_page: "knowledge/domain/docker-swarm.md"
 ```
 
-### 4. Complexity Estimation
+`ner_engine` в NLP-метаданных равен `spacy`, если NER выполнен, и `null`, если нет (отсутствует spaCy или модель). Без NER оценка сложности не достигает порога разбора (см. 4).
 
-```python
-def estimate_complexity(text: str, entities: list, keywords: list) -> float:
-    """
-    Оценка сложности материала (0.0 — 1.0).
-    
-    Факторы:
-    - Длина текста (>2000 слов → +0.2)
-    - Количество unique entities (>15 → +0.2)
-    - Количество unresolved entities (>5 → +0.2)
-    - Наличие числовых данных / таблиц (→ +0.1)
-    - Наличие противоречивых маркеров ("однако", "но", "в отличие") (→ +0.1)
-    """
-    score = 0.0
-    # ... computation ...
-    return min(score, 1.0)
-```
+### 2. Разрешение сущностей с учётом режима
+
+#### `mode: default` — сопоставление Python (0 токенов)
+
+Для каждой сущности:
+
+1. Преобразовать текст в slug; если существует `knowledge/**/<slug>.md`, связать с ним.
+2. Иначе выбрать ближайший slug имени файла (`difflib.get_close_matches`, порог `nlp.fuzzy_match_threshold`, по умолчанию 0.8).
+3. При совпадении записать slug страницы в `canonical`, путь в `existing_page`; без совпадения оставить текст в `canonical` и `existing_page: null` (кандидат на новую страницу).
+
+Сущности с одинаковыми `canonical` и `type` объединяются.
+
+> **Ограничения:** сопоставляются только имена файлов — без словаря псевдонимов, синонимов (`Dragonfly` ↔ `DragonflyDB` ↔ `Redis-compatible cache`) и разноязычных вариантов (`база данных` ↔ `database`).
+
+#### `mode: super` — агент добавляет смысловое сопоставление (~500–1K токенов)
+
+Приём всегда сопоставляет через Python. В режиме super (`mode_profiles.super.entity_resolution.engine: "ai"`) агент дополнительно при разборе выполняет:
+
+1. **Смысловое сопоставление:** понимает, что `"cache layer"` = `"caching layer"` = `"DragonflyDB"` в контексте проекта
+2. **Иерархические связи:** связывает сущность с несколькими страницами разных уровней
+3. **Межъязыковое разрешение:** `"база данных"` ↔ `"database"` ↔ `"DB"` без словарей
+4. **Учёт контекста:** `"Redis"` в контексте кеширования → `[[caching]]`, в контексте pub/sub → `[[messaging]]`
+
+### 3. Извлечение ключевых слов
+
+- **KeyBERT**, если установлен: `keyphrase_ngram_range=(1, 3)`, `top_n = nlp.keyword_top_n` (по умолчанию 20); `source: keybert`.
+- **RAKE** в остальных случаях: лучшие `nlp.keyword_top_n` фраз по рангу; `source: rake`.
+
+Каждое ключевое слово — `{phrase, weight, source}`.
+
+### 4. Оценка сложности
+
+`estimate_complexity(text, entity_count=…)` возвращает 0.0–1.0 как сумму:
+
+| Фактор | Баллы |
+|---|---|
+| больше 2 000 слов | +0.2 |
+| больше 5 000 слов | ещё +0.1 |
+| больше 15 сущностей после объединения | +0.2 |
+| маркеры противопоставления: "however", "but", "однако", "впрочем" | +0.1 |
+| таблица (больше 10 символов `\|`) | +0.1 |
+| любая цифра | +0.05 |
+
+Максимум — 0.75; без сущностей NER — 0.55. Файл с оценкой не ниже `nlp.complexity_threshold` (по умолчанию 0.7) получает пакет разбора в `review/needs-ai-decision/`: практически это длинные тексты со множеством сущностей и работающим NER. Ниже порога файл всё равно ждёт извлечения (`kb-docs/03_PIPELINE.md` → реестр извлечения), а приём имеет другие триггеры разбора (решения, расшифровки, длинные чаты, новые версии). Отсутствие NER фиксируется в `complexity_basis`.
 
 ---
 
 ## Файл NLP-метаданных
 
-Для каждого обработанного файла создаётся `processed/nlp-meta/<slug>.yml`:
+Для каждого обогащённого файла создаётся `processed/nlp-meta/<name>.yml` (на него указывает `nlp_meta_path` в метаданных):
 
 ```yaml
 # processed/nlp-meta/2026-05-06__karpathy-llm-wiki.yml
 source: "processed/markdown/2026-05-06__karpathy-llm-wiki.md"
 processed_at: "2026-05-06T20:30:00+03:00"
 language: "en"
-complexity: 0.65
-
+ner_engine: "spacy"
 entities:
   - text: "Andrej Karpathy"
-    type: "PER"
+    type: "PERSON"
     canonical: "Andrej Karpathy"
     existing_page: null
-  - text: "Obsidian"
-    type: "PRODUCT"
-    canonical: "Obsidian"
-    existing_page: null
   - text: "RAG"
-    type: "TECHNOLOGY"
-    canonical: "RAG"
-    existing_page: "knowledge/domain/retrieval-patterns.md"
-
+    type: "ORG"
+    canonical: "rag"
+    existing_page: "knowledge/domain/rag.md"
 keywords:
   - phrase: "persistent wiki"
     weight: 0.92
     source: "keybert"
   - phrase: "knowledge compilation"
     weight: 0.87
-    source: "rake"
-  - phrase: "cross-references"
-    weight: 0.81
     source: "keybert"
-
-suggested_targets:
-  - path: "knowledge/domain/knowledge-management.md"
-    reason: "3 keyword matches + entity 'RAG' linked"
-  - path: "knowledge/principles/knowledge-compilation.md"
-    reason: "New concept, high keyword weight"
-
 unresolved_entities:
   - "Andrej Karpathy"
-  - "Obsidian"
-  - "Marp"
+suggested_targets:
+  - path: "knowledge/domain/rag.md"
+    reason: "linked entities: RAG"
+complexity: 0.65
 ```
+
+`suggested_targets` перечисляет страницы, с которыми сопоставлены сущности, начиная с наиболее часто упомянутых (не больше 10). Страницы по одним ключевым словам и идеи новых страниц определяет агент.
 
 ---
 
-## Как AI использует NLP-метаданные
+## Как ИИ использует NLP-метаданные
 
-При AI-ревью (04_REVIEW.md) агент читает NLP-метаданные **перед** основным текстом:
+При ИИ-разборе (`kb-docs/04_REVIEW.md`) агент читает NLP-метаданные **до** основного текста:
 
 ```markdown
-## AI Review с NLP-контекстом
+## AI review with NLP context
 
-Ты получаешь:
-1. NLP-мету: `processed/nlp-meta/<slug>.yml`
-2. Текст: `processed/markdown/<slug>.md`
+You receive:
+1. NLP meta: `processed/nlp-meta/<name>.yml`
+2. Text: `processed/markdown/<name>.md` (or tables/, transcripts/, ocr/)
 
-NLP-мета уже содержит:
-- Извлечённые entities с привязкой к существующим knowledge/ страницам
-- Ключевые фразы с весами
-- Рекомендации, какие knowledge/ страницы обновить
-- Список неразрешённых entities (кандидаты на новые страницы)
+The NLP meta already contains:
+- Extracted entities linked to existing knowledge/ pages
+- Key phrases with weights
+- The pages those entities point to (suggested_targets)
+- The unresolved-entities list (candidates for new pages)
 
-Используй эту информацию для более точного извлечения знаний.
+Use this to extract knowledge more precisely.
 ```
 
 ---
 
-## Конфигурация в `kb.config.yml`
+## Настройки в `kb.config.yml`
 
 ```yaml
 nlp:
@@ -269,16 +209,15 @@ nlp:
   spacy_model_fallback: "xx_ent_wiki_sm"
   keyword_top_n: 20
   fuzzy_match_threshold: 0.8
-  complexity_threshold: 0.7     # выше → review/needs-ai-decision/
-  skip_extensions: [".csv", ".xlsx"]  # таблицы не нуждаются в NER
+  complexity_threshold: 0.7     # >= → review package in review/needs-ai-decision/
+  skip_extensions: [".csv", ".xlsx"]  # skip NLP enrichment only — files are still ingested
 ```
 
 ---
 
 ## Интеграция
 
-- **03_PIPELINE:** NLP — шаг 4.5 между конвертацией и review
-- **04_REVIEW:** AI получает NLP-мету как контекст для ревью
-- **09_LINT:** lint проверяет, что NLP-мета существует для каждого processed файла
-- **10_LOG:** `nlp-enrich` записывается в лог
-- **13_AUTORUN:** watch mode автоматически запускает NLP
+- **03_PIPELINE:** NLP — шаг 7 обработки файла между преобразованием и маршрутизацией
+- **04_REVIEW:** агент получает NLP-метаданные как контекст разбора
+- **10_LOG:** запись `ingest` указывает файл NLP-метаданных (`NLP meta:`); `kb_nlp_batch.py` записывает `nlp-batch`
+- **13_AUTORUN:** наблюдатель принимает новые файлы вместе с NLP, кроме `autorun.auto_nlp: false`

@@ -1,237 +1,75 @@
 ---
 translation_of: knowledge-base/13_AUTORUN.md
-source_commit: e497375d391668b75c4fefdddae3dde4d3e200c5
-source_version: 0.15.0
-translated_at: 2026-08-23
+source_commit: 6efb2d083c3a372d1bc37a4cd9ab32bd356117b3
+source_version: 0.16.0
+translated_at: 2026-10-11
 translator: ai-assisted
 ---
 
-# 13 — Auto-run: автоматический запуск при изменениях
+# 13 — Автозапуск: автоматическая обработка изменений
 
-> База знаний должна обновляться **автоматически** при появлении новых данных. Три режима: file watcher (daemon), git hook, cron.
+> База знаний должна обновляться **автоматически** при поступлении данных. Три механизма: наблюдатель файлов (демон), Git-хук, cron; плюс консолидация при каждой полной переиндексации.
 >
-> **Reference implementations:** `knowledge-base/scripts/kb_watch.py`, `knowledge-base/scripts/kb_reflect.py`, `knowledge-base/scripts/kb_nlp_batch.py`, `knowledge-base/shell/watcher.sh`, `knowledge-base/shell/reindex.sh`. Агент копирует их на этапе развёртывания.
+> **Эталонные реализации** (поставляются с базой; модуль описывает поведение, точный код — в скриптах): `scripts/kb_watch.py`, `scripts/kb_reindex.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`, `shell/reindex.sh`, `shell/install-hooks.sh`, `shell/hooks/post-commit`.
 
 ---
 
 ## Зачем
 
-Ручной запуск `./shell/reindex.sh` после каждого изменения — friction, которая приводит к тому, что база устаревает. Автоматизация убирает этот барьер.
+Ручной `./shell/reindex.sh` после каждого изменения создаёт трение, из-за которого база устаревает. Автоматизация убирает этот барьер.
 
 ---
 
-## Режим 1: File watcher (рекомендуется для активной работы)
+## Способ 1: наблюдатель файлов (рекомендуется при активной работе)
 
 ### Зависимости
 
-```txt
-# В requirements.txt
-watchdog>=4.0
-```
+`watchdog` (в `requirements.txt`). Без него `kb_watch.py` опрашивает файлы раз в 2 секунды: медленнее, поведение то же.
 
-### Контракт `scripts/kb_watch.py`
+### Что делает `scripts/kb_watch.py`
 
-```python
-"""
-kb_watch.py — File system watcher для knowledge base.
+Наблюдает папки из `autorun.watch_dirs` (по умолчанию `raw/*/unsorted/` и `knowledge/`). Записи внутри `raw/` — входящие папки приёма; `raw/*/unsorted/` включает общую `raw/unsorted/`. В остальных отслеживаются изменения `.md`.
 
-Мониторит:
-- raw/*/unsorted/  — новые файлы для ingest
-- knowledge/       — изменения для reindex
+| Событие | Ожидание | Действие |
+|-------|------|--------|
+| Новый файл во входящей папке, включая вложенные | файл не меняется `debounce_raw_seconds` (5) | готовые файлы принимаются вместе: `kb_ingest.py` с максимум 100 путями за вызов (`--no-nlp` при `auto_nlp: false`), затем один `kb_reindex.py --no-ingest` |
+| Создание, изменение, перемещение или удаление страницы `.md` в `knowledge/` | `debounce_knowledge_seconds` (2) без изменений | `kb_lint.py --quick` (`auto_lint_on_change`), затем `kb_reindex.py --no-ingest` (`auto_reindex_on_change`) |
+| Запуск наблюдателя | — | уже ожидающие во входящих папках файлы ставятся в очередь как новые |
 
-При обнаружении нового файла в raw/:
-1. Ждёт 5 секунд (файл может быть в процессе записи)
-2. Запускает kb_ingest.py для нового файла
-3. Запускает NLP enrichment (если включён)
-4. Если complexity < threshold → авто-обработка
-5. Если complexity >= threshold → review/needs-ai-decision/
-6. Пишет в log.md
-7. Перегенерирует Repomix-индекс
-
-При изменении файла в knowledge/:
-1. Ждёт 2 секунды (debounce)
-2. Обновляет детерминированные routing-страницы
-3. Перегенерирует Repomix-индекс
-4. Запускает quick lint (--quick)
-5. Пишет в log.md
-
-Usage:
-    ./shell/watcher.sh                         # Foreground
-    ./shell/watcher.sh --daemon                # Background
-    ./shell/watcher.sh --stop                  # Остановить
-    ./shell/watcher.sh --verbose               # С подробным логированием
-
-Exit:
-    Ctrl+C или SIGTERM для graceful shutdown
-"""
-
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import time
-import subprocess
-import os
-
-class RawFileHandler(FileSystemEventHandler):
-    def __init__(self, debounce_seconds=5):
-        self.debounce = debounce_seconds
-        self._pending = {}
-
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        # Debounce: ждём пока файл полностью записан
-        self._pending[event.src_path] = time.time()
-
-    def process_pending(self):
-        now = time.time()
-        ready = [p for p, t in self._pending.items() if now - t > self.debounce]
-        for path in ready:
-            del self._pending[path]
-            self.process_file(path)
-
-    def process_file(self, filepath):
-        print(f"[watch] New file detected: {filepath}")
-        # 1. Ingest
-        subprocess.run(["python3", "scripts/kb_ingest.py", filepath])
-        # 2. Reindex
-        subprocess.run(["./shell/reindex.sh"])
-        print(f"[watch] Processed and reindexed: {filepath}")
-
-
-class KnowledgeChangeHandler(FileSystemEventHandler):
-    def __init__(self, debounce_seconds=2):
-        self.debounce = debounce_seconds
-        self._last_change = 0
-
-    def on_modified(self, event):
-        if event.is_directory or not event.src_path.endswith('.md'):
-            return
-        self._last_change = time.time()
-
-    def should_reindex(self):
-        if self._last_change == 0:
-            return False
-        if time.time() - self._last_change > self.debounce:
-            self._last_change = 0
-            return True
-        return False
-```
+- **Никогда не передаются на приём:** имена из `ingest.ignore_globs` (`.DS_Store`, `~$*`, `*.part`, `*.tmp`, …).
+- **Игнорируются как изменения:** `knowledge/routing/` и `knowledge/routing-table.md`. `kb_reindex.py` обновляет их через `kb_route.py`, который переписывает страницу только при изменении содержимого (иначе даты и счётчики доступа остаются прежними), поэтому наблюдатель не реагирует на свою переиндексацию.
+- `--no-reindex` — никогда не запускать `kb_reindex.py`; `--verbose` — выводить каждую команду.
+- **Один наблюдатель на базу:** удерживает `.kb-state/locks/watch.lock`; второй завершается с кодом 1.
+- `--root` может быть относительным (сначала приводится к абсолютному); папка без `kb.config.yml` отклоняется (код 2).
+- `autorun.watch_enabled: false` — `kb_watch.py` выводит пояснение и завершается с 0.
+- **Остановка:** по SIGTERM (`./shell/watcher.sh --stop`, systemd) наблюдатель завершает текущий шаг (приём или переиндексация не обрываются), затем выходит. Ctrl+C в терминале достигает и процесса текущего шага, прерывая его.
 
 ### Запуск через `shell/watcher.sh`
 
-В развернутой базе используется `shell/watcher.sh` — обёртка над `kb_watch.py` с автоматической активацией venv:
-
 ```bash
-#!/bin/bash
-# watcher.sh — File watcher для Knowledge Base
-# Запускает kb_watch.py с автоматической активацией venv и управлением процессом.
-
-set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
-
-PIDFILE=".watcher.pid"
-LOGFILE=".watcher.log"
-
-# Активировать venv если есть
-if [ -f ".venv/bin/activate" ]; then
-  source .venv/bin/activate
-elif [ -f "venv/bin/activate" ]; then
-  source venv/bin/activate
-fi
-
-# Проверить наличие скрипта
-if [ ! -f "scripts/kb_watch.py" ]; then
-  echo "❌ scripts/kb_watch.py не найден"
-  exit 1
-fi
-
-case "${1:-}" in
-  --stop)
-    if [ -f "$PIDFILE" ]; then
-      PID=$(cat "$PIDFILE")
-      if kill -0 "$PID" 2>/dev/null; then
-        kill "$PID"
-        rm -f "$PIDFILE"
-        echo "✅ Watcher остановлен (PID $PID)"
-      else
-        rm -f "$PIDFILE"
-        echo "⚠️ Процесс $PID уже не работает, pidfile удалён"
-      fi
-    else
-      echo "⚠️ Watcher не запущен (нет $PIDFILE)"
-    fi
-    ;;
-  --status)
-    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-      echo "✅ Watcher работает (PID $(cat "$PIDFILE"))"
-    else
-      echo "⚠️ Watcher не запущен"
-    fi
-    ;;
-  --daemon)
-    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-      echo "⚠️ Watcher уже запущен (PID $(cat "$PIDFILE"))"
-      exit 1
-    fi
-    echo "🔄 Запуск watcher в фоне..."
-    nohup python3 scripts/kb_watch.py "${@:2}" > "$LOGFILE" 2>&1 &
-    echo $! > "$PIDFILE"
-    echo "✅ Watcher запущен (PID $!, лог: $LOGFILE)"
-    ;;
-  --verbose)
-    echo "👁 Запуск watcher (verbose)..."
-    python3 scripts/kb_watch.py --verbose
-    ;;
-  "")
-    echo "👁 Запуск watcher..."
-    echo "   Ctrl+C для остановки"
-    python3 scripts/kb_watch.py
-    ;;
-  *)
-    echo "Usage: ./shell/watcher.sh [--daemon|--stop|--status|--verbose]"
-    echo ""
-    echo "  (без флагов)  Foreground mode (Ctrl+C для остановки)"
-    echo "  --daemon      Запуск в фоне"
-    echo "  --stop        Остановить фоновый watcher"
-    echo "  --status      Проверить, работает ли watcher"
-    echo "  --verbose     Foreground с подробным логированием"
-    ;;
-esac
+./shell/watcher.sh                  # foreground (Ctrl+C to stop); options go to kb_watch.py
+./shell/watcher.sh --verbose        # e.g. foreground with every command printed
+./shell/watcher.sh --daemon         # background: pidfile .watcher.pid, log .watcher.log
+./shell/watcher.sh --status         # is the background watcher running?
+./shell/watcher.sh --stop           # stop it and wait until it has exited
 ```
 
-```bash
-chmod +x shell/watcher.sh
-```
+- Интерпретатор выбирает `shell/_kbpy.sh`: `$KB_PYTHON`, иначе `.venv/bin/python`, иначе `python3`.
+- `--daemon` сообщает об ошибке и показывает хвост журнала, если наблюдатель сразу завершился, например при `watch_enabled: false` или уже работающем наблюдателе.
+- `--stop` отправляет SIGTERM и ждёт завершения до 30 секунд; сообщает "stopped" только после выхода. Сначала проверяет, что PID из `.watcher.pid` всё ещё принадлежит наблюдателю: устаревший pidfile после перезагрузки или повторного использования PID никогда не завершает чужую программу.
+- Лаунчеры двойного щелчка: `watcher-start.command` (macOS, Linux) и `watcher-start.bat` (Windows) запускают наблюдатель на переднем плане своего терминала (Ctrl+C или закрытие окна останавливают его); `watcher-stop.command` выполняет `./shell/watcher.sh --stop` для наблюдателя `--daemon`.
 
-### Команды
-
-```bash
-# Foreground (для разработки)
-./shell/watcher.sh
-
-# Background
-./shell/watcher.sh --daemon
-
-# Проверить статус
-./shell/watcher.sh --status
-
-# Остановить
-./shell/watcher.sh --stop
-```
-
-### Systemd unit (Linux)
+### Служба systemd (Linux)
 
 ```ini
-# /etc/systemd/user/kb-watch.service
+# ~/.config/systemd/user/kb-watch.service
 [Unit]
 Description=Knowledge Base File Watcher
-After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=/path/to/knowledge-base
-ExecStart=/path/to/knowledge-base/.venv/bin/python scripts/kb_watch.py
+ExecStart=/path/to/knowledge-base/.venv/bin/python scripts/kb_watch.py --root /path/to/knowledge-base
 Restart=on-failure
 RestartSec=5
 
@@ -240,319 +78,169 @@ WantedBy=default.target
 ```
 
 ```bash
-systemctl --user enable kb-watch
-systemctl --user start kb-watch
+systemctl --user enable --now kb-watch
 systemctl --user status kb-watch
 ```
 
----
-
-## Режим 2: Git hook
-
-Для баз, которые под git-контролем.
-
-Выстраданные правила хуков (каждое — реальная продакшн-поломка):
-
-1. Одного `post-commit` мало: `git push` его никогда не вызывает, а
-   pull/merge/rebase меняют файлы без локального коммита. Ставь также
-   `post-merge` и `post-rewrite` (и `pre-push`, если индекс должен быть свеж
-   перед каждым push).
-2. Git-GUI и IDE запускают хуки с голым `PATH` — молчаливый
-   `command -v repomix || exit` превращает хук в no-op на месяцы.
-   Делегируй в `kb_reindex.py`: Python сам находит repomix и *сообщает*,
-   когда его нет, вместо молчаливого пропуска.
-3. Обычный фоновый `... &` убивается SIGHUP при выходе хука — используй
-   `nohup` и перенаправляй вывод в лог, никогда в `/dev/null` (проглоченные
-   ошибки — вот как индексы молча протухают).
-4. Хуки никогда не должны блокировать git: всегда `exit 0`.
-5. `.git/hooks/` не версионируется. Держи исходники хуков в репозитории и
-   документируй установку одной командой после clone.
-
-### post-commit / post-merge / post-rewrite hook
-
-```bash
-#!/bin/sh
-# .git/hooks/post-commit  (идентично для post-merge и post-rewrite)
-root=$(git rev-parse --show-toplevel)
-cd "$root" || exit 0
-PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python
-mkdir -p .repomix
-nohup "$PY" scripts/kb_reindex.py --quick >> .repomix/update.log 2>&1 </dev/null &
-exit 0
-```
-
-```bash
-chmod +x .git/hooks/post-commit .git/hooks/post-merge .git/hooks/post-rewrite
-```
-
-На Windows git выполняет эти `.sh`-хуки через встроенный Git Bash —
-дополнительная настройка не нужна.
-
-### pre-commit hook (опционально)
-
-```bash
-#!/bin/sh
-# .git/hooks/pre-commit
-# Проверяет frontmatter перед коммитом
-
-if [ -f "scripts/kb_lint.py" ]; then
-  python3 scripts/kb_lint.py --quick --only frontmatter
-  if [ $? -eq 2 ]; then
-    echo "❌ Frontmatter errors found. Fix before committing."
-    exit 1
-  fi
-fi
-```
+Не запускайте службу systemd и `./shell/watcher.sh --daemon` для одной базы: второй наблюдатель завершится с кодом 1, а systemd будет бесконечно перезапускать его.
 
 ---
 
-## Режим 3: Cron (периодические задачи)
+## Способ 2: Git-хук
+
+Для баз под управлением Git.
 
 ```bash
-# crontab -e
-
-# Каждый день в 3:00 — полный lint + reindex
-0 3 * * * cd /path/to/knowledge-base && ./shell/lint.sh >> log.md 2>&1 && ./shell/reindex.sh >> log.md 2>&1
-
-# Каждые 6 часов — quick lint
-0 */6 * * * cd /path/to/knowledge-base && python3 scripts/kb_lint.py --quick >> /dev/null 2>&1
-
-# Каждое воскресенье в 2:00 — NLP re-enrichment всех processed файлов
-0 2 * * 0 cd /path/to/knowledge-base && python3 scripts/kb_nlp_batch.py >> log.md 2>&1
+bash shell/install-hooks.sh   # once per clone: .git/hooks/ is not versioned
 ```
 
-> **Важно:** ПК может быть выключен — cron не гарантирует выполнение. Поэтому основная консолидация встроена в `reindex.sh` (см. ниже).
+`install-hooks.sh` (обычный POSIX sh; работает и `sh shell/install-hooks.sh`) устанавливает `shell/hooks/post-commit` в папку хуков репозитория (`git rev-parse --git-path hooks`) и предупреждает, если `core.hooksPath` указывает в другое место. Существующий `post-commit`, отличающийся от поставляемого (чужой хук, старая или изменённая наша копия), сначала перемещается в `post-commit.backup-<timestamp>`, никогда не удаляется. База в подпапке рабочего дерева записывается в `git config kb.root`. Хук запускает `kb_reindex.py --hook` в фоне и сразу возвращается:
+
+- **Поиск базы:** папка `kb.root`, иначе корень рабочего дерева (например после уплощения проекта через `finalize.sh`). Нет базы — хук ничего не делает.
+- **Облегчённый режим:** только индекс + `STATUS.md`, без приёма и запроса рефлексии. Остальное делает наблюдатель или ручная переиндексация.
+- Захватывает блокировку пайплайна с коротким ожиданием и тихо выходит, если она занята.
+- Вывод идёт в `.kb-state/hooks.log` (никогда в `/dev/null`: проглоченные ошибки незаметно разрушают актуальность индекса); после 1 MB журнал перемещается в `hooks.log.1`.
+- Код завершения всегда 0: хук никогда не блокирует коммит.
+- Следующий запуск `install-hooks.sh` заменяет установленную копию. Для сочетания со своими post-commit-командами оставьте собственный хук и вызывайте из него `sh <base>/shell/hooks/post-commit` вместо установщика.
+
+Правила хуков, выработанные практикой (каждое связано с реальным производственным сбоем), если пишете собственный:
+
+1. `post-commit` не срабатывает на `git pull`, merge, rebase. После них запускайте `./shell/reindex.sh` или самостоятельно установите тот же хук как `post-merge` / `post-rewrite`.
+2. Git GUI и IDE запускают хуки с минимальным `PATH`: передавайте работу `kb_reindex.py`, который *сообщает* об отсутствии repomix вместо молчаливого пропуска.
+3. Обычный фоновый `... &` завершается от SIGHUP при выходе хука: используйте `nohup` и перенаправление вывода в журнал.
+4. Хуки никогда не должны блокировать Git: всегда `exit 0`.
+5. Храните исходники хуков в репозитории (`shell/hooks/`) и документируйте установку одной командой после клонирования.
+
+**Необязательная проверка pre-commit:** `python3 scripts/kb_lint.py --quick --only frontmatter` возвращает ненулевой код при ошибках frontmatter; вызовите её из `.git/hooks/pre-commit`, чтобы блокировать такие коммиты.
 
 ---
 
-## Консолидация при reindex (вместо чистого cron)
-
-Проблема: cron-задачи не срабатывают, если ПК выключен. Решение: встроить проверку в `reindex.sh` — если прошло > 24 часов с последней консолидации, выполнить её.
-
-### Механизм
+## Способ 3: cron (периодические задачи)
 
 ```bash
-# В reindex.sh добавить перед финальным repomix:
-
-CONSOLIDATION_MARKER=".last_consolidation"
-NOW=$(date +%s)
-DAY_SECONDS=86400
-
-if [ -f "$CONSOLIDATION_MARKER" ]; then
-  LAST=$(cat "$CONSOLIDATION_MARKER")
-  ELAPSED=$((NOW - LAST))
-else
-  ELAPSED=$((DAY_SECONDS + 1))  # Первый запуск → консолидировать
-fi
-
-if [ $ELAPSED -gt $DAY_SECONDS ]; then
-  echo "[reindex] Consolidation needed (${ELAPSED}s since last). Running..."
-
-  # 1. Полный lint (Python, 0 токенов)
-  if [ -f "scripts/kb_lint.py" ]; then
-    python3 scripts/kb_lint.py --output report
-  fi
-
-  # 2. Подсчёт изменений с последней консолидации
-  #    Считаем записи в log.md после даты последней консолидации
-  CHANGES_SINCE=0
-  if [ -f "log.md" ]; then
-    LAST_DATE=$(date -d "@$LAST" -Iseconds 2>/dev/null || date -r "$LAST" -Iseconds 2>/dev/null || echo "")
-    if [ -n "$LAST_DATE" ]; then
-      CHANGES_SINCE=$(grep -c "^## \[" log.md 2>/dev/null || echo "0")
-      # Более точный подсчёт: скрипт kb_reflect.py --count-changes
-    fi
-  fi
-
-  # 3. Проверка рефлексии (mode-aware)
-  #    mode=default: importance_threshold=25, min_interval=7d, require_changes=true
-  #    mode=super:   importance_threshold=5,  min_interval=0,  require_changes=false
-  MODE=$(python3 -c "import yaml; print(yaml.safe_load(open('kb.config.yml')).get('mode','default'))" 2>/dev/null || echo "default")
-
-  REFLECT_TRIGGERED_BY_THRESHOLD=false
-  if [ -f "scripts/kb_reflect.py" ]; then
-    # --check-threshold выводит "THRESHOLD_MET" если sum(importance) > порог (зависит от mode)
-    THRESHOLD_RESULT=$(python3 scripts/kb_reflect.py --check-threshold --dry-run 2>&1)
-    if echo "$THRESHOLD_RESULT" | grep -q "THRESHOLD_MET"; then
-      echo "[reindex] Importance threshold met → auto-triggering reflection (mode=$MODE)"
-      python3 scripts/kb_reflect.py --generate
-      REFLECT_TRIGGERED_BY_THRESHOLD=true
-      echo "$NOW" > ".last_reflection"
-    fi
-  fi
-
-  # 4. Еженедельная рефлексия (ТОЛЬКО если были изменения И НЕ запущена по threshold)
-  REFLECTION_MARKER=".last_reflection"
-  WEEK_SECONDS=604800
-  if [ -f "$REFLECTION_MARKER" ]; then
-    LAST_REFLECT=$(cat "$REFLECTION_MARKER")
-    REFLECT_ELAPSED=$((NOW - LAST_REFLECT))
-  else
-    REFLECT_ELAPSED=$((WEEK_SECONDS + 1))
-  fi
-
-  REFLECT_STATUS="skipped"
-  if [ "$REFLECT_TRIGGERED_BY_THRESHOLD" = true ]; then
-    REFLECT_STATUS="triggered (importance threshold, mode=$MODE)"
-  elif [ "$MODE" = "super" ]; then
-    # super mode: threshold=5 уже покрывает, но если не сработал и есть changes — запустить
-    if [ "$CHANGES_SINCE" -gt 0 ] 2>/dev/null; then
-      echo "[reindex] Super mode reflection: $CHANGES_SINCE changes found → running"
-      if [ -f "scripts/kb_reflect.py" ]; then
-        python3 scripts/kb_reflect.py --generate
-      fi
-      echo "$NOW" > "$REFLECTION_MARKER"
-      REFLECT_STATUS="triggered (super mode, $CHANGES_SINCE changes)"
-    else
-      REFLECT_STATUS="skipped (super, no changes)"
-    fi
-  elif [ $REFLECT_ELAPSED -gt $WEEK_SECONDS ]; then
-    if [ "$CHANGES_SINCE" -gt 0 ] 2>/dev/null; then
-      echo "[reindex] Weekly reflection: $CHANGES_SINCE changes found → running"
-      if [ -f "scripts/kb_reflect.py" ]; then
-        python3 scripts/kb_reflect.py --generate
-      fi
-      echo "$NOW" > "$REFLECTION_MARKER"
-      REFLECT_STATUS="triggered (weekly, $CHANGES_SINCE changes)"
-    else
-      echo "[reindex] Weekly reflection: no changes since last → skipping"
-      REFLECT_STATUS="skipped (no changes, ${REFLECT_ELAPSED}s elapsed)"
-      # НЕ обновляем маркер — пусть дни копятся дальше (10, 15...)
-      # Запустится когда появятся изменения
-    fi
-  else
-    REFLECT_STATUS="skipped (< 7 days)"
-  fi
-
-  # 5. NLP re-enrichment (если включён, 0 токенов)
-  if [ -f "scripts/kb_nlp_batch.py" ]; then
-    python3 scripts/kb_nlp_batch.py --incremental
-  fi
-
-  # 6. Super mode: авто-обработка review queue
-  REVIEW_STATUS="skipped"
-  if [ "$MODE" = "super" ] && [ -d "review/needs-ai-decision" ]; then
-    REVIEW_COUNT=$(find review/needs-ai-decision/ -name '*.md' 2>/dev/null | wc -l)
-    if [ "$REVIEW_COUNT" -gt 0 ]; then
-      echo "[reindex] Super mode: $REVIEW_COUNT items in review queue → AI processing"
-      REVIEW_STATUS="auto-processed ($REVIEW_COUNT items)"
-      # AI-агент обработает при следующей IDE-сессии или скриптом
-    fi
-  fi
-
-  # 7. Super mode: lint L2 (AI-ревью) при консолидации
-  LINT_L2_STATUS="skipped"
-  if [ "$MODE" = "super" ]; then
-    echo "[reindex] Super mode: running lint L2 (AI review)"
-    LINT_L2_STATUS="triggered (super mode)"
-    # AI-агент выполнит lint L2 при следующей IDE-сессии
-  fi
-
-  # 8. Обновить маркер консолидации
-  echo "$NOW" > "$CONSOLIDATION_MARKER"
-  echo "" >> log.md
-  echo "## [$(date -Iseconds)] consolidation | Daily consolidation (via reindex)" >> log.md
-  echo "- Mode: $MODE" >> log.md
-  echo "- Elapsed since last: ${ELAPSED}s" >> log.md
-  echo "- Lint: completed" >> log.md
-  echo "- Changes detected: $CHANGES_SINCE" >> log.md
-  echo "- Reflection: $REFLECT_STATUS" >> log.md
-  echo "- Review queue: $REVIEW_STATUS" >> log.md
-  echo "- Lint L2: $LINT_L2_STATUS" >> log.md
-else
-  echo "[reindex] Consolidation not needed (${ELAPSED}s < ${DAY_SECONDS}s)"
-fi
+# crontab -e — a full reindex (with consolidation) every night at 03:00
+0 3 * * * cd /path/to/knowledge-base && mkdir -p .kb-state && .venv/bin/python scripts/kb_reindex.py >> .kb-state/cron.log 2>&1
 ```
 
-### Что делает консолидация
+Никогда не добавляйте вывод инструментов в `log.md`: у него строгий формат, а скрипты пишут собственные записи.
 
-| Шаг | Действие | Частота |
-|-----|---------|--------|
-| Full lint (Python) | Все проверки уровня 1 из `09_LINT.md` | Раз в сутки, 0 токенов |
-| Change detection | Подсчитать изменения в log.md с последней рефлексии | Раз в сутки, 0 токенов |
-| Importance check | Если `sum(importance)` > threshold → авто-`!reflect` | Раз в сутки, ~15K если сработал |
-| Weekly reflection | Сгенерировать insights (LLM) | ≥7 дней **И** есть изменения, ~15K токенов |
-| NLP batch | Инкрементальный re-enrichment новых processed/ | Раз в сутки, 0 токенов |
-| Access decay | Обновить recency scores в routing tables | Раз в сутки, 0 токенов |
+> **Важно:** компьютер может быть выключен; cron не гарантирует выполнение. Поэтому консолидация встроена в каждую полную переиндексацию (ниже), а не в cron.
 
-### Умное расписание рефлексии
+---
+
+## Консолидация при каждой переиндексации
+
+Проблема: задачи cron не запускаются на выключенном компьютере. Решение: каждый полный запуск `kb_reindex.py` (`./shell/reindex.sh` — тонкая обёртка) проверяет, пора ли выполнять консолидацию.
+
+- **Когда:** `.last_consolidation` старше `autorun.consolidation_interval_hours` (24) или отсутствует. Не при `--quick`, `--index-only`, `--hook`.
+- **Что:** полный отчёт lint (`lint-report.md`), `kb_nlp_batch.py --incremental`, затем при `autorun.consolidation_on_reindex` равном true (по умолчанию) проверка `kb_reflect.py --check-threshold`. При `THRESHOLD_MET` выполняется `kb_reflect.py --generate`, добавляющий `reflect-request` в `log.md`.
+- **Затем:** каждая переиндексация, с консолидацией или без неё, заканчивается перезаписью `STATUS.md` (кроме `status.enabled: false`) — краткой передачей состояния, которую агент читает в начале сессии ("reflection due … → !reflect").
+
+Точные шаги: `scripts/kb_reindex.py` и `kb-docs/05_INDEX.md`.
+
+Ни один скрипт не обрабатывает очереди разбора и не запускает lint уровня 2 с ИИ. Настройки `mode_profiles.*.lint` (`level2_trigger`, `review_auto_process`) — политика агента; см. `kb-docs/07_INTERACTION_LOOP.md` и `kb-docs/09_LINT.md`.
+
+### Триггер рефлексии (`scripts/kb_reflect.py`)
+
+Скрипт лишь принимает решение; сама рефлексия — работа ИИ (`!reflect`, ~15K токенов).
+
+| Решение | Значение |
+|----------|---------|
+| `THRESHOLD_MET` | Пора проводить рефлексию: оценка изменений с последней достигла порога |
+| `STAGNANT` | Пора, но две последние записанные рефлексии нашли 0 инсайтов, и с тех пор не было приёма; плановая рефлексия подавляется, а `!reflect` владельца всё равно выполняется |
+| `SKIP` | Делать нечего |
+
+- **Оценка изменений** с последней рефлексии: каждая запись `ingest` в `log.md` имеет вес важности из метаданных приёма или `default_ingest_importance` (1) при её отсутствии; каждая изменённая страница `knowledge/` — вес `importance` (3, если не задан). Сгенерированные страницы (`generated_by`) и `_archive/` не учитываются.
+- **Изменённая страница:** `--record-result` сохраняет дайджест каждой страницы в `.kb-state/reflection-pages.json`, и страница учитывается, если содержимое отличается. Отслеживание доступа (`last_accessed`, `access_count`) не считается изменением, как и touch, checkout или восстановление без изменения содержимого. Без снимка свидетельства слабее. Если последняя рефлексия определяется локальным `.last_reflection` (база до 0.16, до первого `--record-result`), решает mtime файла. Если известна только запись `reflect` в `log.md` (свежее клонирование или рефлексия с другой машины), mtime ничего не говорит: клонирование сбрасывает его везде; страница учитывается, только если её `extracted_at`, `last_verified` или `valid_from` приходится на день этой рефлексии или позже.
+- **Порог:** `mode_profiles.<mode>.reflection.importance_threshold` активного режима (`knowledge_base.mode`). В недельных профилях (`trigger: "threshold+weekly"`) после `min_interval_days` порог падает до 1: любое изменение требует рефлексии (0 при `require_changes: false`).
+- **Последняя рефлексия:** более новая из `.last_reflection` и последней записи `reflect` в `log.md`, поэтому свежий клон без исключённого через gitignore маркера не пересчитывает старый приём. Записи после неё определяются по позиции в `log.md`: приём в ту же секунду, что `--record-result`, тоже учитывается. База без рефлексий отсчитывает `min_interval_days` от развёртывания: более ранней из `deployed_at` в `kb.config.yml` и первой записи `log.md`. Поэтому первый приём сам по себе не требует рефлексии; `elapsed_days` в `--json` тогда означает дни с развёртывания.
+- **Кто что записывает:** только `--record-result N` записывает состояние — `.last_reflection`, снимок страниц и журнал `reflect | insights: N` (0 инсайтов — допустимый ожидаемый результат). `--generate` добавляет один `reflect-request` только при `THRESHOLD_MET`, не повторяя его, пока запрос ожидает; при `SKIP` / `STAGNANT` не пишет. Остальные вызовы только читают: без флагов, `--json`, `--check-threshold [--json]`, `--count-changes`. `--dry-run` принимается, но устарел (остальные вызовы и так не записывают).
+- `--check-threshold --json` выводит `{decision, changes, threshold, mode, count, trigger, reason}`: `changes` — взвешенная оценка для сравнения с `threshold`, `count` — число изменённых элементов, `trigger` — `importance` или `weekly`.
+- `--json` (без `--check-threshold`) добавляет задание агенту: `max_insights_per_run` (верхний предел, не квота), `meta_insight_allowed` (новый приём с последней рефлексии), `stagnation`, `exploration` — до двух пар страниц из несвязанных компонентов графа (перекрытие `< 0.8`), которые агент может использовать как вопросы рефлексии. Пустой список допустим. Парам нужен весь граф страниц, поэтому строят его только `--json` и записываемый запрос.
+
+### Умное расписание рефлексии (режим default)
 
 ```
-Дни без рефлексии:  1  2  3  4  5  6  7  8  9  10  ...
-Были изменения?     -  -  -  -  -  -  -  -  ✓  -   ...
-                                              ↑
-                                     Запуск! (>7 дней + есть изменения)
+Days without reflection:  1  2  3  4  5  6  7  8  9  10  ...
+Were there changes?       -  -  -  -  -  -  -  -  ✓  -   ...
+                                                    ↑
+                                          Due! (≥7 days + changes)
 ```
 
-- Если **≤7 дней** → не запускать (ещё рано)
-- Если **>7 дней**, но **нет изменений** → не запускать, продолжить считать (10, 15, 20...)
-- Если **>7 дней** и **есть изменения** → запустить, обнулить маркер
-- Если **importance threshold** достигнут → **запустить немедленно** (вне зависимости от дней)
-
-Последний пункт важен: при активной работе с базой рефлексия запустится раньше 7 дней, предотвращая застой.
-
-`kb_reflect.py --json` также возвращает `exploration`: не больше двух пар
-страниц из разных компонент графа (пересечение `< 0.8`). Агент может
-взять их как вопросы рефлексии. Пустой список валиден.
+- **< 7 дней** с последней рефлексии или развёртывания, если рефлексий ещё нет → только при достижении `importance_threshold` (25)
+- **≥ 7 дней**, без изменений → не требуется; отсчёт продолжается
+- **≥ 7 дней** и есть изменения → требуется
+- агент завершает `--record-result N`, сбрасывающим счётчик
 
 ### Гарантии
 
-- Консолидация **не чаще раза в сутки** (маркер `.last_consolidation`)
-- Срабатывает при **любом** вызове `reindex.sh` — ручном, из watcher, из git hook
-- Если ПК был выключен 3 дня — при первом reindex выполнит консолидацию
-- Не блокирует основной reindex — lint и reflection запускаются **до** repomix
+- Консолидация выполняется **не чаще раза в `consolidation_interval_hours`** (маркер `.last_consolidation`).
+- Срабатывает при **любой** полной переиндексации: вручную, лаунчером (`reindex.command` / `reindex.bat`), наблюдателем.
+- Если компьютер был выключен 3 дня, первая полная переиндексация наверстает пропущенное.
+- Lint и проверка рефлексии выполняются **до** пересборки индекса.
 
 ---
 
 ## Таблица триггеров
 
-| Событие | Действие | Кто запускает |
-|---------|---------|--------------|
-| `!view` | Запустить или повторно открыть локальный read-only граф знаний | `python3 scripts/kb_view.py --background` |
-| Новый файл в `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./shell/watcher.sh` |
-| Файл изменён в `knowledge/` | Reindex + Quick lint | `./shell/watcher.sh` или git hook |
-| `!save` в AI-сессии | Session capture (с enrichment) → Reindex | AI-агент |
-| `!reflect` | Рефлексия: генерация insights (~15K токенов) | AI-агент |
-| `!audit` | L2 по пакам из `.repomix/audit/<pack>__request.md` | AI-агент |
-| `!profile-review` | Интервью `knowledge/profile/` (по 3 вопроса) | AI-агент |
-| `!quiz` | Пять вопросов о том, что уже лежит в базе; сначала самые дорогие ошибки | AI-агент |
-| `!heal` | Догоняющая починка после апгрейда (`kb_heal.py --plan` / `--apply auto`) | AI-агент |
-| `!refactor` | Двухшаговое ужатие инструкций (`17_REFACTOR.md`) | AI-агент |
-| Lint нашёл и исправил issues | Reindex | `kb_lint.py --fix` |
-| AI сделал query-writeback | Write page → Reindex | AI-агент |
-| Commit в git | Quick lint + Reindex | git hook |
-| Ежедневно | Full lint (Python) + Reindex | cron |
-| При reindex (>24ч) | Consolidation (lint + NLP batch + reflection) | `reindex.sh` |
-| При reindex (>7д) | Weekly reflection (LLM insights) | `reindex.sh` |
+| Событие | Действие | Источник |
+|-------|--------|--------|
+| `!view` | Запустить или снова открыть локальный просмотрщик графа только для чтения | `python3 scripts/kb_view.py --background` |
+| `!status` | Показать, что требует внимания | `python3 scripts/kb_status.py --print` |
+| Новый файл в `raw/*/unsorted/` или `raw/unsorted/` | Приём (+ NLP) → переиндексация | `./shell/watcher.sh` |
+| Изменение в `knowledge/` | Быстрый lint + переиндексация | `./shell/watcher.sh` |
+| Git-коммит | Индекс + `STATUS.md` (`kb_reindex.py --hook`) | Git-хук |
+| `!save` в ИИ-сессии | Сохранение сессии с обогащением → переиндексация | ИИ-агент |
+| `!reflect` | Рефлексия: генерация инсайтов (~15K токенов), затем `kb_reflect.py --record-result N` | ИИ-агент |
+| `!audit` | Разбор L2 по пакетам из `.repomix/audit/<pack>__request.md` | ИИ-агент |
+| `!profile-review` | Интервью по `knowledge/profile/` (по 3 вопроса) | ИИ-агент |
+| `!quiz` | Пять вопросов о содержимом базы; сначала самые дорогие ошибки | ИИ-агент |
+| `!heal` | Приведение базы в актуальное состояние после обновления (`kb_heal.py --plan` / `--apply auto`) | ИИ-агент |
+| `!refactor` | Двухэтапное сокращение инструкций (`kb-docs/17_REFACTOR.md`) | ИИ-агент |
+| `kb_lint.py --fix` изменил страницы | Быстрый lint + переиндексация (видны как изменения `knowledge/`) | `./shell/watcher.sh` |
+| ИИ выполнил query-writeback | Запись страницы → переиндексация | ИИ-агент |
+| Ночью (необязательно) | Полная переиндексация с консолидацией | cron |
+| Полная переиндексация, консолидация просрочена (> 24h) | Отчёт lint + пакетная NLP-обработка + проверка рефлексии; `reflect-request` при `THRESHOLD_MET` | `kb_reindex.py` |
 
 ---
 
-## Конфигурация в `kb.config.yml`
+## Настройки в `kb.config.yml`
 
 ```yaml
 autorun:
-  watch_enabled: true
-  watch_dirs:
+  watch_enabled: true               # false: kb_watch.py exits at once
+  watch_dirs:                       # raw/… entries = ingest inboxes; others = .md edits
     - "raw/*/unsorted/"
     - "knowledge/"
-  debounce_raw_seconds: 5
-  debounce_knowledge_seconds: 2
-  auto_nlp: true                    # NLP enrichment при ingest
-  auto_lint_on_change: true         # Quick lint при изменении knowledge/
-  auto_reindex_on_change: true      # Reindex при изменении knowledge/
-  complexity_auto_threshold: 0.5    # Ниже → auto-extract, выше → review
-  consolidation_interval_hours: 24  # Минимальный интервал между консолидациями
-  consolidation_on_reindex: true    # Проверять при каждом reindex
+  debounce_raw_seconds: 5           # a new file must stay unchanged this long
+  debounce_knowledge_seconds: 2     # quiet time after knowledge/ edits
+  auto_nlp: true                    # false: the watcher ingests with --no-nlp
+  auto_lint_on_change: true         # quick lint on knowledge/ edits
+  auto_reindex_on_change: true      # reindex on knowledge/ edits
+  consolidation_interval_hours: 24  # min interval between consolidations
+  consolidation_on_reindex: true    # consolidation requests a reflection when due
+  # complexity_auto_threshold: deprecated — nlp.complexity_threshold is the only threshold
+
+mode_profiles:
+  default:
+    reflection:
+      trigger: "threshold+weekly"
+      importance_threshold: 25
+      min_interval_days: 7
+      require_changes: true
+      max_insights_per_run: 3
+      # default_ingest_importance: 1  # weight of an ingest without importance
 ```
+
+Каждый ключ имеет значение по умолчанию в коде: старый `kb.config.yml` без них продолжает работать.
 
 ---
 
 ## Интеграция
 
-- **03_PIPELINE:** watch вызывает ingest при новом файле; surprise filter проверяет дупликаты
-- **05_INDEX:** watch вызывает reindex при изменениях
-- **07_INTERACTION_LOOP:** консолидация проверяет reflection threshold и запускает insights
-- **09_LINT:** watch → quick lint; консолидация → полный lint
-- **10_LOG:** все авто-операции записываются в log.md, включая consolidation
-- **11_PROVENANCE:** консолидация обновляет recency scores и проверяет bi-temporal validity
-- **12_NLP:** watch запускает NLP при ingest; консолидация — batch re-enrichment
+- **03_PIPELINE:** наблюдатель принимает новые файлы входящих папок пакетами
+- **05_INDEX:** наблюдатель и Git-хук запускают `kb_reindex.py`; каждая переиндексация заканчивается `STATUS.md`
+- **07_INTERACTION_LOOP:** `kb_reflect.py` решает, пора ли проводить рефлексию; `!reflect` заканчивается `--record-result N`
+- **09_LINT:** наблюдатель → быстрый lint; консолидация → полный отчёт lint
+- **10_LOG:** скрипты добавляют собственные записи (`ingest`, `reflect-request`, `reflect`, …) в `log.md`
+- **12_NLP:** наблюдатель запускает NLP при приёме (`auto_nlp`); консолидация — `kb_nlp_batch.py --incremental`
