@@ -1,0 +1,13 @@
+#!/bin/sh
+# Fires after `git checkout <branch>` / `git switch` (and `git worktree add`):
+# another branch means other files. $3 is 1 for a branch checkout and 0 for
+# a file checkout (`git checkout -- <file>`), which the next hook run covers.
+# `git reset --hard` and `git stash` fire no hook: the next commit/merge/push
+# (or a manual run) picks those changes up.
+# Project-specific steps belong in .githooks/post-checkout.local (executable).
+root=$(git rev-parse --show-toplevel) || exit 0
+[ -x "$root/.githooks/post-checkout.local" ] && "$root/.githooks/post-checkout.local" "$@"
+[ "${3:-0}" = 1 ] || exit 0
+script="$root/scripts/update-repomix-index.sh"
+[ -f "$script" ] || exit 0   # a branch from before the index setup
+exec sh "$script" --background

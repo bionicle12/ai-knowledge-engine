@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # export.command — double-click launcher: pack this base into a bundle (macOS).
+# Works from shell/ and from the base root (where finalize.sh promotes it).
+# The Python interpreter is chosen by shell/export.sh (shell/_kbpy.sh).
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/shell/export.sh" ]; then
@@ -13,18 +15,19 @@ else
   echo "   Looked at:"
   echo "     $SCRIPT_DIR/shell/export.sh"
   echo "     $SCRIPT_DIR/../shell/export.sh"
-  read -r -p "Press Enter to close..."
+  read -r -p "Press Enter to close..." || true
   exit 1
 fi
 
-cd "$PROJECT_ROOT"
+cd "$PROJECT_ROOT" || exit 1
 
-if [ -f ".venv/bin/activate" ]; then
-  # shellcheck disable=SC1091
-  source ".venv/bin/activate"
-elif [ -f "venv/bin/activate" ]; then
-  # shellcheck disable=SC1091
-  source "venv/bin/activate"
+# Older bases keep their venv in venv/, which these launchers used to
+# activate. shell/_kbpy.sh does not look there: use it where _kbpy.sh would
+# otherwise fall back to python3 (no .venv here, and no project .venv next
+# to setup/ while the base is still being deployed).
+if [ -z "${KB_PYTHON:-}" ] && [ -x venv/bin/python ] && [ ! -x .venv/bin/python ] \
+    && ! { [ -f ../setup/scripts/kb_common.py ] && [ -x ../.venv/bin/python ]; }; then
+  export KB_PYTHON="$PROJECT_ROOT/venv/bin/python"
 fi
 
 # `clear` fails when there is no TERM (double-clicked from a non-tty context).
@@ -35,10 +38,16 @@ echo "    --------------------------------------"
 echo ""
 
 bash shell/export.sh "$@"
+code=$?
 
 echo ""
-echo "Copy the bundle above to the other machine's sync/inbox/, then run its import launcher."
+if [ "$code" = "0" ]; then
+  echo "Copy the bundle above to the other machine's sync/inbox/, then run its import launcher."
+else
+  echo "Export failed (exit $code) — see the messages above."
+fi
 echo ""
 # `|| true`: on EOF (non-interactive run) `read` returns non-zero, which must
-# not turn a successful export into a failure.
+# not replace the export's own exit code.
 read -r -p "Press Enter to close..." || true
+exit "$code"

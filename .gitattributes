@@ -1,0 +1,8 @@
+# Line endings of the kit's scripts, whatever core.autocrlf says on the
+# checkout: POSIX shells refuse CRLF scripts ("bad interpreter: /bin/bash^M"),
+# and cmd.exe misreads LF-only batch files. Deployed bases get the same rules
+# from knowledge-base/templates/.gitattributes.template.
+*.sh text eol=lf
+*.command text eol=lf
+knowledge-base/shell/hooks/* text eol=lf
+*.bat text eol=crlf

@@ -2,24 +2,35 @@
 """kb_doctor — post-deployment smoke-test for AI Knowledge Engine.
 
 Verifies that:
-  1. Required Python packages are importable
+  1. Required Python packages are importable (optional ones: warnings)
   2. Mandatory directory structure exists
   3. kb.config.yml is parseable and has the expected shape
   4. Codex / Claude Code instruction environment (AGENTS.md placement,
-     32 KiB budget, AGENTS.override.md, CLAUDE.md import)
-  5. (Optional) spaCy model loads
+     32 KiB budget, AGENTS.override.md, CLAUDE.md import — expected when
+     index.primary_agent is claude-code)
+  5. (Optional) spaCy model loads; NLTK data for RAKE is downloaded
   6. Frontmatter helpers work on a sample fixture
-  7. Filesystem is writable (log.md append works)
+  7. log.md is writable — checked without writing to it
+  8. Index: repomix (or the pinned `npx` fallback) and the last build in
+     .repomix/PACKS_STATUS.md (FAILED / not rebuilt / over-ceiling packs,
+     knowledge/ changed since the last reindex)
+  9. Engine scripts: every scripts/kb_*.py imports, and every kb_common name
+     they use exists (a partial upgrade breaks this)
+ 10. Upgrade leftovers: unmerged `.new` sidecars
+ 11. Runtime docs: kb-docs/ holds every module AGENTS.md & co. point to
+ 12. The base venv: nested .venv/.venv, a moved venv (activate / pip point
+     elsewhere), doctor itself running outside the venv
+
+Doctor never writes to the base (no log.md entry).
 
 Exit codes:
-  0 — all checks passed (or only soft warnings)
-  1 — one or more soft checks failed (warnings)
-  2 — at least one critical check failed (errors)
+  0 — doctor passes: no errors (warnings are advice and do not fail it)
+  2 — at least one error
 
 Usage:
   python3 scripts/kb_doctor.py
   python3 scripts/kb_doctor.py --self-test       # run on this script's own repo
-  python3 scripts/kb_doctor.py --skip-nlp        # don't try to load spaCy
+  python3 scripts/kb_doctor.py --skip-nlp        # don't load spaCy / NLTK data
   python3 scripts/kb_doctor.py --json            # machine-readable output
 """
 from __future__ import annotations
@@ -29,7 +40,12 @@ import datetime as _dt
 import importlib
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
+import traceback
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -38,7 +54,24 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-import kb_common as kbc  # noqa: E402
+try:
+    import kb_common as kbc  # noqa: E402
+except Exception as _exc:  # noqa: BLE001 — a broken install still gets a verdict
+    if __name__ != "__main__":
+        raise
+    print(
+        f"❌ scripts:consistency: scripts/kb_common.py does not import "
+        f"({type(_exc).__name__}: {_exc}) — install the requirements "
+        "(pip install -r requirements.txt) or merge scripts/kb_common.py.new\n\n"
+        "Summary: 0 ok, 0 warn, 1 error — FAIL (exit 2): fix the errors above",
+        file=sys.stderr,
+    )
+    raise SystemExit(2) from None
+
+# Doctor is what diagnoses a partial upgrade, so it must run against an older
+# kb_common.py too: no 0.16-only kb_common name is used at import time, and
+# `scripts:consistency` names what is missing.
+KB_DOCS_DIR = getattr(kbc, "KB_DOCS_DIR", "kb-docs")
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +107,14 @@ OPTIONAL_PACKAGES = [
     ("rake_nltk", "rake-nltk"),
     ("keybert", "keybert"),
 ]
+
+# How to get an optional package that requirements.txt does not install.
+OPTIONAL_PACKAGE_HINTS = {
+    "keybert": (
+        "ingest uses RAKE keywords without it. Install: pip install -r requirements-nlp.txt "
+        "(CPU torch first: pip install torch --index-url https://download.pytorch.org/whl/cpu)"
+    ),
+}
 
 
 def check_python_version() -> CheckResult:
@@ -116,7 +157,8 @@ def check_optional_packages() -> list[CheckResult]:
                 CheckResult(
                     f"opt:{package_name}",
                     "warn",
-                    f"Optional package missing: {package_name} (some features will be unavailable)",
+                    f"Optional package missing: {package_name} — "
+                    + OPTIONAL_PACKAGE_HINTS.get(package_name, "some features will be unavailable"),
                 )
             )
     return results
@@ -351,6 +393,16 @@ def check_agent_env(
                         "Claude Code will not load this base's instructions",
                     )
                 )
+    elif str(_config_or_defaults(root).index.get("primary_agent") or "").lower() == "claude-code":
+        results.append(
+            CheckResult(
+                "agent-env:claude-md-import",
+                "warn",
+                "index.primary_agent is claude-code but there is no CLAUDE.md — "
+                "Claude Code will not load AGENTS.md; create CLAUDE.md with the "
+                "single line @AGENTS.md",
+            )
+        )
     else:
         results.append(
             CheckResult(
@@ -452,36 +504,21 @@ def check_frontmatter_roundtrip() -> CheckResult:
     return CheckResult("frontmatter", "ok")
 
 
-def check_log_writable(root: Path, *, ephemeral: bool = False) -> CheckResult:
-    """Verify that log.md can be appended to.
+def check_log_writable(root: Path) -> CheckResult:
+    """log.md (or, before the first entry, the base root) accepts writes.
 
-    When `ephemeral=True` (used by --self-test), uses a temporary directory so
-    the source repo is not polluted with a log.md.
+    Read-only: doctor used to append a smoke-test entry on every run.
     """
-    if ephemeral:
-        import tempfile
-
-        with tempfile.TemporaryDirectory(prefix="kb_doctor_") as tmp:
-            try:
-                kbc.append_log(
-                    operation="doctor",
-                    title="kb_doctor self-test (ephemeral)",
-                    details=["log writability verified in temporary directory"],
-                    root=Path(tmp),
-                )
-                return CheckResult("log:writable", "ok", "ephemeral write succeeded")
-            except Exception as e:  # noqa: BLE001
-                return CheckResult("log:writable", "error", f"cannot write log.md: {e}")
-    try:
-        kbc.append_log(
-            operation="doctor",
-            title="kb_doctor smoke-test",
-            details=["if you see this, log.md is writable"],
-            root=root,
+    log = kbc.log_path(root)
+    probe = log if log.exists() else root
+    if os.access(probe, os.W_OK):
+        if log.exists():
+            return CheckResult("log:writable", "ok", f"{log} is writable")
+        return CheckResult(
+            "log:writable", "ok",
+            f"{root} is writable (log.md is created by the first logged operation)",
         )
-        return CheckResult("log:writable", "ok", f"appended to {kbc.log_path(root)}")
-    except Exception as e:  # noqa: BLE001
-        return CheckResult("log:writable", "error", f"cannot write to log.md: {e}")
+    return CheckResult("log:writable", "error", f"cannot write to {probe}")
 
 
 def check_media(root: Path) -> list[CheckResult]:
@@ -537,8 +574,19 @@ def check_media(root: Path) -> list[CheckResult]:
 
         ocr_usable = kb_ocr.available_backends(cfg)
         if ocr_usable:
+            # The languages to read vs. what the backends can read (the same
+            # lines as `kb_ocr.py --check`): missing Tesseract data is a setup
+            # problem the OCR failure messages send the owner here for.
+            notes = kb_ocr.language_report(kb_ocr.ocr_languages(cfg), ocr_usable)
+            gaps = [n for n in notes if " — missing " in n or "install Tesseract" in n]
             results.append(
-                CheckResult("media:ocr", "ok", f"available: {', '.join(ocr_usable)}")
+                CheckResult(
+                    "media:ocr",
+                    "warn" if gaps else "ok",
+                    f"available: {', '.join(ocr_usable)}"
+                    + ("; some languages cannot be read — see below" if gaps else ""),
+                    details=gaps,
+                )
             )
         else:
             results.append(
@@ -555,7 +603,7 @@ def check_media(root: Path) -> list[CheckResult]:
 
 
 def check_sync(root: Path) -> list[CheckResult]:
-    """Cross-base import/export readiness (see 16_MERGE.md)."""
+    """Cross-base import/export readiness (see kb-docs/16_MERGE.md)."""
     results: list[CheckResult] = []
 
     missing_scripts = [
@@ -698,9 +746,463 @@ def check_repomix_config(root: Path) -> CheckResult:
     return CheckResult("repomix:config", "ok")
 
 
+def _config_or_defaults(root: Path) -> kbc.KbConfig:
+    try:
+        return kbc.load_config(root)
+    except Exception:  # noqa: BLE001 — check_config reports the parse error
+        return kbc.KbConfig(raw={}, root=root)
+
+
+def check_repomix(root: Path) -> CheckResult:
+    """kb_reindex needs `repomix`, or `npx` + `node` for the pinned fallback."""
+    cfg = _config_or_defaults(root)
+    # getattr: a pre-0.16 kb_common.py (partial upgrade) has no typed keys.
+    index = cfg.index if isinstance(cfg.index, dict) else {}
+    version = getattr(cfg, "index_repomix_version", None) or index.get(
+        "repomix_version", "1.14.0"
+    )
+    npx_fallback = getattr(cfg, "index_npx_fallback", index.get("npx_fallback", True))
+    repomix = shutil.which("repomix")
+    if repomix:
+        return CheckResult("index:repomix", "ok", f"repomix at {repomix}")
+    npx, node = shutil.which("npx"), shutil.which("node")
+    if npx and node and npx_fallback:
+        return CheckResult(
+            "index:repomix", "ok",
+            f"repomix not installed; kb_reindex uses `npx --yes repomix@{version}` "
+            "(the first run downloads it)",
+        )
+    if npx and node:
+        reason = "the npx fallback is off (index.npx_fallback: false)"
+    else:
+        reason = "neither npx nor node is on PATH"
+    install = f"npm install -g repomix@{version}"
+    if not node:
+        install = f"Node.js 18+ (https://nodejs.org), then {install}"
+    return CheckResult(
+        "index:repomix", "error",
+        f"repomix not found and {reason} — kb_reindex cannot build the index "
+        f"packs. Install: {install}",
+    )
+
+
+_PACK_CEILING_RE = re.compile(r"Pack ceiling:\s*(\d[\d,]*)")
+_PACK_TOKENS_RE = re.compile(r"~?\s*(\d[\d,]*)")
+_INDEX_NOT_BUILT_RE = re.compile(r"^\*\*Index not built:\*\*\s*(.*)$", re.M)
+
+
+def _pack_columns(cells: list[str]) -> dict[str, int | None] | None:
+    """Column positions from a PACKS_STATUS.md header row, else ``None``."""
+    heads = [c.casefold() for c in cells]
+    if not heads or heads[0] != "pack":
+        return None
+
+    def find(word: str) -> int | None:
+        return next((i for i, h in enumerate(heads) if word in h), None)
+
+    cols = {"tokens": find("token"), "ceiling": find("ceiling"), "build": find("last build")}
+    return cols if cols["tokens"] is not None and cols["build"] is not None else None
+
+
+def _pack_rows(text: str) -> list[tuple[str, int, bool, str]]:
+    """``(name, tokens, marked OVER, last-build cell)`` for every pack row of
+    PACKS_STATUS.md. Columns are found by the header row: kb_reindex writes
+    ``| Pack | ~Tokens | Last build | Load when |`` (the token cell ends in
+    ``⚠ OVER`` for a pack over the ceiling); a separate ``Ceiling`` column
+    holding ``⚠ OVER`` is read too."""
+    rows: list[tuple[str, int, bool, str]] = []
+    cols: dict[str, int | None] | None = None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("|"):
+            continue
+        cells = [c.strip() for c in re.split(r"(?<!\\)\|", line)[1:-1]]
+        header = _pack_columns(cells)
+        if header is not None:
+            cols = header
+            continue
+        if cols is None or len(cells) <= max(i for i in cols.values() if i is not None):
+            continue
+        tokens = _PACK_TOKENS_RE.match(cells[cols["tokens"]])
+        if not tokens:
+            continue  # the |---|---| separator
+        marks = cells[cols["tokens"]]
+        if cols["ceiling"] is not None:
+            marks += " " + cells[cols["ceiling"]]
+        rows.append((
+            cells[0], int(tokens.group(1).replace(",", "")),
+            "OVER" in marks, cells[cols["build"]],
+        ))
+    return rows
+
+
+def check_packs_status(root: Path) -> CheckResult:
+    """The last reindex as recorded in .repomix/PACKS_STATUS.md."""
+    status = root / ".repomix" / "PACKS_STATUS.md"
+    if not status.is_file():
+        return CheckResult(
+            "index:packs", "warn",
+            "no .repomix/PACKS_STATUS.md — the index has not been built yet; "
+            "run ./shell/reindex.sh (or python3 scripts/kb_reindex.py)",
+        )
+    text = status.read_text(encoding="utf-8", errors="replace")
+    not_built_at_all = _INDEX_NOT_BUILT_RE.search(text)
+    if not_built_at_all:
+        return CheckResult(
+            "index:packs", "error",
+            f"the last reindex built no index: {not_built_at_all.group(1).strip()} "
+            "— fix it, then re-run ./shell/reindex.sh",
+        )
+    ceiling_match = _PACK_CEILING_RE.search(text)
+    ceiling = int(ceiling_match.group(1).replace(",", "")) if ceiling_match else None
+    rows = _pack_rows(text)
+    if not rows:
+        return CheckResult(
+            "index:packs", "warn",
+            "no pack rows could be read from .repomix/PACKS_STATUS.md — re-run "
+            "./shell/reindex.sh",
+        )
+    failed = [name for name, _t, _o, built in rows if re.search(r"\bFAILED\b", built)]
+    not_built = [name for name, _t, _o, built in rows if re.search(r"\bSTALE\b", built)]
+    over = [
+        f"{name} (~{tokens:,} tokens)"
+        for name, tokens, marked, _b in rows
+        if marked or (ceiling and tokens > ceiling)
+    ]
+    if failed:
+        return CheckResult(
+            "index:packs", "error",
+            f"{len(failed)} pack(s) FAILED in the last reindex — the agent cannot "
+            "load them; re-run ./shell/reindex.sh and read its output",
+            details=failed,
+        )
+    warnings: list[str] = []
+    if not_built:
+        warnings.append(
+            f"{len(not_built)} pack(s) not rebuilt in the last reindex (repomix "
+            "unavailable, see index:repomix)"
+        )
+    knowledge = root / "knowledge"
+    newest = 0.0
+    if knowledge.is_dir():
+        newest = max(
+            (p.stat().st_mtime for p in knowledge.rglob("*.md") if p.is_file()),
+            default=0.0,
+        )
+    if newest > status.stat().st_mtime + 1:
+        warnings.append(
+            "knowledge/ changed after the last reindex — the packs are stale; "
+            "run ./shell/reindex.sh"
+        )
+    if over:
+        warnings.append(
+            f"{len(over)} pack(s) over the ceiling — split them (see kb-docs/05_INDEX.md)"
+        )
+    left_out = [line for line in text.splitlines() if line.startswith("Left out by repomix")]
+    if left_out:
+        warnings.append(
+            "repomix left files out of a pack (security check or an ignore file) — "
+            "python3 scripts/kb_lint.py names credential-looking lines"
+        )
+    if warnings:
+        return CheckResult(
+            "index:packs", "warn", "; ".join(warnings), details=over + not_built + left_out
+        )
+    return CheckResult("index:packs", "ok", f"{len(rows)} pack(s) built, none failed")
+
+
+_SIDECAR_DIRS = ("scripts", "shell", "templates", KB_DOCS_DIR)
+
+
+def check_sidecars(root: Path) -> CheckResult:
+    """`.new` files kb_upgrade left for the agent to merge."""
+    found = [p for p in root.glob("*.new") if p.is_file()]
+    for name in _SIDECAR_DIRS:
+        folder = root / name
+        if folder.is_dir():
+            found.extend(
+                p for p in folder.rglob("*.new")
+                if p.is_file() and "__pycache__" not in p.parts
+            )
+    if not found:
+        return CheckResult("upgrade:sidecars", "ok", "no unmerged .new sidecars")
+    return CheckResult(
+        "upgrade:sidecars", "warn",
+        f"{len(found)} unmerged upgrade sidecar(s) — say !heal: the agent merges "
+        "each into the live file, then deletes the .new",
+        details=sorted(p.relative_to(root).as_posix() for p in found),
+    )
+
+
+_UPGRADE_HINT = "the engine repo's scripts/kb_upgrade.py --kb-root <this base>"
+
+# Runs in a child interpreter so the base's own scripts/ are imported, not the
+# modules this doctor process already holds.
+_SCRIPTS_PROBE = r"""
+import importlib, json, re, sys
+from pathlib import Path
+scripts = Path(sys.argv[1])
+sys.path.insert(0, str(scripts))
+out = {"broken": {}, "optional": {}, "missing": {}}
+try:
+    import kb_common
+    names = set(dir(kb_common))
+except Exception as exc:
+    out["broken"]["kb_common"] = f"{type(exc).__name__}: {exc}"
+    names = None
+for path in sorted(scripts.glob("kb_*.py")):
+    mod = path.stem
+    if mod != "kb_common":
+        try:
+            importlib.import_module(mod)
+        except ModuleNotFoundError as exc:
+            top = (exc.name or "").split(".")[0]
+            ours = top.startswith("kb_") or (scripts / (top + ".py")).exists()
+            if top and not ours:
+                out["optional"][mod] = top
+            else:
+                out["broken"][mod] = f"{type(exc).__name__}: {exc}"
+        except BaseException as exc:
+            out["broken"][mod] = f"{type(exc).__name__}: {exc}"
+    if names is not None:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        used = set(re.findall(r"\bkbc\.([A-Za-z_]\w*)", text))
+        if used - names:
+            out["missing"][mod] = sorted(used - names)
+print(json.dumps(out))
+"""
+
+
+def check_scripts(root: Path) -> CheckResult:
+    """Every scripts/kb_*.py imports and finds the kb_common names it uses.
+
+    A customized kb_common.py kept by an upgrade (`kb_common.py.new` beside it)
+    next to updated scripts fails here instead of at the first real run.
+    """
+    scripts = root / "scripts"
+    if not scripts.is_dir():
+        return CheckResult(
+            "scripts:consistency", "warn", f"no scripts/ in {root} — nothing to check"
+        )
+    if not (scripts / "kb_common.py").is_file():
+        return CheckResult(
+            "scripts:consistency", "error", "scripts/kb_common.py is missing"
+        )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-B", "-c", _SCRIPTS_PROBE, str(scripts.resolve())],
+            cwd=root, capture_output=True, text=True, timeout=120,
+        )
+        probe = json.loads(proc.stdout.strip().splitlines()[-1])
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError) as e:
+        return CheckResult(
+            "scripts:consistency", "warn", f"could not probe scripts/: {e}"
+        )
+    problems = [
+        f"scripts/{mod}.py does not import: {why}"
+        for mod, why in sorted(probe["broken"].items())
+    ] + [
+        f"scripts/{mod}.py uses kb_common.{', kb_common.'.join(names)} "
+        "— not in scripts/kb_common.py"
+        for mod, names in sorted(probe["missing"].items())
+    ]
+    if problems:
+        return CheckResult(
+            "scripts:consistency", "error",
+            "engine scripts do not match each other (a partial upgrade?) — merge "
+            f"any scripts/*.py.new, or re-run {_UPGRADE_HINT} (add "
+            "`--accept kb_common.py` to take the engine's kb_common.py over a kept "
+            "local copy)",
+            details=problems,
+        )
+    optional = sorted(set(probe["optional"].values()))
+    note = f" (optional modules not installed: {', '.join(optional)})" if optional else ""
+    return CheckResult("scripts:consistency", "ok", f"all scripts/kb_*.py import{note}")
+
+
+_KB_DOCS_REF_RE = re.compile(r"kb-docs/((?:\d\d_[A-Za-z0-9_]+|README)\.md)")
+_KB_DOCS_READERS = ("AGENTS.md", "CLAUDE.md", "START_HERE.md", "KNOWLEDGE_STRUCTURE.md")
+
+
+def check_kb_docs(root: Path) -> CheckResult:
+    """kb-docs/ holds the runtime modules the agent's files point to."""
+    docs = root / KB_DOCS_DIR
+    wanted: dict[str, str] = {}
+    for name in _KB_DOCS_READERS:
+        reader = root / name
+        if reader.is_file():
+            text = reader.read_text(encoding="utf-8", errors="replace")
+            for ref in _KB_DOCS_REF_RE.findall(text):
+                wanted.setdefault(ref, name)
+    missing = sorted(ref for ref in wanted if not (docs / ref).is_file())
+    if missing:
+        return CheckResult(
+            "kb-docs", "error",
+            f"{len(missing)} runtime module(s) the agent files point to are missing "
+            f"from kb-docs/ — run {_UPGRADE_HINT} (or copy them from the "
+            "engine's knowledge-base/)",
+            details=[f"kb-docs/{ref} (referenced by {wanted[ref]})" for ref in missing],
+        )
+    if not docs.is_dir():
+        return CheckResult(
+            "kb-docs", "warn",
+            "no kb-docs/ — the runtime modules (!heal, !merge, !refactor "
+            f"procedures) are not in this base; run {_UPGRADE_HINT}",
+        )
+    count = sum(1 for p in docs.glob("*.md") if p.is_file())
+    return CheckResult("kb-docs", "ok", f"kb-docs/: {count} module(s)")
+
+
+def _base_venv(root: Path) -> Path | None:
+    """The venv the shell wrappers use (same rule as shell/_kbpy.sh)."""
+    own = root / ".venv"
+    if own.is_dir():
+        return own
+    project = root.parent / ".venv"
+    if (root.parent / "setup" / "scripts" / "kb_common.py").is_file() and project.is_dir():
+        return project  # deploy layout, before finalize.sh
+    return None
+
+
+_VIRTUAL_ENV_RE = re.compile(
+    r"""^\s*(?:export\s+)?VIRTUAL_ENV=(["']?)([^"'\n]+)\1\s*$""", re.MULTILINE
+)
+_SHEBANG_PYTHON_RE = re.compile(r"(/\S*python[\d.]*)\b")
+
+
+def check_venv(root: Path) -> list[CheckResult]:
+    """The base venv is where the wrappers expect it and still works."""
+    venv = _base_venv(root)
+    if venv is None:
+        # The wrappers, launchers and git hook fall back to python3: without
+        # a base venv the optional packages (NLP, media) silently go unused.
+        create = (
+            "create .venv at the base root and install the requirements there "
+            "(kb-docs/01_PREREQUISITES.md)"
+        )
+        stranded = root / "knowledge-base" / ".venv"
+        running = Path(sys.prefix).resolve()
+        if (stranded / "pyvenv.cfg").is_file():
+            return [
+                CheckResult(
+                    "venv:stranded", "warn",
+                    "knowledge-base/.venv is left from the build folder; the shell "
+                    "wrappers, launchers and git hook never use it — they run "
+                    f"python3; {create}, then delete knowledge-base/.venv",
+                )
+            ]
+        if sys.prefix != sys.base_prefix and not running.is_relative_to(root.resolve()):
+            return [
+                CheckResult(
+                    "venv:stranded", "warn",
+                    f"doctor runs in the venv {running}, which the shell wrappers, "
+                    f"launchers and git hook never use — they run python3; {create}",
+                )
+            ]
+        return [
+            CheckResult(
+                "venv:missing", "warn",
+                "no .venv for this base — the shell wrappers, launchers and git hook "
+                f"run python3 ({shutil.which('python3') or 'not on PATH'}); {create}",
+            )
+        ]
+    results: list[CheckResult] = []
+    rel = ".venv" if venv.parent == root else "../.venv"
+    recreate = (
+        f"python3 -m venv --clear {rel} && {rel}/bin/pip install -r requirements.txt"
+    )
+    if (venv / ".venv").is_dir():
+        results.append(
+            CheckResult(
+                "venv:nested", "warn",
+                f"{rel}/.venv exists — a venv was moved inside another one "
+                f"(finalize.sh without --force). The wrappers use the outer {rel}: "
+                f"install the requirements there, then delete {rel}/.venv "
+                "(kb-docs/01_PREREQUISITES.md)",
+            )
+        )
+    bindir = venv / ("Scripts" if os.name == "nt" else "bin")
+    activate = bindir / "activate"
+    if activate.is_file():
+        text = activate.read_text(encoding="utf-8", errors="replace")
+        # Skip shell expansions such as the Cygwin branch's $(cygpath …).
+        created_at = next(
+            (m.group(2) for m in _VIRTUAL_ENV_RE.finditer(text) if "$" not in m.group(2)),
+            None,
+        )
+        if created_at and Path(created_at).resolve() != venv.resolve():
+            results.append(
+                CheckResult(
+                    "venv:moved", "warn",
+                    f"{rel} was created at {created_at} and moved — `activate` "
+                    f"still points there. Recreate it in place: {recreate}",
+                )
+            )
+    pip = bindir / "pip"
+    if os.name != "nt" and pip.is_file():
+        head = pip.read_text(encoding="utf-8", errors="replace")[:600]
+        target = _SHEBANG_PYTHON_RE.search(head)
+        if target and not Path(target.group(1)).exists():
+            results.append(
+                CheckResult(
+                    "venv:pip", "warn",
+                    f"{rel}/bin/pip runs {target.group(1)}, which does not exist "
+                    f"(the venv was moved) — pip is broken until you recreate it: {recreate}",
+                )
+            )
+    if Path(sys.prefix).resolve() != venv.resolve():
+        results.append(
+            CheckResult(
+                "venv:active", "warn",
+                f"doctor runs on {sys.executable}, not the base venv {rel} — the "
+                "package checks above describe that interpreter. Use "
+                f"./shell/doctor.sh or {rel}/bin/python scripts/kb_doctor.py",
+            )
+        )
+    if not results:
+        results.append(CheckResult("venv", "ok", f"{rel} is in place and in use"))
+    return results
+
+
+def check_nltk_data() -> CheckResult | None:
+    """RAKE (rake-nltk) needs the NLTK stopwords and punkt data; without them
+    keyword extraction silently returns nothing. None when RAKE is absent."""
+    try:
+        importlib.import_module("rake_nltk")
+    except ImportError:
+        return None
+    try:
+        corpus = importlib.import_module("nltk.corpus")
+        tokenize = importlib.import_module("nltk.tokenize")
+        corpus.stopwords.words("english")
+        tokenize.sent_tokenize("One. Two.")
+    except LookupError:
+        return CheckResult(
+            "nlp:nltk-data", "warn",
+            "rake-nltk is installed but NLTK data is missing — keywords come out "
+            "empty. Run: python3 -m nltk.downloader stopwords punkt punkt_tab",
+        )
+    except Exception as e:  # noqa: BLE001
+        return CheckResult("nlp:nltk-data", "warn", f"could not probe NLTK data: {e}")
+    return CheckResult("nlp:nltk-data", "ok", "NLTK stopwords and punkt available")
+
+
 # ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
+
+
+def _guarded(
+    name: str, fn: Callable[[], CheckResult | list[CheckResult] | None]
+) -> list[CheckResult]:
+    """One crashing check becomes one error result, not a dead doctor."""
+    try:
+        result = fn()
+    except Exception as e:  # noqa: BLE001
+        return [CheckResult(name, "error", f"check crashed: {type(e).__name__}: {e}")]
+    if result is None:
+        return []
+    return result if isinstance(result, list) else [result]
 
 
 def run_all_checks(
@@ -710,19 +1212,21 @@ def run_all_checks(
     ephemeral_log: bool = False,
     self_test: bool = False,
 ) -> list[CheckResult]:
+    """All default checks. `ephemeral_log` is accepted for callers written
+    before 0.16 and ignored: doctor no longer writes log.md at all."""
+    del ephemeral_log
     results: list[CheckResult] = []
     results.append(check_python_version())
     results.extend(check_required_packages())
     results.extend(check_optional_packages())
     results.extend(check_structure(root))
+    results.extend(_guarded("config", lambda: check_config(root, self_test=self_test)))
 
-    cfg_res = check_config(root, self_test=self_test)
-    results.append(cfg_res)
-
-    # Source-repo self-test is not a deployed base; skip Codex-environment
-    # checks so a missing root AGENTS.md does not fail the smoke test.
+    # Source-repo self-test is not a deployed base; skip the deployment checks
+    # (Codex environment, index, kb-docs, venv, heal) so a missing root
+    # AGENTS.md or index does not fail the smoke test.
     if not self_test:
-        results.extend(check_agent_env(root))
+        results.extend(_guarded("agent-env", lambda: check_agent_env(root)))
 
     if not skip_nlp:
         try:
@@ -732,14 +1236,21 @@ def run_all_checks(
             results.append(
                 CheckResult("nlp:spacy", "warn", f"could not test spaCy (config error): {e}")
             )
+        results.extend(_guarded("nlp:nltk-data", check_nltk_data))
 
-    results.append(check_frontmatter_roundtrip())
-    results.extend(check_media(root))
-    results.extend(check_sync(root))
-    results.append(check_repomix_config(root))
-    results.append(check_log_writable(root, ephemeral=ephemeral_log))
+    results.extend(_guarded("frontmatter", check_frontmatter_roundtrip))
+    results.extend(_guarded("media", lambda: check_media(root)))
+    results.extend(_guarded("sync", lambda: check_sync(root)))
+    results.extend(_guarded("repomix:config", lambda: check_repomix_config(root)))
+    results.extend(_guarded("scripts:consistency", lambda: check_scripts(root)))
+    results.extend(_guarded("upgrade:sidecars", lambda: check_sidecars(root)))
+    results.extend(_guarded("log:writable", lambda: check_log_writable(root)))
     if not self_test:
-        results.extend(check_heal(root))
+        results.extend(_guarded("index:repomix", lambda: check_repomix(root)))
+        results.extend(_guarded("index:packs", lambda: check_packs_status(root)))
+        results.extend(_guarded("kb-docs", lambda: check_kb_docs(root)))
+        results.extend(_guarded("venv", lambda: check_venv(root)))
+        results.extend(_guarded("heal", lambda: check_heal(root)))
     return results
 
 
@@ -769,25 +1280,29 @@ def render_text(results: list[CheckResult]) -> str:
     for r in results:
         counts[r.severity] = counts.get(r.severity, 0) + 1
     lines.append("")
+    verdict = (
+        "FAIL (exit 2): fix the errors above" if counts["error"]
+        else "PASS (exit 0; warnings are advice)"
+    )
     lines.append(
-        f"Summary: {counts['ok']} ok, {counts['warn']} warn, {counts['error']} error"
+        f"Summary: {counts['ok']} ok, {counts['warn']} warn, {counts['error']} error "
+        f"— {verdict}"
     )
     return "\n".join(lines)
 
 
-def exit_code(results: list[CheckResult], *, warnings_ok: bool = False) -> int:
-    if any(r.severity == "error" for r in results):
-        return 2
-    if not warnings_ok and any(r.severity == "warn" for r in results):
-        return 1
-    return 0
+def exit_code(results: list[CheckResult]) -> int:
+    """0 = doctor passes (warnings allowed), 2 = at least one error."""
+    return 2 if any(r.severity == "error" for r in results) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AI Knowledge Engine — post-deploy smoke-test")
     parser.add_argument("--root", type=Path, default=None, help="KB root (default: auto-detect)")
     parser.add_argument("--self-test", action="store_true", help="Run on this script's own repo")
-    parser.add_argument("--skip-nlp", action="store_true", help="Skip spaCy model check")
+    parser.add_argument(
+        "--skip-nlp", action="store_true", help="Skip the spaCy model and NLTK data checks"
+    )
     parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
     parser.add_argument(
         "--with-mutation",
@@ -799,24 +1314,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_test:
         # Run from the parent of this script's directory (the knowledge-base/ folder)
         root = SCRIPT_DIR.parent
-        ephemeral_log = True
     else:
         root = args.root or kbc.find_kb_root()
-        ephemeral_log = False
 
-    results = run_all_checks(
-        root,
-        skip_nlp=args.skip_nlp,
-        ephemeral_log=ephemeral_log,
-        self_test=args.self_test,
-    )
+    results = run_all_checks(root, skip_nlp=args.skip_nlp, self_test=args.self_test)
     if args.with_mutation and not args.self_test:
         results.append(check_mutations(root))
 
-    # In --self-test we validate that the scripts are wired and importable;
-    # warnings about optional deps / missing deployed config are expected and
-    # must not fail the run (e.g. in CI with only core deps installed).
-    code = exit_code(results, warnings_ok=args.self_test)
+    code = exit_code(results)
 
     if args.json:
         print(
@@ -837,4 +1342,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        code = main()
+    except Exception:  # noqa: BLE001 — a crash is a failed doctor (2), not 1
+        traceback.print_exc()
+        code = 2
+    raise SystemExit(code)

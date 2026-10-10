@@ -41,10 +41,10 @@ See `docs/ARCHITECTURE.md` for the layered structure.
 2. Make your change
 3. Update tests if you changed a script
 4. Update the corresponding contract `.md` if you changed a script
-5. Add a CHANGELOG entry under `[Unreleased]`
+5. Add a CHANGELOG entry under the pending section at the top (`[Unreleased]`, or `[X.Y.Z] - Unreleased` once `VERSION` is bumped)
 6. Run `pytest knowledge-base/scripts/tests/`
 7. Run `python3 knowledge-base/scripts/kb_doctor.py --self-test --skip-nlp`
-8. Run `python3 scripts/check_translations.py` if your change touched any `knowledge-base/*.md`
+8. Run `python3 scripts/check_translations.py` if your change touched `README.md` or any `.md` under `knowledge-base/` or `quick-start/`
 9. Open a PR
 
 See `docs/MAINTENANCE.md` for full versioning and synchronization rules.

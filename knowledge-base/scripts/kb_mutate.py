@@ -3,6 +3,8 @@
 
 Copies the base (or a tiny seed) into a temp tree, applies seven L1
 mutations, runs ``kb_lint.py``, and reports killed / survivors. No LLM.
+A mutation counts as killed only when its check fires on the page the
+mutation touched — an unrelated issue elsewhere in the base does not count.
 
 L2 contradictions are out of scope (iteration D2 / ``!audit``).
 
@@ -27,7 +29,10 @@ if str(SCRIPT_DIR) not in sys.path:
 import kb_common as kbc  # noqa: E402
 import kb_lint  # noqa: E402
 
-_SKIP_COPY = {".venv", "venv", ".git", ".kb-backups", "node_modules", "__pycache__", ".repomix"}
+_SKIP_COPY = {
+    ".venv", "venv", ".git", ".kb-backups", ".kb-state", "node_modules",
+    "__pycache__", ".repomix",
+}
 
 
 @dataclass
@@ -35,6 +40,7 @@ class Mutation:
     id: str
     expected_check: str
     detail: str
+    path: str  # the page (root-relative, posix) the check must fire on
 
 
 @dataclass
@@ -53,14 +59,20 @@ class MutationReport:
         )
 
 
+_ALPHA = "knowledge/domain/mutate-alpha.md"
+_BETA_COPY = "knowledge/playbooks/mutate-beta.md"
+_GAMMA = "knowledge/insights/mutate-gamma.md"
+_DELTA = "knowledge/playbooks/mutate-delta.md"
+_EPSILON = "knowledge/decisions/mutate-epsilon.md"
+
 MUTATIONS: tuple[Mutation, ...] = (
-    Mutation("broken-link", "broken-link", "plant [[no-such-mutate-page]]"),
-    Mutation("duplicate-slug", "duplicate-slug", "same slug in two folders"),
-    Mutation("source-hash", "source-hash", "wrong source_hash on a page"),
-    Mutation("stale", "stale", "last_verified older than 30 days"),
-    Mutation("orphan", "orphan", "drop all inbound wikilinks to a page"),
-    Mutation("expired-temporal", "expired-temporal", "valid_until in the past"),
-    Mutation("frontmatter", "frontmatter", "drop a required frontmatter field"),
+    Mutation("broken-link", "broken-link", "plant [[no-such-mutate-page]]", _ALPHA),
+    Mutation("duplicate-slug", "duplicate-slug", "same slug in two folders", _BETA_COPY),
+    Mutation("source-hash", "source-hash", "wrong source_hash on a page", _ALPHA),
+    Mutation("stale", "stale", "last_verified and extracted_at older than 30 days", _GAMMA),
+    Mutation("orphan", "orphan", "drop all inbound wikilinks to a page", _GAMMA),
+    Mutation("expired-temporal", "expired-temporal", "valid_until in the past", _DELTA),
+    Mutation("frontmatter", "frontmatter", "drop a required frontmatter field", _EPSILON),
 )
 
 
@@ -129,7 +141,7 @@ def seed_fixture(root: Path) -> None:
 
 
 def apply_mutations(root: Path) -> None:
-    alpha = root / "knowledge" / "domain" / "mutate-alpha.md"
+    alpha = root / _ALPHA
     text = alpha.read_text(encoding="utf-8")
     alpha.write_text(
         text.replace("[[mutate-gamma]]", "[[no-such-mutate-page]]"),
@@ -137,7 +149,7 @@ def apply_mutations(root: Path) -> None:
     )
     # drop inbound to gamma (orphan) — the replace above already removed it
     beta = root / "knowledge" / "domain" / "mutate-beta.md"
-    dest = root / "knowledge" / "playbooks" / "mutate-beta.md"
+    dest = root / _BETA_COPY
     dest.write_text(beta.read_text(encoding="utf-8"), encoding="utf-8")
     alpha.write_text(
         alpha.read_text(encoding="utf-8").replace(
@@ -145,20 +157,21 @@ def apply_mutations(root: Path) -> None:
         ),
         encoding="utf-8",
     )
+    # A page is dated by the newer of last_verified / extracted_at, so both age.
     old = (date.today() - timedelta(days=90)).isoformat()
-    gamma = root / "knowledge" / "insights" / "mutate-gamma.md"
+    gamma = root / _GAMMA
+    today = date.today().isoformat()
     gamma.write_text(
-        gamma.read_text(encoding="utf-8").replace(
-            f"last_verified: {date.today().isoformat()}",
-            f"last_verified: {old}",
-        ),
+        gamma.read_text(encoding="utf-8")
+        .replace(f"last_verified: {today}", f"last_verified: {old}")
+        .replace(f"extracted_at: {today}", f"extracted_at: {old}"),
         encoding="utf-8",
     )
-    delta = root / "knowledge" / "playbooks" / "mutate-delta.md"
+    delta = root / _DELTA
     dtext = delta.read_text(encoding="utf-8")
     dtext = re.sub(r"valid_until:\s*\S+", "valid_until: 2020-01-01", dtext, count=1)
     delta.write_text(dtext, encoding="utf-8")
-    epsilon = root / "knowledge" / "decisions" / "mutate-epsilon.md"
+    epsilon = root / _EPSILON
     lines = [
         ln
         for ln in epsilon.read_text(encoding="utf-8").splitlines()
@@ -167,9 +180,15 @@ def apply_mutations(root: Path) -> None:
     epsilon.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _fired_checks(root: Path) -> set[str]:
+def _fired_checks(root: Path) -> set[tuple[str, str]]:
+    """``(check, page)`` pairs lint reported; a multi-page issue (duplicate
+    slug) yields one pair per page."""
     report = kb_lint.run_lint(root)
-    return {issue.check for issue in report.issues}
+    fired: set[tuple[str, str]] = set()
+    for issue in report.issues:
+        for path in issue.path.split(", "):
+            fired.add((issue.check, path.replace("\\", "/")))
+    return fired
 
 
 def run_mutations(
@@ -189,7 +208,7 @@ def run_mutations(
     fired = _fired_checks(work)
     out = MutationReport(total=len(MUTATIONS), work=work)
     for mut in MUTATIONS:
-        if mut.expected_check in fired:
+        if (mut.expected_check, mut.path) in fired:
             out.killed.append(mut.id)
         else:
             out.survivors.append(mut.id)

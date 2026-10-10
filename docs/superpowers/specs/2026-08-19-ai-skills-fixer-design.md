@@ -286,7 +286,11 @@ Releases. A release is a materialized snapshot at
 is the first twelve hex digits of the resolved commit and `<hash12>` the
 first twelve of the content hash. Release directories are immutable by
 policy: created once, never edited, removed only by `rollback` or an
-approved plan.
+approved plan. Their files (and, on POSIX, their folders) are made
+read-only, `.git` folders are never copied into them, an existing release is
+reused only while its content still matches its hash, and a skill with
+symlinks resolving outside it (checked component by component, with the
+skill folder as the top) never becomes a release.
 
 Formats and identifiers. Human-edited configuration is YAML; generated
 machine artifacts (inventories, plans, apply records, audit findings) are
@@ -360,9 +364,16 @@ Skill identity is path-based:
   `skills/backend-architect` under the root `skills`);
 - when several roots are declared, resolved relative paths must be unique
   across all roots; a collision is a catalog error and stops processing;
-- for a `single` source, the skill ID is the bare `<source-id>`;
+- for a `single` source, the skill ID is the bare `<source-id>`, and it is
+  installed into host roots under a folder named `<source-id>`;
 - the frontmatter `name` is display metadata only and never acts as identity;
   a name/folder mismatch is a lint finding, not an identity change.
+
+A source ID is one path component matching `^[a-z0-9][a-z0-9._-]*$` (IDs
+registered before 0.16.0 may also contain capitals); checkouts must resolve
+inside `sources/`. Linked folders are not searched; a linked folder that is
+itself a skill must resolve inside the checkout (outside `.git`), otherwise
+the catalog stops.
 
 ### 7.2 Shared profile
 
@@ -824,7 +835,7 @@ ai-skills-fixer audit [skill-id]
 ai-skills-fixer reconcile
 ai-skills-fixer reconcile --apply <plan-id>
 ai-skills-fixer rollback <apply-id>
-ai-skills-fixer eval <skill-id>
+ai-skills-fixer eval <skill-id>   # Phase 5 (§16, §22) — not implemented yet
 ```
 
 `reconcile` is a dry run. Applying requires an immutable saved plan ID so the
@@ -887,7 +898,12 @@ A change plan contains:
 
 Before applying, the tool verifies that configuration hashes, destination
 state, and source commits still match the plan. Drift invalidates the plan and
-requires a new dry run.
+requires a new dry run. The applier recomputes the plan ID from the saved plan
+and refuses a plan edited after approval. Mutating operations may only target
+direct children of the host user roots recorded in the plan, and those must
+equal the user roots discovered at apply time (same `--home` and
+environment). The apply record is a write-ahead journal, and `rollback` saves
+its progress after every undone operation.
 
 Default removal behavior is recoverable:
 

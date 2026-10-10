@@ -2,7 +2,8 @@
 
 These checks are evidence for the audit, not verdicts: they flag what
 can be verified mechanically — frontmatter validity, portable naming,
-description bounds, body size, and broken references.
+description bounds, body size, broken references, and symlinks that
+point outside the skill.
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .filesystem import unsafe_symlinks
 from .frontmatter import read_skill_file
 
 DESCRIPTION_MAX_CHARS = 1024
@@ -159,7 +161,17 @@ def cross_skill_duplicates(skill_texts: dict[str, str]) -> list[dict]:
 def lint_skill_dir(path: Path) -> list[Finding]:
     path = Path(path)
     skill = path.name
-    findings: list[Finding] = []
+    findings: list[Finding] = [
+        Finding(
+            skill,
+            "unsafe-symlink",
+            "error",
+            f"symlink {link} resolves outside the skill (or cannot be "
+            "resolved inside it); installing it would expose that path to "
+            "the agent",
+        )
+        for link in unsafe_symlinks(path)
+    ]
 
     doc = read_skill_file(path / "SKILL.md")
     if doc.error is not None:

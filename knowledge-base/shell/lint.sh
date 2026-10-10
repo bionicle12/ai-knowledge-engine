@@ -1,24 +1,7 @@
 #!/usr/bin/env bash
-# AI Knowledge Engine — lint wrapper.
-set -e
-
-SHELL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-PROJECT_ROOT="$(cd "$SHELL_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
-
-if [ -x ".venv/bin/python" ]; then
-  PYTHON="./.venv/bin/python"
-elif command -v python3 >/dev/null 2>&1; then
-  PYTHON="python3"
-else
-  echo "❌ Python 3 not found"
-  exit 2
-fi
-
-if [ ! -f "scripts/kb_lint.py" ]; then
-  echo "❌ scripts/kb_lint.py not found"
-  echo "   Looked in: $PROJECT_ROOT/scripts/"
-  exit 2
-fi
-
-$PYTHON scripts/kb_lint.py "$@"
+# AI Knowledge Engine — lint wrapper: runs scripts/kb_lint.py from the base
+# root with every argument passed through; the exit status is kb_lint's.
+# Python comes from shell/_kbpy.sh: $KB_PYTHON, the base's .venv, else python3.
+KB_SHELL_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)" || exit 2
+. "$KB_SHELL_DIR/_kbpy.sh" || exit 2
+kb_run scripts/kb_lint.py "$@"

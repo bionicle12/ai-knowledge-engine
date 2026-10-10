@@ -79,3 +79,43 @@ def test_scan_single_uses_bare_source_id(tmp_path):
     (found,) = scan_source("solo-src", tmp_path, {"type": "single", "skill_path": "."})
     assert found.skill_id == "solo-src"
     assert found.name == "solo"
+
+
+def test_linked_skill_folder_leaving_the_checkout_stops_the_catalog(tmp_path):
+    """B1/B8: `skills/notes -> /abs/private-notes` used to be scanned,
+    snapshotted and installed as if the source provided it."""
+    repo = tmp_path / "repo"
+    write_skill(repo, "skills/foo", name="foo")
+    private = tmp_path / "private-notes"
+    write_skill(tmp_path, "private-notes", name="notes")
+    (private / "credentials.txt").write_text("TOPSECRET\n", encoding="utf-8")
+    (repo / "skills" / "notes").symlink_to(private, target_is_directory=True)
+
+    with pytest.raises(CatalogError, match="'skills/notes' resolves outside"):
+        scan_source("s", repo, {"type": "collection", "roots": ["skills"]})
+
+
+def test_linked_skill_folder_into_git_metadata_stops_the_catalog(tmp_path):
+    repo = tmp_path / "repo"
+    write_skill(repo, "skills/foo", name="foo")
+    write_skill(repo, ".git/stash", name="stash")
+    (repo / "skills" / "stash").symlink_to(repo / ".git" / "stash")
+
+    with pytest.raises(CatalogError, match="resolves outside"):
+        scan_source("s", repo, {"type": "collection", "roots": ["skills"]})
+    with pytest.raises(CatalogError, match="leaves the checkout"):
+        scan_source("s", repo, {"type": "single", "skill_path": ".git/stash"})
+
+
+def test_linked_folders_inside_the_checkout(tmp_path):
+    """A linked skill folder inside the checkout is fine; linked non-skill
+    folders are never searched (no loops, no walks elsewhere)."""
+    repo = tmp_path / "repo"
+    write_skill(repo, "lib/real", name="real")
+    write_skill(repo, "skills/foo", name="foo")
+    (repo / "skills" / "alias").symlink_to("../lib/real")
+    (repo / "skills" / "loop").symlink_to(".")
+    (repo / "skills" / "group").symlink_to("../lib")
+
+    found = scan_source("s", repo, {"type": "collection", "roots": ["skills"]})
+    assert sorted(s.skill_id for s in found) == ["s:alias", "s:foo"]

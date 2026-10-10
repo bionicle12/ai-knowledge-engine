@@ -14,8 +14,9 @@ from pathlib import Path
 from .discovery import SkillRoot
 from .filesystem import managed_link_type
 from .frontmatter import read_skill_file
+from .gitops import redact_url
 from .provenance import content_hash
-from .sources import SourceSkill
+from .sources import SourceSkill, install_basename
 
 TOKEN_CHARS_PER_TOKEN = 4  # coarse estimate; always labeled as an estimate
 
@@ -91,7 +92,7 @@ def _parse_git_remote(git_dir: Path) -> str | None:
             in_origin = stripped.replace(" ", "") in ('[remote"origin"]',)
         elif in_origin and stripped.startswith("url"):
             _, _, value = stripped.partition("=")
-            return value.strip()
+            return redact_url(value.strip())
     return None
 
 
@@ -196,7 +197,7 @@ def match_provenance(
     for source_skill in catalog:
         digest = content_hash(source_skill.repo_path)
         by_hash.setdefault(digest, []).append(source_skill)
-        by_name.setdefault(Path(source_skill.rel_path).name, []).append(source_skill)
+        by_name.setdefault(install_basename(source_skill), []).append(source_skill)
         if source_skill.name:
             by_name.setdefault(source_skill.name, []).append(source_skill)
 
@@ -207,7 +208,7 @@ def match_provenance(
         hash_matches = by_hash.get(skill.content_hash, [])
         if hash_matches:
             same_name = [
-                s for s in hash_matches if Path(s.rel_path).name == basename
+                s for s in hash_matches if install_basename(s) == basename
             ]
             chosen = same_name[0] if same_name else hash_matches[0]
             level = "exact" if same_name else "probable"

@@ -1,4 +1,11 @@
 #!/bin/sh
-# Fires after `git rebase` / `git commit --amend`.
-root=$(git rev-parse --show-toplevel)
-exec "$root/scripts/update-repomix-index.sh" --background
+# Fires after `git rebase` / `git commit --amend`. Several hooks firing in a
+# row cost at most two builds: a run that finds a build in progress only
+# queues a re-check.
+# Project-specific steps belong in .githooks/post-rewrite.local (executable);
+# it gets git's arguments and the rewritten-commit list on stdin.
+root=$(git rev-parse --show-toplevel) || exit 0
+[ -x "$root/.githooks/post-rewrite.local" ] && "$root/.githooks/post-rewrite.local" "$@"
+script="$root/scripts/update-repomix-index.sh"
+[ -f "$script" ] || exit 0
+exec sh "$script" --background

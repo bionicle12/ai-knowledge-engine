@@ -39,15 +39,18 @@ nlp:
 
 
 def test_ingest_empty_file(kb_root: Path):
+    """An empty file is not ingested (no asset, no assets-index entry); it
+    stays in unsorted/ and --status names it."""
     kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
     src = kb_root / "raw" / "documents" / "unsorted" / "empty.md"
     src.write_text("", encoding="utf-8")
     code = kb_ingest.main(["--root", str(kb_root), "--no-nlp"])
-    # Empty file should be processed without crash
     assert code == 0
-    # Should appear in assets/
-    assets = list((kb_root / "assets" / "documents").glob("*.md"))
-    assert len(assets) == 1
+    assert src.exists()
+    assert not list((kb_root / "assets" / "documents").glob("*"))
+    assert not (kb_root / "assets-index" / "documents.md").exists()
+    status = kb_ingest.collect_status(kb_root)
+    assert status["unsorted"] == {"total": 1, "by_reason": {"empty": 1}}
 
 
 def test_ingest_handles_unicode_filename(kb_root: Path):
@@ -72,15 +75,23 @@ def test_ingest_processes_txt_via_passthrough(kb_root: Path):
     assert len(processed) == 1
 
 
-def test_ingest_unknown_extension_routes_to_review(kb_root: Path):
+def test_ingest_unknown_extension_routes_to_classification(kb_root: Path):
+    """I15: a file of unknown type goes to review/needs-classification/ with a reason."""
     kb_ingest.main(["--root", str(kb_root), "--init-dirs"])
     src = kb_root / "raw" / "documents" / "unsorted" / "weird.xyz"
     src.write_text("binary-ish stuff", encoding="utf-8")
     code = kb_ingest.main(["--root", str(kb_root), "--no-nlp"])
     assert code == 0
-    # Unknown extensions should be routed somewhere safe
-    review = list((kb_root / "review" / "needs-ai-decision").glob("*.md"))
+    review = list((kb_root / "review" / "needs-classification").glob("*.md"))
     assert len(review) == 1
+    assert "unknown file type (.xyz)" in review[0].read_text(encoding="utf-8")
+    meta = kbc.yaml_load(
+        next((kb_root / "processed" / "extracted-metadata").glob("*.yml")).read_text(
+            encoding="utf-8"
+        )
+    )
+    assert meta["review_reason"] == "unknown file type (.xyz)"
+    assert meta["extraction"] == "pending"
 
 
 # ---------------------------------------------------------------------------
@@ -132,8 +143,10 @@ def test_lint_handles_broken_frontmatter(kb_root: Path):
     # Lint must not crash
     report = kb_lint.run_lint(kb_root)
     assert report.pages_scanned == 1
-    # Broken frontmatter → empty meta → reports missing required fields
-    assert any(i.check == "frontmatter" for i in report.issues)
+    # Broken frontmatter → a `frontmatter-yaml` error that --fix never acts on
+    # (not "missing required fields", which --fix would try to fill in)
+    assert any(i.check == "frontmatter-yaml" and not i.fixable for i in report.issues)
+    assert not [i for i in report.issues if i.check == "frontmatter"]
 
 
 def test_lint_handles_unicode_in_frontmatter(kb_root: Path):

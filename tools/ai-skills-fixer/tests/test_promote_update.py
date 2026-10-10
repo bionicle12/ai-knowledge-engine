@@ -113,7 +113,7 @@ def test_apply_update_relinks_and_rollback_restores(env, directory_link):
     promote_source(store, "awesome")
 
     plan = build_plan(store, "m1", home=home)
-    record = apply_plan(store, plan["plan_id"])
+    record = apply_plan(store, plan["plan_id"], home=home)
 
     assert dest.resolve() != dest.absolute()
     assert dest.resolve() != old_release

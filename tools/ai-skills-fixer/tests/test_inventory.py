@@ -158,3 +158,32 @@ def test_offline_git_facts_are_recorded(tmp_path):
     assert found.git is not None
     assert found.git["commit"] == "a" * 40
     assert found.git["remote"] == "git@github.com:example/clone.git"
+
+
+def test_git_remote_credentials_are_redacted(tmp_path):
+    """B9: an installed clone's token URL never reaches the inventory report."""
+    root = make_root(tmp_path / "clone" / "skills")
+    write_skill(root.path, "in-repo")
+    git_dir = tmp_path / "clone" / ".git"
+    git_dir.mkdir(parents=True)
+    (git_dir / "HEAD").write_text("a" * 40 + "\n")
+    (git_dir / "config").write_text(
+        '[remote "origin"]\n\turl = https://oauth2:glpat_SECRET@gitlab.test/o/r.git\n'
+    )
+
+    (found,) = scan_installed_root(root)
+    assert found.git["remote"] == "https://gitlab.test/o/r.git"
+
+
+def test_single_skill_source_matches_by_its_install_name(tmp_path):
+    """B6: a single-skill source (skill path `.`) installs under its source
+    ID, so an identical copy in a folder of that name is `exact`."""
+    src = tmp_path / "solo-src"
+    write_skill(src, ".", name="solo")
+    catalog = scan_source("solo-src", src, {"type": "single", "skill_path": "."})
+    root = make_root(tmp_path / "home" / ".claude" / "skills")
+    write_skill(root.path, "solo-src", name="solo")
+
+    skills = scan_installed_root(root)
+    match_provenance(skills, catalog)
+    assert skills[0].provenance["level"] == "exact"

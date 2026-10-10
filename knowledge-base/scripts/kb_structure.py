@@ -11,10 +11,15 @@ Usage:
     python3 scripts/kb_structure.py --role fiction-writer --write --kb-root .
     python3 scripts/kb_structure.py --role fiction-writer --json
     python3 scripts/kb_structure.py --role fiction-writer --blind-spots
+
+``--role`` is resolved like ``kb_populate.py --role``: a file name or the
+YAML's ``role:`` title, looked up in ``<kb-root>/examples/`` (default: cwd)
+first, then in the engine's ``examples/``.
 """
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import json
 import sys
 from pathlib import Path
@@ -125,19 +130,19 @@ def blind_spots(role_data: dict[str, Any]) -> list[str]:
     return custom or default_blind_spots(role_data)
 
 
-def _entity_slugs(ents: list[dict[str, Any]], limit: int = 5) -> list[str]:
-    return [e["key"].replace("_", "-") for e in ents[:limit]]
-
-
 def _tree(lines: list[str]) -> str:
     return "\n".join(lines)
 
 
-def variants(role_data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Four sketches. Owner reacts; they do not pick a number from a form."""
+def variants(
+    role_data: dict[str, Any], *, today: _dt.date | None = None
+) -> list[dict[str, Any]]:
+    """Four sketches. Owner reacts; they do not pick a number from a form.
+
+    Dated folders in the sketches use `today` (default: the current date).
+    """
     role = _safe(role_data.get("role")) or "this role"
-    ents = enabled_entities(role_data)
-    slugs = _entity_slugs(ents)
+    day = today or _dt.date.today()
     arts = artifacts(role_data)
     art_dirs = []
     for art in arts[:6]:
@@ -156,7 +161,8 @@ def variants(role_data: dict[str, Any]) -> list[dict[str, Any]]:
             seen.add(name)
             art_unique.append(name)
 
-    project_children = slugs or ["current", "parked"]
+    # Entities are topics, not projects: the project folders stay
+    # placeholders for the owner's real project names.
     return [
         {
             "id": "projects",
@@ -175,7 +181,9 @@ def variants(role_data: dict[str, Any]) -> list[dict[str, Any]]:
                 [
                     "knowledge/",
                     "  projects/",
-                    *[f"    {slug}/" for slug in project_children],
+                    "    <project-a>/      # one folder per named effort",
+                    "    <project-b>/",
+                    "    parked/           # paused or abandoned efforts",
                     "  _shared/",
                     "    profile/",
                     "    principles/",
@@ -219,8 +227,8 @@ def variants(role_data: dict[str, Any]) -> list[dict[str, Any]]:
                     "knowledge/",
                     "  current/            # this season only",
                     "  timelines/",
-                    "    2026/",
-                    "    2025/",
+                    f"    {day.year}/",
+                    f"    {day.year - 1}/",
                     "  profile/            # permanent",
                     "  principles/         # permanent",
                     "  _archive/",
@@ -243,7 +251,7 @@ def variants(role_data: dict[str, Any]) -> list[dict[str, Any]]:
                 [
                     "knowledge/",
                     "  decisions/",
-                    "    2026-08__example.md",
+                    f"    {day:%Y-%m}__example.md",
                     "  consequences/       # what followed",
                     "  profile/",
                     "  principles/",
@@ -325,7 +333,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Four structure sketches + blind-spot list from a role YAML"
     )
-    parser.add_argument("--role", help="Role name (matches examples/<role>.yml)")
+    parser.add_argument(
+        "--role",
+        help="Role file name (examples/<role>.yml) or its `role:` title; "
+        "<kb-root>/examples/ is searched first",
+    )
     parser.add_argument("--from", dest="from_path", type=Path, help="Path to a custom role YAML")
     parser.add_argument("--kb-root", type=Path, help="Deployed KB root (defaults to cwd)")
     parser.add_argument("--write", action="store_true", help=f"Write {OUTPUT_REL}")
@@ -344,7 +356,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        role_path = kb_populate.resolve_role_path(args.role, args.from_path)
+        role_path = kb_populate.resolve_role_path(
+            args.role, args.from_path, kb_root=args.kb_root or Path.cwd()
+        )
         role_data = kb_populate.load_role_yaml(role_path)
     except (FileNotFoundError, ValueError, SystemExit) as exc:
         print(f"❌ {exc}", file=sys.stderr)

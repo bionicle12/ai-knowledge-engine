@@ -1,0 +1,1231 @@
+{
+ "format": 1,
+ "generated_by": "scripts/build_known_hashes.py",
+ "files": {
+  "knowledge-base/00_OVERVIEW.md": {
+   "181a9bcd88180a0e2e0dd258b14ff358948bca2516118d9b49c7fb0c7a7bfc84": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "693a973f00072727c040b12c8551966eb128d2f2c699ccfc96605c8bc647d1f9": [
+    "0.16.0"
+   ],
+   "75f36d98909768cabcdf09bb76a316d6ab13143861cdbe757cf1279393ff9cf6": [
+    "0.9.0"
+   ],
+   "7c7e84b82a81ce3afaea9fb7a75b455a5cb8ce13bf989b3f9baa2dff18322293": [
+    "0.11.0"
+   ],
+   "8540196acd3ab1f5afaea13822680d63df7c4ab8730f227239414fbeae7f0d01": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "94fdbe406c4e0cc52ea3bfb6c255ce0dbb4b49efe5f4be1591554c8ff1b4cb2e": [],
+   "a5ef51a980e25c4c7ecbb8e2f3d9786f0c81eee17d7c387ee222347a5b77d5d3": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2"
+   ],
+   "b64e781d6b26169d7bb4cd5fcf7b07390f817eaa1c5ce55d78f67fb56ff8e1b1": [
+    "0.9.3",
+    "0.10.0"
+   ],
+   "b8926aa6b15f97a7c5c6c38ac9dbbb2d1e2f3219e23f018ff67ec6b8d6d26754": [],
+   "e198ced9c20f856eb57cf566006f72cb1415de8cdd128e908f0c11e8c2ae4b1e": [
+    "0.9.1"
+   ],
+   "fcbcf09919b89be655158ab003e99ba59ad24d363da52bab38dfa691e3b411b1": []
+  },
+  "knowledge-base/01_PREREQUISITES.md": {
+   "161196ee16a569b06466a3490c155e136728d5aba0e333ef95e613834e0f6b9e": [],
+   "206d6f515aec7af761d092f044547ab3a23e9d43353ccf1e8b98cbc32eccdc97": [
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "36251e6c4a6a224c3ee19433c24293d87ecaa36e0a915f2560acc1a3557cf56f": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "8b5c22441648c7db9be16d84f8b26e8579692c4418c5c927fdfaaa57fb971006": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/02_INIT.md": {
+   "294373086c3498c9570e04bb9551c47e5c499e649c87fd833d9ed47b2f47d434": [
+    "0.9.1"
+   ],
+   "2fb3d71521a615b8587011dd0c5c2ca15a494defcf30d01a4c1b5f20d41e72e5": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2"
+   ],
+   "3a12b4589b17b64a05e61a956a7b0b04aeb0aaad69d0ff9dadde397783f988fe": [
+    "0.13.0"
+   ],
+   "6f424b2672c64970614f7475eab65c4b8ec23b7d12ddbe37e3748cef064d915d": [
+    "0.11.0"
+   ],
+   "705981068c59a77273b2166fa2e2c4116a1d378eed82298e4ed3e323334c3f5a": [
+    "0.12.0"
+   ],
+   "73276f2541fc1d5f6b67aa7ad4efbfb6892aeb11598f2264e59075bfdf8a819e": [],
+   "9c22b994942ce2b69f40b59d4133eca315bb79370aac4ac7968e3ddb18cda1f6": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "b0ca5bfac4240a43044716d179cabc519226665846737b173c6378357ca68428": [
+    "0.9.0"
+   ],
+   "d9bb40552501c955d62e8f6e3d6cedb5c475d6efe8b5b6ef2ecca29d9e3c7652": [
+    "0.16.0"
+   ],
+   "e2290367196265365c432ddcb0452de0b9005aa8c5411753f8d1740fa14e8f70": [
+    "0.9.3",
+    "0.10.0"
+   ]
+  },
+  "knowledge-base/03_PIPELINE.md": {
+   "0e8b34e73035aba72f127e59dfb967f424dc4113059c1cc90ea9610f00a3f002": [
+    "0.16.0"
+   ],
+   "2cb1223ac2bcdad6cde341d19e8b31a5f54d6ec26e8e6fba0496c5c06ed563eb": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "618b04a22c160d1899efba63b236f6325758f1b371544bbabeefd30bf14f2e03": [],
+   "64d5645c95a2ad94ee88a0f10c14e60a48c22e75f3f91fb5c68236f5e591073b": [],
+   "84e9b426830d568beaed692399a4e4cab2077f36597960c28249dad1609a46f9": [
+    "0.8.0"
+   ],
+   "bd5d3771833a188383e25f769927c9637548552df5e18444742b40237dcf3efe": [
+    "0.10.0",
+    "0.11.0"
+   ],
+   "c5c4d1b02815d3f6a2bbba5aedd6c07dd3c977277a1af1c8a3bdbc9f7b2088d6": [
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ]
+  },
+  "knowledge-base/04_REVIEW.md": {
+   "1bce79d03f593d6baa02e567895c26ce0f08937687d7bff095ee7693c2e1c833": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2"
+   ],
+   "314d0e859c1801fa00f7b73f0bd81f29d92302cce754dc9edcdfdb30710bfde1": [
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ],
+   "abd695540c1b7d6b2a0d2583b35a913a7bc9f94b9daba1dfea5c2a328b9e91e8": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "c1bb32d73398773db88ec009cde4046a5810571963dc241447c87474c2de40a8": [],
+   "efb21d06b4d0f8ebbba7036d3cfb59d79bbcae38008a2883d70030d7db55b963": [
+    "0.16.0"
+   ],
+   "fa988ab80f972e9dd93859c0f72418152116b0b535e83915839bcb5f0ce78259": [
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/05_INDEX.md": {
+   "08ab2a2234c09bdaa6b7c5739667cc04a76593d9542727d5e0c62a8b2afbc628": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "09d5e175742a7205d49c331ad4cc98ddd47a633d9c646105284293f1910d7a5a": [],
+   "1b0d5994903997ae7e8292cfd90c9868373ac4bea47deefb755840f6ced7df3a": [
+    "0.13.0"
+   ],
+   "b8c7faefefc6e652ad5f087243b179f032e9c965ed75ac09eef55a38ba34fe72": [
+    "0.11.0",
+    "0.12.0"
+   ],
+   "c0e520fd014d11983fa79a3696b4c53f33dc2ec537a58438940b385521a18303": [
+    "0.16.0"
+   ],
+   "f72a9cbbb58d1bb07ceca41fa8b0a50d9e9a517a938e932c12101852711191f4": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ]
+  },
+  "knowledge-base/06_AGENTS_TEMPLATE.md": {
+   "185bfa4fc14ce8a790b2d48a255ff4138b34e4c0091d598b7180cf38b9b75d7c": [
+    "0.10.0"
+   ],
+   "1b34482adc6b70805601d66997fe5281c09e9ad7b6c41e66ccd5efed0fbae265": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "53a5f533d0d0ee365e8d286bdd7a09f4d6f5dbc28ab414e94140255a30d796d0": [],
+   "6b0df1532cd2292441181f70af2f3823bfce827971c25cc113eeffe84035a19c": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "7ebec90a1ae114698670fd0ed1ac7d79214854440ffb765db1a2c41e6a04fee6": [
+    "0.16.0"
+   ],
+   "9e12457e60241874489ad07c730651c433711f686a512ffe8d6aa115af47643e": [
+    "0.11.0",
+    "0.12.0"
+   ],
+   "bafc086e46776c66341bc171be5fd70aba6c7f0d07fc7b73d7cec245a6dce849": [
+    "0.13.0"
+   ],
+   "c04d5807e313fa34580dab6eea169f18335d2bba85ef3927bc898871644d4dda": [],
+   "dc322711a3f463e17716d41471ad97b1d8ff1bfa37b69f55e0fdda6dceb9b68a": []
+  },
+  "knowledge-base/07_INTERACTION_LOOP.md": {
+   "13b8685dac9523620f3d8661d7d672e7bc68514deac2963b692fe6a2ace64153": [
+    "0.16.0"
+   ],
+   "37b01f6f91f30d0d8005b272d64d6abc8edb5d281ebf2ef6aa2825f39f448620": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "3bc967ec8c9773de1d7faee1f39819dbc31e6ec351853379274b1adf44bd12a0": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "cd06a2323fe40bcfe160e705e26f66788f36fe8a290e64f2736c8282afb13956": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ],
+   "d9e9e5c4165d4714f16f3795acd28d1775ed0b957b8d7c99adc841aa7dc0561c": []
+  },
+  "knowledge-base/08_PORTABLE.md": {
+   "0f28dea38f9298e46bdc0c736c52754dd58c7d6c2c7c5351edeb51404c8b0f25": [
+    "0.16.0"
+   ],
+   "2d6712268c682f4f375f19c8dcb864d88a4c15fd85bf6188db73018d79fe8904": [],
+   "3650f8163753ae1d4d2eb4483bb79c0a15ea60fcf53554c672b2cec09af8e00b": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ],
+   "af7cb61089e0b860e02511d10fe43adaad6a61f6020892d8626698909637b84c": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/09_LINT.md": {
+   "5f287789d1572e94ef8b0684ac8745283ad22cafbd55987dccf3755c8361ea63": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "678f2687c3e5fd7faaa3efead0c2415eaede40d9ae28281f7b8ad37c82ba1163": [],
+   "b5164f7826328005910f912c7aa53d0b2cea51117edc0e58b8f366e1904031ff": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "bedcf9c2a48048aea3f9026c73165ac67cacefb8ee3c724ec6f50e0e9b917e13": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/10_LOG.md": {
+   "0cfebc40662df1a1b96cc00d87c1d139297585eb6d769d1773f589664f69dd35": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "2f284c604d34db05373308aafc02d9d7f69bb210a15ed3487525a05790e418b9": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "b1bfae2b275a302332d002953bc4ca69e3af895cb81503130ffbf96e3ad967f4": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ],
+   "d7b75e61e3cb6e6ff55bfd5f222e5b293041d816cea90393cbc08d4b5d91e154": [],
+   "d92ca73e95e6ec615e080235fec5e5ccfc50e5096e30aae8fa7d10c8918db755": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/11_PROVENANCE.md": {
+   "5b223529e330c9210d63507a4ab88099a378e32aafd271aeffa9463916774a6b": [
+    "0.16.0"
+   ],
+   "6fb357950c3a2dc357d197bab4ddee9a1cab4db58155400777da169fa58157fe": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "81225b1b4da632206c8a69f0e4d448bd18ef5c5fae07d9bbf4e68f0f7156c797": [],
+   "fa465406539e8de2a9c241fe51a58a2eabb65ac3b622b0334a0c4687833a444d": [
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/12_NLP_PREPROCESS.md": {
+   "42c832484960088cd8fc2a5b1852730371a41239bcfd45db0e9067d44c5567f2": [
+    "0.16.0"
+   ],
+   "8f34668b600db1905387c575eea6aa91962cbae5ea92c3d7fbbbc9c26d99564e": [],
+   "e60ff8f7cf983f6e1fcaba58675c5df7488c6ca2430566e67302d98218bf3e9d": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/13_AUTORUN.md": {
+   "27223f19f941241d88b12b39e5b7d5b933fddf16067602fdb44e6de1782f2b64": [
+    "0.12.0"
+   ],
+   "98a4a95d0cf26a817161655b61f7e20083b4ce8d99502708c54c90da98bbdac1": [],
+   "992faf4271512f5ee44a9fc712afa2d658fe64fa54693b641cb629091c529031": [
+    "0.13.0"
+   ],
+   "9fdd11e6aa6f6a39bf1341eaf9dacf4d3b4ea3c8348b12d4b137a0c1c9d73141": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "d2d46e5773ff433e056922fff5c248ad8b7526f609fa3ccb9674cfc884aba0c0": [],
+   "ddf57a1bf6bb7aa844bf5ac3c676c97ba5af8963d62ba79f8d7fd3a743287b49": [
+    "0.11.0"
+   ],
+   "e68f6ecd62217344ea98917fe3bcd0f7111254f68aaf8f77b89e8ad0c0cf3cc4": [
+    "0.16.0"
+   ],
+   "f0bfceb237dbff45ed98a1b7c494765370280659e053b371ee8a83de885db0b8": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ]
+  },
+  "knowledge-base/14_INITIAL_POPULATION.md": {
+   "02e61cef1e235bf3b6aceff376bbce1f34ebe8c911fc94c524cd6382880202c7": [
+    "0.16.0"
+   ],
+   "0b904e5d8fb405fd566cf818436abac81a175a56170b7aa42c79da1fa7f198c3": [
+    "0.9.1",
+    "0.9.3",
+    "0.10.0"
+   ],
+   "bc45978c0fdeb70b4b967c8e5d6242067143c7c2467608403bbb495d7317b326": [
+    "0.9.0"
+   ],
+   "bd905e2c66ba17cc45849bcf664459bfb7fce92f0be52476ed38b91f9ea73987": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2"
+   ],
+   "de87ab340aab2bad8f50b6b842506e4e44c222fb12dd2d132468b3af41184085": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "e2c2093cf7bd51f9d03901e93e428c79629fc4d836dd4fb03a06255dcece81ca": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ]
+  },
+  "knowledge-base/15_MEDIA_PROCESSING.md": {
+   "0041365abc971dd39748d2447e2eed598af3eaac120fa6485ba22041c32aa5c9": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "5794e58e920ca784ff1e0effca268ff02b657b31f3abd04896566b98c57710c3": [
+    "0.16.0"
+   ],
+   "c8739247bcb8b92ac3fe1c4bef3adb2e3c7a9dcfd809ac99e4c13486c9102237": [
+    "0.10.0"
+   ],
+   "de20db885336b7fab0f82338323bf6a1c32ebf7861af7eb5dd972e7c78773f7c": []
+  },
+  "knowledge-base/16_MERGE.md": {
+   "3ab7d694bc2dee026c0eb8d4ba401d934c52ffb55e733d3710ccbeecb648c644": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "7a27ec3b5b50eb9e49573bc354c2acb6d087e6d918a81c1e0a676769bc0c0c16": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "bce73687950c1685b3c773d0b8214a9c93f114a6309aed8ca6678eb3df97b01f": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/17_REFACTOR.md": {
+   "2634d32c775a275333e8fb21a4569a0f288ac60036052c48f1385882c4b090f8": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "e7fa26e28db739703bd94350ffe5ee7e4ccb543a69017dba24c2fd15fa4861b0": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/18_HEAL.md": {
+   "9e280c83eb1e322583c9c15e16defb0cc2f84cd5544aaf08efd4bbb014067074": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "dfb4da66637c05a06967524bfeae31aeee68d9a9016a87d2b10d0b3b32e277fd": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/README.md": {
+   "03f7eeb152dce7ab4a2ddb21978991ffcb16094a93ce3adc49ca6500ad386c32": [
+    "0.11.0"
+   ],
+   "0669c8e30706c23bfe3c734045a2b04994ba0699ddac8bc3e6b8cc022678e209": [
+    "0.16.0"
+   ],
+   "0ad8adb76a6877ba2fb09d3ce767284dab934249d28a824d1c75d82798a3f1b2": [],
+   "2b8a74cb74311a79e717b0c5b74b1f1800201c68582364271b3f067d014c9c9e": [],
+   "385f4223ddcd1523fc377dc988dbaa19c2ec393e849c143d09fab11a6b4e1e42": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "4f249c5b7e13b861f8a2c5d35dca1bb22437d85c1888c4e477a0dd0ffcd00346": [
+    "0.10.0"
+   ],
+   "e451a11c3aeb012ba5b93f2c7e2d6389e12588fbb1c4a26a00a19ad89c7c1777": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "f590127e5cc1f8620dbeb2e89ae1addcbb27752709d9286e379e3aa216e9bb48": [],
+   "fc51158ead8ee2788eb647f29cbfe78f0bf2d7f0fffee9bdeba8cad44eac8f3d": [
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_common.py": {
+   "083f95ea92b3401b0c8b9b4d50acf8bc6285b3d876222c66874f2f1fe3cc2de2": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "0d2dfe2a134da2170f6cbba69a76ff8e938629e09ab6b7aacdc83c006c21d5ee": [],
+   "152213be9ddd67c6ea184f01a0e526197156c1ed0227c046741f55da2c34d77c": [
+    "0.10.0"
+   ],
+   "27fa62849fdc9827437b055bff6963e762a6f51e32495559f93d8c5256bf78a5": [
+    "0.11.0"
+   ],
+   "2b68ed4d4e9476ed8e0faf39ea2023db8d0a589ea9e2aaba627cdd459d3d0692": [
+    "0.13.0"
+   ],
+   "406ab1cfed8b0c41095d0b695d5993b71c7f606ebc7e73694556148afe2e4a40": [
+    "0.16.0"
+   ],
+   "43da507ccb07ccfcf06b162a41567bb80a468c3d494581d58597ddbe84728ced": [],
+   "74fe021ef9ac49114d9fa1329369884d16d7983eb14aabff0c23ca17c88260be": [],
+   "8bab12a5a0775265ed13278696220dc4d3effbba7cca0315cb5a06057464d1c3": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "eb521b1e76655b01f816f868fc1bfaead45e5f01d1b68842b852bba5f880b159": [
+    "0.12.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_doctor.py": {
+   "41317acb7aeaed139a25e814e43286e90bb2c959407a63dd3a341e3157f51d37": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "60f39bca23d8047aa832dec61561378d903bc60d93eac340dc9e8d112333b593": [
+    "0.10.0",
+    "0.11.0"
+   ],
+   "b69d37820f824102deb411c8b1ca7d457ecc5856e996721b7bfc29297d8f090f": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "db3d99490b4d6406e2d4b82856ff047e04967a0e500fe7ab273ed61dd0bc7fa4": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "fb8b785ae5d90f1342462250c74f7951007ffb579d7cdfea5742a2cb2154318c": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_export.py": {
+   "603211211dfa4aa277c9a83aceb0c3a5778554d5015529e1337fc859e39c3b8f": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "c9c339dcb97bc03158c3fe96df6f8961373d80c220990d9e5e3e6b13c3a14249": [
+    "0.16.0"
+   ],
+   "ef08aec3a89692408083083b49660d46d6fa6b0e74f374cbe81b4c71bac8425f": []
+  },
+  "knowledge-base/scripts/kb_heal.py": {
+   "cab6b1c4d4076b51c41804935829f872f218db6f1c9875d442768fe753ba323d": [
+    "0.16.0"
+   ],
+   "d4000f4718e0f90dcb17c1668df30664537aa7462041b120f87169478cc2e78f": [
+    "0.15.1"
+   ],
+   "f9af4810896cb045fe13902abed5fb8e37a3fae689d75f8572ea85e277f8797b": [
+    "0.15.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_import.py": {
+   "a9bf75b33c99d80519992fb89190f32422d85be697de994003ffa6c5a1b7e90d": [],
+   "b5dbaa07a08372103b77c3b7a9628f4daf5b50891b5e28be743dcf24b2c9db6b": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "effe1edf26b2a11fb224039383af60bf4ee12f5aa2f1b8088016f475dd535e21": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_ingest.py": {
+   "1806e169d8fef1fed1ddc2efbe1a36e0bc59bc6ac5dd9dddb17300c143cde7b0": [
+    "0.8.0"
+   ],
+   "4cde87368ca9e701a8591b3ef58e4cf1f0bd591c9b8c114e6d242a35950606a1": [
+    "0.10.0"
+   ],
+   "50b425445718550b9f1b8eac69ff3342e253ab82c7b4b7a0f7666673d4969814": [
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "5755e83c4d37c5e25fb8778afa7f64d0f746a5a3be7509eb88c24f5a17cc8fcf": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "6acd7a297d0aae9bf53d147673b2b56069d28142ec44f2e1dfaf9793aa65b1a4": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "78ed596bbec99546dac58bb20c283d64b042b04a2fd7ff83f1ad0c6c6e5fce62": [],
+   "a5bc677c1e3586cc3126878125ef15b7cac79d2748c4b669cefc19a7bbabf647": [],
+   "a77e500f9347a1496a77d4d5b2a327eee24fac93946b5248d8119493375e136e": [
+    "0.16.0"
+   ],
+   "b1bfa9ccbf04719c7fc6d8d2dae8f574d6de503529eb19a8e16bc2f067b9a708": [
+    "0.11.0"
+   ],
+   "ccafff939dd1a716b1deeedf86c26a6f8a3e700ff2cb55c77980ce2736044aa6": []
+  },
+  "knowledge-base/scripts/kb_lint.py": {
+   "0f5fbe0936f5161d279d63a0f525db50cd8429ceb1dace8e61305e13141f1155": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0",
+    "0.11.0"
+   ],
+   "1a8fcf9249dace1bda008da9eab97bad9e744d5b9e99b721b24194b704a1836c": [],
+   "5301c44705f5309af0d8bddcf1778bb72e30805c8c710bb383f753c9372c338d": [
+    "0.16.0"
+   ],
+   "c8a05175476a48b12d9af7dd432c13bb2ca0a33462c9e5103f784d061111ebad": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "e3f874976724a75831dab05bc016882309129c18bf226b936684f9ddaae1c793": [
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_mutate.py": {
+   "5ff26e436e4c3f1ddc97d9c29dc61378b3e338357e6d1bb1e980ef84ed9d4847": [
+    "0.16.0"
+   ],
+   "b5e352c879d678059f57771bbf6fa0d27f18d8af5a8ebb8fb2afc833e0e9ad19": [
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_nlp_batch.py": {
+   "2009de83f464f7d7f822256b39b310f660a86660755014eeb7db179680703268": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0",
+    "0.11.0"
+   ],
+   "561d3526b3cf28d429cd7c00fc2332c46b36e894aea83fe756150ec432ab463c": [
+    "0.16.0"
+   ],
+   "e3e9550a2e46aa63a7fc9cfb6dbb07ad8ccba0da98f19f50b6ec74a68a8b51ad": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_ocr.py": {
+   "680a080c48f156a54fbd1167ed1d12f21deea216b99e531f305c4f1ebbf71d92": [
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "ad800277dd3f6149c0251f63c2c821b864ec344501596f2158686ef36aa5e874": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_populate.py": {
+   "0de4555c202e1185dcc4b5e7d187096c6aedae6ac649be9ba3f7ff769f8a3458": [
+    "0.11.0",
+    "0.12.0"
+   ],
+   "1def2e3c901877b25629ef57215dd7c1bc5aa12c74d7593b2af55fb430951d62": [
+    "0.16.0"
+   ],
+   "2adeb995468e92ddddfafec27c4e86120cd183818d5f6118c7dad16711bf133f": [
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "a4102d32e8357c1316b4bc73cdbc5e1bebe84ab50b7f2283bdbdf23d75e91ce7": [
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "ffb4a1f09000d206eb8b38e48c4babe0c5ea27a672d8f73480e9f22a69c37bd3": [
+    "0.10.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_reflect.py": {
+   "4b5e6d547a5f6ca343206c4e9e6faa53c6936fd8e6d9a0514e697a84013e41f8": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "b55d52d1af43bb89059ab1f67ef3a9a8045515ce76333e50992d33b8847b42fa": [
+    "0.16.0"
+   ],
+   "f1f6661ee96b06a2e5b450210b9496f72f609235fe07a9590a050ca5a69fb42c": [
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_reindex.py": {
+   "2ee2c16b9c3994eccd13de2b0141ccbb8e55d90f1069e9b55f189169bbbdd9a8": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "5dca96d24cb707998034206cacb1080a097df923a5625cab8bec8ce3c26dbc0f": [
+    "0.13.0"
+   ],
+   "ab66adca243854aa48b4ad447018a6382ca2a6a15148cb75a06a742f8a1c3804": [
+    "0.16.0"
+   ],
+   "b928ad390d056fe984191b37621e30242af31bc9871e861c0924b596196853d1": [
+    "0.12.0"
+   ],
+   "bdfc382cdbc5f4fd0adb7b6407c80029b7275e4bc5465667854d5495392d5dd4": [
+    "0.10.0",
+    "0.11.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_route.py": {
+   "52b2e740d369604463e2840d32b6f7eacaf52a91d1270016ff5ee16442e8da63": [
+    "0.16.0"
+   ],
+   "b743e91f09a2b874e5a123ea8095b2a38320d9730386d16463ab1328cf2459b1": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_save_session.py": {
+   "4057394211707899bd2d7267b7f4b2a7e487017e6fd70c52d42c2d0fb357144c": [
+    "0.16.0"
+   ],
+   "880c37c1d214fdb3f0d026e9a27f780f7cfc8b68cb21a8aeb7560976def56760": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/scripts/kb_status.py": {
+   "9526b97ae0387dd726296b588486a51232c25ed032fb9d510ccf918a63fb84f2": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_structure.py": {
+   "b7acc3b2e20c0bdc735fa036473f03dfebddc9d906393aa526b462a7b13345ea": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "fc1ab690a4fb7a99aaf9b3974b47013706635eabab2872b36f9cd3f645be5cea": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_stt.py": {
+   "69c58c6033b7db076fe94ac5f73a9433382d7e3e08d7dc95e6ad9eca86149088": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "7eb4c5dc03848c1aedc60348dba1efe03c8eececb589fb3a0c9379e986c3c066": [
+    "0.10.0"
+   ],
+   "8edaa75e5d9b00eff4bd76ea88f678cf86e8661f7c2a65610e4571a8d30549db": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_update.py": {
+   "e7b85adc4778e7644af745e6634eeb75803d6c58ebbb4fab5dade3b4e09267f0": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_view.py": {
+   "95954b2ef193073c850f9a610f7ed0cdddb62091be0c690adf56ab55ee5b5a48": [],
+   "9fd6a129967707705a057f33a7d614bd77711bae6654d0b3b5de92e0cc596690": [
+    "0.16.0"
+   ],
+   "a98cd99e31db0e7c725372bd84ebd702363a813d6b1f2a50dd8fa794f8fcb0f4": [
+    "0.12.0",
+    "0.13.0"
+   ],
+   "bfd3f1f51baf1d730e21c5e67903122197c21826d120ceb9f61e0ae4c6b9a6d3": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "e7629a4a03add9b0fbef27d80256b2c49d5750e7122d35fe5211fcc9ef1353f2": [
+    "0.11.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_viewer/app.css": {
+   "0d0ffb9bc9daf11b70dbd023bfde8347c3794447acc6e32f02295e2ccd49e8d9": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "e8e0f3f1f1008359b3939831960bfab2f0360c1b79ccf10b2d92a7d81fe49905": [
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_viewer/app.js": {
+   "0c4769152207c9eb6792e4702f6cc162d3e4bc33ea61aa7c63b6772574bd0be4": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "72a33ce2f88ff03b39df6c6c53ce6f14fabefa5cb23ae4f2a5c3ac1efc406e1e": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "d1ae0fe280bb04b2a57d7ca620579f7369ecaa2546a9a961272288ce95f58370": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_viewer/index.html": {
+   "1257aa38e9ed11e04509cbc0ee835a6e3962b52e8732e731f06c73d32b0a6abb": [
+    "0.15.0",
+    "0.15.1"
+   ],
+   "8bf0cab79ba9a446e1b2db1016257a793570c940aba114e10679a018c92fef95": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0"
+   ],
+   "90945a5bc00ab3a453d06cc3cbd2880edcaa1fecd7b1690d42fdb824ddbcce07": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_viewer/vendor/LICENSE-vis-network.txt": {
+   "1f65085e54c036645082257618db2c7b787e68c3b02485e214ecd09e0834ee8f": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_viewer/vendor/NOTICE.md": {
+   "5ecc6f0521bcdc3e3c7e6995042d1c5c12ddfcd8775bdc01d4e47826446025d1": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_viewer/vendor/vis-network.min.js": {
+   "fd730e304a5b877a937a896be9536e7974dc473d8ac87fa66644bce52cb5f8e4": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/scripts/kb_watch.py": {
+   "474eadcb300411fc29a51c6efaa13af3c419156a10cd2d52710b32ed01371dce": [
+    "0.16.0"
+   ],
+   "b8ef72751ae0a8102d015d8eee5b5c819c5cb29c3d074139938c0e4b23f02350": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "d781e76b7666d016fed3962a69ffb267c7a60125dda0228a9fc24546a7a0be3b": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "f559da0cd66ddf9cba278b7cd46d27519952af73b09db1a84f52f41502c2b733": [
+    "0.10.0",
+    "0.11.0"
+   ]
+  },
+  "knowledge-base/shell/_kbpy.sh": {
+   "db95f578cabcd4338474c92e173e0be8b47a7f907e496ed0296951ead664a4b6": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/doctor.sh": {
+   "196be78a2b5a166f4ef0f35911ad613ea923373611e46b42a4d82703e531d29e": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1"
+   ],
+   "3fe1dba9d20c0d3d5fe2df8418774c6744f3337aafb89ae74f213d0a6a342317": [
+    "0.16.0"
+   ],
+   "f812281488fe17de925580e2d437bc6bcf1de24f3ed3415f32af33cd1a5dfd81": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/shell/export.bat": {
+   "980aa99e4501697f83eb9e76a3ec0789ded29462bffbed49ac93499b4b50803b": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "cb2822166d3bd8ba9434ff102f3752b9e5dfaa1c0c42ae872cce188fb73edb0d": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/export.command": {
+   "ca29360a3d8ce074d19d108e255fd2c8d4691e4084268d8d15749516b2a815a1": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "f02979669497e14c840ccd1a9f2c30b1f83f8ddcb3b49bd4f6cbb55444077d6e": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/export.sh": {
+   "27b3b6c7f843c8bf3e5ee1dd837a3120a940a0f4bbab51ae66624488b38b7ae6": [
+    "0.16.0"
+   ],
+   "92f24ce1520e1cce3293c5f28c9bad3254991be1244731d846b3393919965d48": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/shell/hooks/post-commit": {
+   "94f257e3fc2fd20f66adba25ef2f7231f5c5b953b8f0dbe0d9cd29499133b9ed": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/import.bat": {
+   "18e6baa19a65e244254e12bc92d7669c6615b2cf1e50680db863c3dfb45bb367": [
+    "0.16.0"
+   ],
+   "44e1f714783f05f7920696720f9c986203cede740da6a405fc730681e905ac35": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/shell/import.command": {
+   "76151b32430005e8e9584d1550878bd305eeabb771d4accc5c4e40499a51570e": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "d5c136a8b22d12e93812ecede987b47f11dfff7ce0c2895ba06c98c1453b7693": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/import.sh": {
+   "6f01e279209aaf16bd3a7a32f9be28251640c6b9c7b04143ff31b55fa049c486": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "f14fed428c31cf0c49d98b855702665a5914650160605f6c49690353011c396e": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/install-hooks.sh": {
+   "3bf23be808609bad980ad39cafc0dd5890f70102f6caf2d3b32a0e41eeb767a0": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/install.sh": {
+   "e811ba4c0b1770398e4ebf98cf1025da1480e009dab458d3797fe76045b834ed": [
+    "0.9.0"
+   ]
+  },
+  "knowledge-base/shell/lint.sh": {
+   "aa645839474b72238bcb723c090b13fbf35c8cbac5cd02061ac1aa3f73cb34ea": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "d086f872e805424e85b6a8057f08540ba3c04f3040db28a6a068069ec649159c": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1"
+   ],
+   "e9ea3601ce469b157ad075c751df7738925c4975c28f1e72732ee2875c814440": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/reindex.bat": {
+   "23c33f326ebc79282d6b5b250fe1a44fa5198cb128cca55c0e1ab40d9ab32e19": [
+    "0.9.0",
+    "0.9.1"
+   ],
+   "596ddc2543b50f834a4cf2040be8a3001dae4c26a6bf8f68fa9ec1b229207199": [
+    "0.16.0"
+   ],
+   "7a25a47c550f139fc929d71090701b0dcb68c36a154a2e03a50e9579923aaa33": [
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "d303f2f20a2f0bc3c6444d2ccb6c5174c89030e2f4f86b78ea420aa896aa1b46": [
+    "0.9.3"
+   ]
+  },
+  "knowledge-base/shell/reindex.command": {
+   "49491a3de6a6b19684c2076e67bcd9ab8bd9d8c548057d1c4f7e185a9222e259": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "7eaaecc784361d313ce4d9c7d847c59d4e5714603342f5aa7685d4eb824c61ba": [
+    "0.9.0",
+    "0.9.1"
+   ],
+   "cf6ed718a0890cbcce0dbb2006a2265330d9cdc86f5d29f5d718677f274868df": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/shell/reindex.sh": {
+   "29a411777e994f415b1fcc3e537a5a63dd0701313730cfc384b14fe8634df8a6": [
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "37475778ee81b275a7b4bb12f4e350258753ad094f8e053bdfa32f32b20ace7a": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0"
+   ],
+   "70d9532d47bf15cac3976a0b519b4d93bbaadcc7c675930a2a937b7ddb4b4b50": [
+    "0.12.0"
+   ],
+   "bbb154d0c2af3adbb0748de16ec078ac7b28e8f8d50c270dd661b86153fb8668": [
+    "0.16.0"
+   ],
+   "fcb102b7ece8bcdc90568079d334d2057e0c20727c0a725a0ef7e8a70903cedb": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1"
+   ]
+  },
+  "knowledge-base/shell/watcher-start.bat": {
+   "884cf1c0dcd1d81faf859dd4bd879521359eabfdd83d4757d4e1ac0e213af79a": [
+    "0.16.0"
+   ],
+   "a4db538805e059cd613b28a214583a1cfe546050bffeb7ebca898a1fc335fe40": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "b71321a035c44e2c1029f3055617a76a3791a8ec665d34e7487d58753ef49028": [
+    "0.9.0",
+    "0.9.1"
+   ]
+  },
+  "knowledge-base/shell/watcher-start.command": {
+   "08a794066134cb0dc007141fb8c8447737032da9b2f8f75469792173ef60fe17": [
+    "0.9.3"
+   ],
+   "3293c47459d3cdb5fec89bc217f455a9243c2d53bb2c1f333e7db0565d34ecc0": [
+    "0.16.0"
+   ],
+   "78a9a9ddfd753164d6f4f7d1d4958330b3ee192b62d02eafe963fa8095357ece": [
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "b997c71179374ed5e7c3e1e12654bf093e8dc883e301c852e06d2142f29ada64": [
+    "0.9.0",
+    "0.9.1"
+   ]
+  },
+  "knowledge-base/shell/watcher-stop.command": {
+   "623cb92a2b8de0b9976dbf8f4faeb9fd6b417b8dd62fb34a91a336ddb130cd08": [
+    "0.9.0",
+    "0.9.1"
+   ],
+   "6d8b1a5e5b13eac94165db0a2aa6ab33d2d49e39691c96900bc8b6f59404d960": [
+    "0.16.0"
+   ],
+   "d2a84bc426012bec8739685829b11e16fe0aafe8e09556cd634c6561a00f6d46": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/shell/watcher.sh": {
+   "0370c4f00b81dd97bfe9b619b480032fd00942738c3f22a1e81437f801d7b726": [
+    "0.16.0"
+   ],
+   "26f1efc89e384f7825b5994a81d2df334ccbebed5c3a5cb641600d64cc694089": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1"
+   ],
+   "8c42d1748fd887a9ab0666ce33ebcf5e7bae5463071c282f3e4a69f6befb8cda": [
+    "0.9.3",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/templates/requirements-media.txt": {
+   "1073b30a5780dcb8d8b820ba2fe3b6a2d5d297ac9f2625fdf7d2e79add2e5d7b": [
+    "0.16.0"
+   ],
+   "1e9e50249ab8c8a68d4ac9d137266a16865ffbea475e11f3732ad8d2c6b7cc9d": [
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ]
+  },
+  "knowledge-base/templates/requirements-nlp.txt": {
+   "d0201509adfedbe0dc5e6c510e0107ab7819b0f5e881e9ce81941eefc66ea64a": [
+    "0.16.0"
+   ]
+  },
+  "knowledge-base/templates/requirements.txt": {
+   "685a4235c2bb9777b2c594a11a891f805bf3b3772111f60b9770c2fc5cafd3ef": [
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1"
+   ],
+   "6e79e3f0d15199b1939a7e09baec778d135f448ee6248d9a678196bc76aced36": [
+    "0.8.0",
+    "0.8.1",
+    "0.8.2",
+    "0.9.0",
+    "0.9.1",
+    "0.9.3"
+   ],
+   "bf8bb71f5a3f5b85f42b0ce0a1d91d8312dd48c548c8361700db39b8153a4508": [
+    "0.16.0"
+   ],
+   "c825f89a36f8c3e21a6f2dcec05c884a3413aeb6736292699b16cd2615eda7ea": [
+    "0.10.0",
+    "0.11.0"
+   ]
+  }
+ },
+ "blocks": {
+  "INDEX": {
+   "fd5e7c84cb7689174b2a9e9d7dc8d168a449bf402c0bfe1cc7f43c1ee44504d2": [
+    "0.13.0",
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  },
+  "STATUS": {
+   "9bbfb53494191b4a6f37a7ed9bd8a5f069b3feb001d23c86741fa646adf1cf16": [
+    "0.16.0"
+   ]
+  },
+  "VIEW": {
+   "763f2adcaeca8bf1195065986101458a2ee588f6a744417088ba873fea1a7dff": [
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.15.0",
+    "0.15.1",
+    "0.16.0"
+   ]
+  }
+ }
+}

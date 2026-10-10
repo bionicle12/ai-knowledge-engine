@@ -1,6 +1,6 @@
 {
   "$schema": "https://repomix.com/schemas/latest/schema.json",
-  "$comment": "FORMAT reference for one domain pack — the include globs below are placeholders; the init agent derives real ones from measuring the project (INIT_GUIDE.md Phase 3). One pack = ONE semantic domain, code + its tests together (so a test fix never forces loading a second giant pack). Keep under the pack_token_ceiling from repomix.packs.json. AGENTS.md/CLAUDE.md are excluded — they are already in the system prompt. GOTCHA (repomix 1.14.0): with an include list present, ignore customPatterns like '**/*Name*' (bare **/ prefix, no extension) are SILENTLY dropped — write cross-domain ignores with an explicit root or an extension ('src/**/*Name*.php'), then run the Phase 6 coverage check (0 orphans, 0 duplicates).",
+  "$comment": "FORMAT reference for one domain pack — the include globs below are placeholders; the init agent derives real ones from measuring the project (INIT_GUIDE.md Phase 3). One pack = ONE semantic domain, code + its tests together (so a test fix never forces loading a second giant pack). Keep under the pack_token_ceiling from repomix.packs.json. AGENTS.md/CLAUDE.md are excluded — they are already in the system prompt. GOTCHA (repomix 1.14.0): with an include list present, ignore customPatterns like '**/*Name*' or '**/.env*' (bare **/ prefix, no file extension) are SILENTLY dropped — write them with an explicit root ('src/**/*Name*'), an extension ('**/*Name*.php') or a doubled prefix ('**/**/*Name*'); scripts/update-repomix-index.sh reports files that end up in no pack or in two. The last patterns keep secrets out (.env files, keys, certificates) in forms verified on 1.14.0 — keep them in every pack config.",
   "output": {
     "filePath": ".repomix/<domain-a>.xml",
     "style": "xml",
@@ -21,7 +21,7 @@
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/var/**", ".repomix/**", "AGENTS.md", "CLAUDE.md"]
+    "customPatterns": ["**/vendor/**", "**/node_modules/**", "**/dist/**", "**/var/**", ".repomix/**", "AGENTS.md", "CLAUDE.md", "**/.env", "**/**/.env.*", "**/*.env", "**/*.pem", "**/*.key", "**/*.p12", "**/*.pfx", "**/*.jks", "**/*.keystore", "**/**/id_rsa*", "**/**/id_ecdsa*", "**/**/id_ed25519*"]
   },
   "security": { "enableSecurityCheck": true },
   "tokenCount": { "encoding": "o200k_base" }

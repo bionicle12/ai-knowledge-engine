@@ -1,87 +1,19 @@
 #!/usr/bin/env bash
-# AI Knowledge Engine — reindex script.
-# Runs ingest, quick lint, optional consolidation, and regenerates the index.
+# AI Knowledge Engine — reindex wrapper.
+# A thin wrapper over scripts/kb_reindex.py (the same pipeline the watcher,
+# the git hook and reindex.bat run): ingest → routing → quick lint →
+# throttled consolidation → index → STATUS.md.
 # POSIX-friendly: works on Linux and macOS.
 #
-# Usage:
-#   ./shell/reindex.sh              # full pipeline
-#   ./shell/reindex.sh --no-watch   # skip the consolidation block
-#   ./shell/reindex.sh --quick      # ingest + reindex only
+# Usage (every flag is passed to kb_reindex.py; see --help):
+#   ./shell/reindex.sh               # full pipeline
+#   ./shell/reindex.sh --quick       # skip the consolidation block
+#   ./shell/reindex.sh --index-only  # index + STATUS.md only
+#   ./shell/reindex.sh --force       # rebuild every pack
+#
+# Exit status is kb_reindex.py's: non-zero when ingest failed or the index
+# could not be built (for example, repomix is not installed).
 
-set -e
-
-# Resolve the project root (parent of shell/ where this script lives).
-SHELL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-PROJECT_ROOT="$(cd "$SHELL_DIR/.." && pwd)"
-cd "$PROJECT_ROOT"
-
-# Resolve Python (prefer venv)
-if [ -x ".venv/bin/python" ]; then
-  PYTHON="./.venv/bin/python"
-elif [ -x "venv/bin/python" ]; then
-  PYTHON="./venv/bin/python"
-elif command -v python3 >/dev/null 2>&1; then
-  PYTHON="python3"
-else
-  echo "❌ Python 3 not found"
-  exit 2
-fi
-
-if [ ! -f "scripts/kb_ingest.py" ]; then
-  echo "❌ scripts/kb_ingest.py not found"
-  echo "   Looked in: $PROJECT_ROOT/scripts/"
-  exit 2
-fi
-
-QUICK=false
-for arg in "$@"; do
-  case "$arg" in
-    --quick) QUICK=true ;;
-  esac
-done
-
-echo "🔄 [reindex] ingest pipeline..."
-$PYTHON scripts/kb_ingest.py
-
-echo "🧭 [reindex] routing pages..."
-$PYTHON scripts/kb_route.py || true
-
-echo "🩺 [reindex] quick lint..."
-$PYTHON scripts/kb_lint.py --quick || true
-
-# ----- Consolidation (lint + reflection trigger + nlp batch) -----
-if [ "$QUICK" = false ]; then
-  CONSOLIDATION_MARKER=".last_consolidation"
-  NOW=$(date +%s)
-  DAY_SECONDS=86400
-
-  if [ -f "$CONSOLIDATION_MARKER" ]; then
-    LAST=$(cat "$CONSOLIDATION_MARKER")
-    ELAPSED=$((NOW - LAST))
-  else
-    ELAPSED=$((DAY_SECONDS + 1))
-  fi
-
-  if [ "$ELAPSED" -gt "$DAY_SECONDS" ]; then
-    echo "🧰 [reindex] consolidation (${ELAPSED}s since last)..."
-    $PYTHON scripts/kb_lint.py --output report || true
-    if [ -f scripts/kb_nlp_batch.py ]; then
-      $PYTHON scripts/kb_nlp_batch.py --incremental || true
-    fi
-    if [ -f scripts/kb_reflect.py ]; then
-      RESULT=$($PYTHON scripts/kb_reflect.py --check-threshold --dry-run || echo SKIP)
-      if [ "$RESULT" != "SKIP" ]; then
-        echo "🧠 [reindex] reflection due ($RESULT) — recording trigger"
-        $PYTHON scripts/kb_reflect.py --generate || true
-      fi
-    fi
-    echo "$NOW" > "$CONSOLIDATION_MARKER"
-  fi
-fi
-
-# ----- Index generation -----
-# Delegated to kb_reindex.py: it honors the `index:` packs config in
-# kb.config.yml (falls back to the legacy monolithic build without it).
-$PYTHON scripts/kb_reindex.py --index-only || true
-
-echo "✅ [reindex] done"
+KB_SHELL_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)" || exit 2
+. "$KB_SHELL_DIR/_kbpy.sh" || exit 2
+kb_run scripts/kb_reindex.py "$@"

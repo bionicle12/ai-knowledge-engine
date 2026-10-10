@@ -2,8 +2,15 @@
 
 ## Skill locations
 
-- User: `~/.antigravity/skills/<skill>/SKILL.md` (and `~/.gemini/config/skills/<skill>/SKILL.md`).
-- Plugins: `~/.gemini/config/plugins/<plugin>/skills/<skill>/SKILL.md`.
+- User (scanned, reconcile target): `~/.antigravity/skills/<skill>/SKILL.md`.
+- Plugins (scanned, never planned): `<gemini-config>/plugins/<plugin>/skills/<skill>/SKILL.md`,
+  where `<gemini-config>` is `$GEMINI_CONFIG_DIR` (evidence `env-override`)
+  or `~/.gemini/config`.
+- Not scanned: `~/.gemini/config/skills/`. If skills live there, report
+  them to the user as unmanaged; the tool will not see or plan them.
+- Gemini CLI is not a separate host: `GEMINI_CONFIG_DIR` only moves the
+  Antigravity plugin root above, and no Gemini CLI skill location is
+  discovered (spec §22 Phase 6: adapters only for clients in real use).
 
 ## Capabilities
 

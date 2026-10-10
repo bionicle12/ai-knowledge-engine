@@ -17,6 +17,7 @@
       "additionalProperties": {"type": "string"}
     },
     "sources": {"type": "object", "additionalProperties": {"type": "string"}},
+    "user_roots": {"type": "object", "additionalProperties": {"type": "string"}},
     "operations": {
       "type": "array",
       "items": {
@@ -28,8 +29,8 @@
           "host": {"type": "string",
                    "enum": ["claude", "codex", "cursor", "antigravity"]},
           "type": {"type": "string",
-                   "enum": ["install", "adopt", "review", "quarantine",
-                            "noop"]},
+                   "enum": ["install", "adopt", "update", "review",
+                            "quarantine", "noop"]},
           "strategy": {"type": ["string", "null"]},
           "source": {"type": ["string", "null"]},
           "destination": {"type": "string"},

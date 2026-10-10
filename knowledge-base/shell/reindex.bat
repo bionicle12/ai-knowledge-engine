@@ -1,28 +1,33 @@
 @echo off
-REM reindex.bat — double-click launcher to run a manual reindex (Windows).
+REM reindex.bat - double-click launcher to run a manual reindex (Windows).
+REM Works from shell\ and from the base root (where finalize.sh promotes it).
 
 setlocal
 
-set "SCRIPT_DIR=%~dp0"
-if exist "%SCRIPT_DIR%scripts\kb_ingest.py" (
-    set "PROJECT_ROOT=%SCRIPT_DIR%"
-) else if exist "%SCRIPT_DIR%..\scripts\kb_ingest.py" (
-    pushd "%SCRIPT_DIR%.."
-    set "PROJECT_ROOT=%CD%\"
-    popd
-) else (
-    echo ERROR: cannot find scripts\kb_ingest.py near this launcher
+REM Project root: this folder, or its parent while the launcher sits in shell\.
+REM No %CD% inside a parenthesized block: cmd expands it before pushd runs.
+set "PROJECT_ROOT="
+if exist "%~dp0scripts\kb_reindex.py" set "PROJECT_ROOT=%~dp0"
+if not defined PROJECT_ROOT for %%I in ("%~dp0..") do if exist "%%~fI\scripts\kb_reindex.py" set "PROJECT_ROOT=%%~fI\"
+if not defined PROJECT_ROOT (
+    echo ERROR: cannot find scripts\kb_reindex.py near this launcher
     pause
     exit /b 1
 )
-
 cd /d "%PROJECT_ROOT%"
 
-if exist ".venv\Scripts\activate.bat" (
-    call .venv\Scripts\activate.bat
-) else if exist "venv\Scripts\activate.bat" (
-    call venv\Scripts\activate.bat
-)
+REM Python, same order as shell/_kbpy.sh: %KB_PYTHON%, the base's .venv, the
+REM project .venv while the base still sits next to setup\ (before
+REM finalize.sh), then the legacy venv\ of older bases, then the py launcher,
+REM then python on PATH.
+set "PY=%KB_PYTHON%"
+set "PYARGS="
+if not defined PY if exist ".venv\Scripts\python.exe" set "PY=.venv\Scripts\python.exe"
+if not defined PY if exist "..\setup\scripts\kb_common.py" if exist "..\.venv\Scripts\python.exe" set "PY=..\.venv\Scripts\python.exe"
+if not defined PY if exist "venv\Scripts\python.exe" set "PY=venv\Scripts\python.exe"
+if not defined PY where py >nul 2>nul && set "PY=py"
+if not defined PY set "PY=python"
+if "%PY%"=="py" set "PYARGS=-3"
 
 cls
 echo Manual reindex
@@ -30,13 +35,10 @@ echo project: %PROJECT_ROOT%
 echo --------------------------------------
 echo.
 
-if exist "scripts\kb_reindex.py" (
-    python scripts\kb_reindex.py
-) else (
-    python scripts\kb_ingest.py
-    python scripts\kb_lint.py --quick
-    where repomix >nul 2>nul && repomix
-)
+"%PY%" %PYARGS% scripts\kb_reindex.py %*
+set "CODE=%ERRORLEVEL%"
 
+echo.
+if not "%CODE%"=="0" echo Reindex failed with exit code %CODE% - see the messages above.
 pause
-endlocal
+endlocal & exit /b %CODE%

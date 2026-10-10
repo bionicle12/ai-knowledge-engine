@@ -1,4 +1,9 @@
 #!/bin/sh
 # Rebuild the Repomix index in the background so commits stay fast.
-root=$(git rev-parse --show-toplevel)
-exec "$root/scripts/update-repomix-index.sh" --background
+# Project-specific steps belong in .githooks/post-commit.local (executable):
+# it runs first, and refreshing this file from the template never touches it.
+root=$(git rev-parse --show-toplevel) || exit 0
+[ -x "$root/.githooks/post-commit.local" ] && "$root/.githooks/post-commit.local" "$@"
+script="$root/scripts/update-repomix-index.sh"
+[ -f "$script" ] || exit 0   # e.g. an old commit from before the index setup
+exec sh "$script" --background

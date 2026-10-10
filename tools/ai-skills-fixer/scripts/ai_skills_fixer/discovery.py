@@ -4,6 +4,11 @@ Every candidate location is reported with evidence and confidence, and
 absent locations stay in the result marked ``exists=False`` — discovery
 never invents paths and never searches outside bounded roots. Env
 overrides replace the default candidate for their host.
+
+Antigravity keeps its plugin root in the Gemini configuration directory
+(``GEMINI_CONFIG_DIR``, default ``~/.gemini/config``), so that override
+moves the Antigravity plugin root. Gemini CLI is not a supported host:
+none of its own skill locations are scanned.
 """
 from __future__ import annotations
 
@@ -74,6 +79,9 @@ def discover_roots(
         if env.get("GEMINI_CONFIG_DIR")
         else home / ".gemini" / "config"
     )
-    roots.append(_root("antigravity", gemini_config / "plugins", "plugin"))
+    gemini_evidence = "env-override" if env.get("GEMINI_CONFIG_DIR") else None
+    roots.append(
+        _root("antigravity", gemini_config / "plugins", "plugin", gemini_evidence)
+    )
 
     return sorted(roots, key=lambda r: (r.host, r.kind, str(r.path)))

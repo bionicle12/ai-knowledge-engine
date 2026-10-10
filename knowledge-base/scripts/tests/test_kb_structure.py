@@ -1,8 +1,10 @@
 """Tests for kb_structure — four init sketches + blind-spot order."""
 from __future__ import annotations
 
+import datetime as dt
 from pathlib import Path
 
+import kb_populate
 import kb_structure
 
 
@@ -57,3 +59,53 @@ def test_cli_blind_spots(tmp_path: Path, capsys):
     assert rc == 0
     out = capsys.readouterr().out.strip().splitlines()
     assert len(out) >= 3
+
+
+def _sketch(data: dict, axis: str, **kwargs) -> str:
+    return next(s["tree"] for s in kb_structure.variants(data, **kwargs) if s["id"] == axis)
+
+
+def test_dated_sketches_follow_the_current_date():
+    # G:L8: the sketches had "2026/", "2025/" and "2026-08__example.md" baked in.
+    data = kb_populate.load_role_yaml(EXAMPLES / "fiction-writer.yml")
+    later = dt.date(2031, 3, 1)
+    time_tree = _sketch(data, "time", today=later)
+    decisions_tree = _sketch(data, "decisions", today=later)
+    assert "    2031/" in time_tree and "    2030/" in time_tree
+    assert "2031-03__example.md" in decisions_tree
+    assert "2026" not in time_tree + decisions_tree
+    assert f"    {dt.date.today().year}/" in _sketch(data, "time")
+
+
+def test_project_sketch_does_not_turn_entities_into_projects():
+    # E: "by project" put every entity under projects/, e.g. projects/projects/.
+    data = kb_populate.load_role_yaml(EXAMPLES / "programmer-senior.yml")
+    assert {"projects", "tech_stack"} <= set(data["entities"])
+    tree = _sketch(data, "projects")
+    assert "    projects/" not in tree
+    assert "tech-stack" not in tree
+    assert "<project-a>/" in tree
+
+
+def test_cli_finds_a_custom_role_by_title_in_the_base(tmp_path: Path, capsys):
+    (tmp_path / "examples").mkdir()
+    (tmp_path / "examples" / "night-baker.yml").write_text(
+        'role: "Night baker"\nblind_spots: ["Where do failed batches go?"]\n',
+        encoding="utf-8",
+    )
+    rc = kb_structure.main(["--role", "Night baker", "--blind-spots", "--kb-root", str(tmp_path)])
+    assert rc == 0
+    assert capsys.readouterr().out.strip() == "Where do failed batches go?"
+
+
+def test_cli_defaults_the_kb_root_to_the_cwd(tmp_path: Path, capsys, monkeypatch):
+    # Review: kb_populate found ./examples/<custom>.yml without --kb-root,
+    # kb_structure did not.
+    (tmp_path / "examples").mkdir()
+    (tmp_path / "examples" / "my-custom.yml").write_text(
+        'role: "My Custom Role"\nblind_spots: ["What gets thrown away?"]\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    assert kb_structure.main(["--role", "My Custom Role", "--blind-spots"]) == 0
+    assert capsys.readouterr().out.strip() == "What gets thrown away?"

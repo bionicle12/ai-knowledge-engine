@@ -102,7 +102,8 @@
         </div>
         <div class="health-chips" id="health-chips">
           <button class="health-chip" type="button" data-health="orphans"
-                  aria-pressed="false" title="Pages with no inbound links">
+                  aria-pressed="false"
+                  title="Pages with no inbound links (routing pages, routing-table.md, _archive/ and generated pages are not counted, as in kb_lint)">
             <span class="chip-dot"></span><span>Orphans</span>
             <output id="count-orphans">0</output>
           </button>
@@ -112,7 +113,8 @@
             <output id="count-broken">0</output>
           </button>
           <button class="health-chip" type="button" data-health="stale"
-                  aria-pressed="false" title="Not verified in the last 180 days">
+                  aria-pressed="false"
+                  title="Newest of last_verified / extracted_at is older than lifecycle.stale_warning_days (kb_lint's rule). Undated, permanent, generated and _archive/ pages, and pages whose valid_until has not passed, are never stale.">
             <span class="chip-dot"></span><span>Stale</span>
             <output id="count-stale">0</output>
           </button>

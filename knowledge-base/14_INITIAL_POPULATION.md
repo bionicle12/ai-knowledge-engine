@@ -23,12 +23,28 @@ The agent has two ways to produce `DATA_PLACEMENT_EXAMPLES.md`:
 
 Both end with **the same optional review step** where the agent reads the generated file and adds project-specific notes the YAML couldn't capture.
 
+### How `--role` finds the YAML
+
+`--role` takes the file name (`programmer-senior` or `programmer-senior.yml`)
+**or** the `role:` title inside the YAML (`"Senior Software Engineer"`,
+case-insensitive). The script looks in `<kb-root>/examples/` (default: the
+current directory) first, then in the `examples/` next to its own `scripts/`
+folder — so a custom role saved in `knowledge-base/examples/` is found even
+when `setup/scripts/kb_populate.py` runs. `kb_structure.py --role` resolves
+roles the same way. Without `--role` and `--from`, the role is
+`knowledge_base.roles.primary` from `<kb-root>/kb.config.yml` (that is what
+`!populate` uses), so `roles.primary` must be a YAML's file name or its
+`role:` title. An unknown role exits 1 and lists the known ones; when the role
+came from `roles.primary`, the message says so.
+
 ---
 
 ## Path A: built-in role
 
-1. User picks (or agent suggests) a role from `examples/`:
-   `programmer-senior`, `marketing-director`, `creative-hybrid`, `product-manager`, `researcher`, `founder`, `content-creator`, `fiction-writer`.
+1. User picks (or agent suggests) a role from `examples/` — every `*.yml` there
+   is a role (`ls examples/`), e.g. `programmer-senior`, `marketing-director`,
+   `product-manager`, `researcher`, `founder`, `content-creator`,
+   `fiction-writer`, `psychologist-gestalt`.
 2. Agent runs (during deployment, before `finalize.sh`):
    ```bash
    python3 knowledge-base/scripts/kb_populate.py --role <role> --kb-root knowledge-base
@@ -41,6 +57,8 @@ Both end with **the same optional review step** where the agent reads the genera
 4. Agent **reads** the generated `DATA_PLACEMENT_EXAMPLES.md` and proceeds to the review step (below).
 
 This path uses **0 LLM tokens** for the actual generation — `kb_populate.py` is pure templating.
+
+`--dry-run` prints the file instead of writing it; `--json` prints a summary.
 
 ---
 
@@ -63,7 +81,11 @@ When the user describes a role that isn't in `examples/`, the agent **must creat
      - `quickstart` — 3-5 first-impression steps
      - `do_not_drop` — 3-5 role-specific exclusions
 
-3. Validate the file parses:
+3. Use the same text as `role:` for `knowledge_base.roles.primary` in
+   `kb.config.yml` (the `{{PRIMARY_ROLE}}` placeholder, `02_INIT.md` Phase 2).
+   `!populate` runs without `--role` and finds the YAML by that title; a
+   title that matches no `examples/*.yml` makes it exit 1.
+4. Validate the file parses:
    ```bash
    python3 -c "import yaml; yaml.safe_load(open('knowledge-base/examples/<slug>.yml'))"
    ```
@@ -82,6 +104,33 @@ python3 knowledge-base/scripts/kb_populate.py --role <slug> --kb-root knowledge-
 
 ---
 
+## Helper: copy the role's entities into `kb.config.yml`
+
+`kb.config.yml` starts with `entities: {}`. Once the config exists
+(`02_INIT.md`, Phase 2), copy the role's `entities:` mapping instead of
+retyping it:
+
+```bash
+python3 knowledge-base/scripts/kb_populate.py --entities-from <role> --kb-root knowledge-base
+```
+
+- `<role>` is resolved like `--role` (file name or title; custom roles in
+  `knowledge-base/examples/` included).
+- The edit is line-based: every other key, comment and blank line of
+  `kb.config.yml` stays as it was. The block starts with a
+  `# Copied from … by kb_populate.py --entities-from` comment.
+- It only fills a missing or empty `entities:` (`entities:`, `entities: {}`).
+  When the config already has entities, nothing changes (exit 0, message
+  "already has entities") — those are the owner's.
+- Then drop the entities the owner did not confirm and add the ones they
+  asked for, by hand.
+- `--dry-run` shows the block that would be copied (or says the config
+  already has entities) and leaves `kb.config.yml` untouched; with `--json`
+  the summary carries `"dry_run": true` and `"would_copy"`.
+- No `kb.config.yml` in `--kb-root` → exit 2; a role without `entities:` → exit 1.
+
+---
+
 ## Optional step: AI review pass
 
 After `kb_populate.py` writes the file, the agent **should** read it and look for improvements:
@@ -93,7 +142,17 @@ After `kb_populate.py` writes the file, the agent **should** read it and look fo
 | User-stated preferences | "User said they hate slack export noise — emphasize `review/needs-redaction/`" |
 | Quickstart sharpening | Pick the *one* file in the user's environment that will demonstrate value fastest |
 
-The agent appends a `## Project notes` section at the bottom of the generated file (do **not** modify the auto-generated sections — they will be overwritten on re-run; only append below the footer).
+The generated part ends with the line
+
+```markdown
+<!-- kb_populate: everything above is regenerated; notes added below this line are kept on re-run -->
+```
+
+The agent appends a `## Project notes` section **below that line**. Do not
+edit anything above it: a re-run rewrites everything above the marker and
+keeps everything below it. (A file generated before the marker
+existed keeps its `## Project notes` section — from that heading to the end
+of the file — and gets the marker on the next run.)
 
 This pass typically costs ~1-2K tokens and is genuinely valuable. If the user is on a tight budget, skip it and proceed.
 
@@ -115,12 +174,10 @@ This writes `raw/_samples/<artifact-slug>.example.md` for each artifact in `plac
 
 | Trigger | Action |
 |---------|--------|
-| User edits `examples/<role>.yml` | Re-run `kb_populate.py` — file is overwritten cleanly |
+| User edits `examples/<role>.yml` | Re-run `kb_populate.py` — the generated part is rewritten, notes below the marker are kept |
 | User wants different artifact set | Edit YAML → re-run script |
-| `!populate` command from user | Re-run script + AI review pass |
+| `!populate` command from user | `python3 scripts/kb_populate.py --kb-root .` (role from `knowledge_base.roles.primary`) + AI review pass |
 | New role discovered post-deploy | Create new YAML (Path B), then run script |
-
-> ⚠️ Project notes added by the agent in `## Project notes` survive only if the agent appends below the auto-generated footer. The script overwrites everything above it.
 
 ---
 
@@ -136,29 +193,27 @@ This writes `raw/_samples/<artifact-slug>.example.md` for each artifact in `plac
 
 ## Agent checklist
 
-When deployment completes:
+For module 14 during deployment:
 
 - [ ] Determined whether built-in role applies (Path A) or custom role is needed (Path B)
 - [ ] (Path B only) Created `examples/<slug>.yml` from `templates/role.yml.template`, validated YAML parses
+- [ ] `kb.config.yml` has the confirmed entities (`--entities-from <role>`, then trimmed by hand)
 - [ ] Ran `python3 knowledge-base/scripts/kb_populate.py --role <role> --kb-root knowledge-base`
 - [ ] Verified `DATA_PLACEMENT_EXAMPLES.md` was written
-- [ ] (Recommended) Read the generated file and appended a `## Project notes` section with user-specific tips
+- [ ] (Recommended) Read the generated file and appended a `## Project notes` section below the `<!-- kb_populate: … -->` line
 - [ ] (Optional) Re-ran with `--create-samples` if the user wants format examples
-- [ ] **Generated `START_HERE.md`** from `templates/START_HERE.md.template` (parameterize `{{KB_NAME}}` and `{{PRIMARY_ROLE}}`)
-- [ ] **Wrote `eval/QUESTIONS.md`** from the three typical questions (mandatory Q6 in `02_INIT.md`); `eval/results/` exists and is empty
-- [ ] Ran `python3 knowledge-base/scripts/kb_doctor.py --root knowledge-base` to confirm the install
-- [ ] Ran `bash setup/shell/finalize.sh` — promotes the base to the project root, removes `setup/` and the empty `knowledge-base/`
-- [ ] Showed the user a 3-5 line summary in chat. **Must include**:
-  - "Read `START_HERE.md` first."
-  - "Every new chat session: start with *'Используй AGENTS.md как основную инструкцию'*."
-  - The OS-specific watcher launcher (`watcher-start.command` for macOS, `./shell/watcher.sh` for Linux, `watcher-start.bat` for Windows)
-- [ ] Logged the operation in `log.md` (auto-handled if integrated)
+- [ ] Continued with module 15. `START_HERE.md`, `eval/QUESTIONS.md`, the doctor run, `finalize.sh` and the summary for the user come after module 18 (`02_INIT.md`, "Finish the deployment")
+
+`kb_populate.py` records every write in `log.md` as
+`populate | DATA_PLACEMENT_EXAMPLES generated` (role, source YAML, whether notes
+were kept) when `--kb-root` holds a `kb.config.yml`; a folder without one gets
+the file but no log entry.
 
 ---
 
 ## Integration
 
-- **02_INIT:** at the end of Phase 1 ("Create structure") the agent moves to this module
+- **02_INIT:** this module runs in Phase 3 (modules 03–18), after `kb.config.yml` and `STRUCTURE_VARIANTS.md` exist
 - **03_PIPELINE:** `raw/_samples/` is not picked up by the pipeline (name starts with `_`)
 - **05_INDEX:** `raw/_samples/` is excluded by the ignore pattern `raw/**`
 - **10_LOG:** generation is recorded in `log.md` as `populate | DATA_PLACEMENT_EXAMPLES generated`
@@ -170,6 +225,7 @@ When deployment completes:
 - [x] `scripts/kb_populate.py` — automated yaml → markdown generation
 - [x] `--create-samples` — placeholder format files
 - [x] `templates/role.yml.template` — for custom roles
+- [x] `--entities-from` — copy a role's entities into `kb.config.yml`
 - [ ] Versioning of generated file (`generated_at`, `from_template_version`)
 - [ ] Auto regeneration when entities change in `kb.config.yml`
 - [ ] Translate sections into the base's primary language (use `language` from config)

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.15.1-62D8FF?style=flat-square" alt="Version 0.15.1"></a>
+  <a href="VERSION"><img src="https://img.shields.io/badge/version-0.16.0-62D8FF?style=flat-square" alt="Version 0.16.0"></a>
   <a href="#requirements"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.11 or newer"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-7EE787?style=flat-square" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/storage-local%20Markdown-8A9BB5?style=flat-square" alt="Local Markdown storage">
@@ -29,7 +29,7 @@ It can start as a compact codebase index or grow into a full knowledge pipeline 
 
 The visual above is the actual storage model, not a conceptual cloud architecture:
 
-- `raw/`, `processed/`, `review/`, and `interactions/` stay out of the generated AI index.
+- `raw/`, `processed/`, `review/`, and `interactions/` stay out of the generated AI index and, by default, out of git.
 - `knowledge/` contains reviewed, reusable Markdown and is safe to index.
 - `assets-index/` holds searchable descriptions while original binaries remain private.
 - `.repomix/*.xml` are rebuildable context packs (core + one per knowledge section), not the source of truth.
@@ -40,7 +40,7 @@ The visual above is the actual storage model, not a conceptual cloud architectur
 |---|---|---|
 | Start here | [`quick-start/`](quick-start/) | [`knowledge-base/`](knowledge-base/) |
 | Best for | Giving an agent a reliable project map | Building a long-lived personal or team knowledge system |
-| You get | Domain-pack indexing with token ceilings, secret checks, hardened Git hooks (commit/push/pull) | Raw-first ingest, NLP, provenance, review queues, reflection, linting, watchers |
+| You get | Domain-pack indexing with token ceilings, secret checks, hardened Git hooks (commit, push, pull/merge, rebase, branch checkout) | Raw-first ingest, NLP, provenance, review queues, reflection, linting, watchers |
 | Typical setup | About 5 minutes | About 30 minutes |
 | Runtime | Repomix + Node.js | Python pipeline + an indexer; Repomix is the included default |
 
@@ -67,7 +67,7 @@ When kb_doctor passes, run setup/shell/finalize.sh to flatten
 the base into the project root.
 ```
 
-The agent asks about your role, configures the pipeline, creates a role-specific knowledge structure, verifies it with `kb_doctor.py`, and promotes the finished system to the project root.
+The agent asks about your role, configures the pipeline, creates a role-specific knowledge structure, verifies it with `kb_doctor.py` ("passes" means it exits with code 0; warnings alone do not fail it), and promotes the finished system to the project root. The instruction modules stay in the base as `kb-docs/`, where `AGENTS.md` and the scripts point.
 
 <details>
 <summary><strong>PowerShell copy command</strong></summary>
@@ -96,9 +96,9 @@ Then tell your agent:
 Read docs/ai-init/INIT_GUIDE.md and initialize the Repomix pack index in this project (mode: init). Show me the proposed pack table before writing any configs.
 ```
 
-The guide has the agent measure the codebase, cut it into **semantic domain packs** (each under a token ceiling — a single giant `output.xml` stops fitting the context window on real projects), install hardened cross-platform git hooks (commit/push/pull, with PATH bootstrap and logging), and write a short routing table into `AGENTS.md`. The result is not one file: it is `.repomix/catalog.xml` plus the domain packs listed in `repomix.packs.json`, with fresh sizes in `.repomix/PACKS_STATUS.md`.
+The guide has the agent measure the codebase, cut it into **semantic domain packs** (each under a token ceiling — a single giant `output.xml` stops fitting the context window on real projects), install hardened cross-platform git hooks (commit, push, pull/merge, rebase and branch checkout, with PATH bootstrap, locking and logging), and write a short routing table into `AGENTS.md`. The result is not one file: it is `.repomix/catalog.xml` plus the domain packs listed in `repomix.packs.json`, with sizes, OVER/FAILED flags and coverage problems in `.repomix/PACKS_STATUS.md`.
 
-**Already initialized?** Routine rebuilds run themselves through the git hooks; manually it's `scripts/update-repomix-index.sh` (`--force` to rebuild everything). When the project was set up with an old single-`output.xml` index — or the packs no longer match the grown codebase — tell the agent:
+**Already initialized?** Routine rebuilds run themselves through the git hooks; manually it's `scripts/update-repomix-index.sh` (`--force` to rebuild everything, `--check` to only refresh `PACKS_STATUS.md`). When the project was set up with an old single-`output.xml` index — or the packs no longer match the grown codebase — tell the agent:
 
 ```text
 Read docs/ai-init/INIT_GUIDE.md and REINITIALIZE the Repomix index in this project (mode: reinit): measure everything from scratch, propose a new pack split, show me the diff against the current setup, back up the old configs, and migrate.
@@ -136,20 +136,22 @@ source material
     ↓
 raw/                     immutable originals, never indexed
     ↓  kb_ingest.py
-processed/               Markdown + extraction metadata, never indexed
-    ↓  routing and review
+processed/               Markdown + extraction metadata, never indexed;
+    ↓  !review           each file waits (extraction: pending) until the agent extracts it
 knowledge/               clean linked notes, indexed
 assets-index/            searchable descriptions of binary assets
     ↓  context indexer
 .repomix/*.xml           rebuildable AI context packs (each under a token ceiling)
+STATUS.md                what is pending, rewritten by every reindex, read at session start
 ```
 
-The pipeline adds five controls around that path:
+The pipeline adds six controls around that path:
 
 - **Provenance** — hashes and source references trace knowledge back to its origin.
-- **Review queues** — ambiguity, low-confidence conversion, and sensitive material stop for a decision.
+- **Review queues** — files that cannot be converted or classified, AI review triggers, and private or secret-bearing material stop for a decision.
+- **Status hand-off** — `STATUS.md` lists pending review and extraction, reflection due, heal items, and index problems, each with the command that resolves it.
 - **Health checks** — linting finds stale pages, broken links, orphans, and structural drift.
-- **Reflection** — accumulated facts can be synthesized into higher-level insights on a schedule or by command.
+- **Reflection** — accumulated facts can be synthesized into higher-level insights when enough has changed (checked on every reindex) or by command.
 - **Upgrades** — `kb_upgrade.py` refreshes reference files while preserving user customizations when possible.
 
 Read the contributor-level [architecture overview](docs/ARCHITECTURE.md) for the full deployment sequence and invariants.
@@ -164,7 +166,8 @@ Read the contributor-level [architecture overview](docs/ARCHITECTURE.md) for the
 | Archives | ZIP and TAR inputs are unpacked with a size safety cap and re-ingested |
 | NLP | Entities, keywords, and routing hints are extracted before AI review |
 | Knowledge graph | Markdown pages use `[[wikilinks]]`, routing tables, lifecycle metadata, and provenance |
-| Automation | Cross-platform reindexing, watchers, health checks, and importance-based reflection triggers |
+| Automation | Cross-platform reindexing, watchers, a git post-commit hook, health checks, and importance-based reflection triggers |
+| Privacy | By default, files from `raw/chats/` and `raw/personal-context/` and files with credential-looking strings go to `review/needs-redaction/`; export refuses secret-looking files unless told otherwise |
 | Portability | The complete system is files and folders that can be copied, synced, versioned, or inspected directly |
 | Multi-machine | Two deployments of one base exchange knowledge through bundles, with content-hash dedup, fast-forward, and conflicts routed to review |
 
@@ -174,10 +177,12 @@ These commands are messages to your AI agent, not shell commands.
 
 | Command | Purpose | Typical AI cost |
 |---|---|---:|
-| `!view` | Open the local read-only knowledge graph viewer (health triage, full-text search, path finding) | 0 tokens |
+| `!status` | Say what is pending (from `STATUS.md`): review and extraction backlog, reflection due, heal items, index problems | ~0.5K tokens |
+| `!view` | Open the local read-only knowledge graph viewer (health triage, full-text search, path finding); `!view status` shows the URL, `!view stop` stops it | 0 tokens |
 | `!save` | Capture decisions and insights from a productive session | ~2K tokens |
 | `!reflect` | Synthesize higher-level patterns from accumulated knowledge | ~15K tokens |
-| `!review` | Resolve items waiting in review queues | ~5–30K tokens |
+| `!meta-review` | Find recurring patterns across saved session summaries not reviewed yet | ~5–15K tokens |
+| `!review` | Resolve items waiting in review queues and extract the converted files still waiting in `processed/` | ~5–30K tokens |
 | `!audit` | Deep review for contradictions and gaps — one pack at a time, in a fresh session, findings need `file:line` and a quote | ~5–20K tokens per pack |
 | `!heal` | Catch up a base after an upgrade: collect what is still wrong, apply the safe fixes, walk the rest one item at a time | ~0–40K tokens |
 | `!refactor` | Trim the instructions: audit `AGENTS.md` line by line, stop for your decisions, then rewrite from them | ~5–40K tokens |
@@ -194,7 +199,9 @@ These commands are messages to your AI agent, not shell commands.
 | Mode | Behavior | Expected active usage |
 |---|---|---:|
 | `default` | Python-first processing with throttled AI decisions | ~3–4K tokens/day |
-| `super` | AI reasoning for surprise detection, annotations, entity resolution, and frequent review | ~50–200K+ tokens/day |
+| `super` | The agent spends tokens freely: substantive annotations, importance with reasoning, reflection after small changes, `!review` offered at session start when `needs-ai-decision` has items (it starts after a yes) | ~50–200K+ tokens/day |
+
+The mode lives in `knowledge_base.mode`. Between modes the scripts change only the reflection trigger; everything else is agent behavior described in `mode_profiles`. The surprise filter is not implemented yet ([roadmap](docs/ROADMAP.md)).
 
 Token figures are planning estimates, not benchmarks. Actual usage depends on document size, activity, model, and agent behavior.
 
@@ -321,6 +328,9 @@ changes nothing.
   them the imported `assets-index/` entries are annotated as "original file not
   present in this base" rather than left dangling.
 - **`sync/` is excluded** from the AI index and from git.
+- **Secret-looking files are refused.** Export stops when a file matches a
+  credential pattern (tokens, `password=`, private keys) and lists the hits;
+  `--allow-secrets` overrides after you have checked them.
 - `--dry-run` classifies everything and writes nothing.
 - Sharing the base with someone else? Export with `--only knowledge` and read the
   result first — `interactions/` holds session history and the provenance
@@ -335,6 +345,7 @@ changes nothing.
 | "No bundle to import" | The `.zip` is not in `sync/inbox/` on **this** machine. |
 | Both machines produce identically named bundles | Their `sync.label` is the same. Give each its own. |
 | Want to check before committing to it | Run the import with `--dry-run`. |
+| Want to take an import back | `python3 scripts/kb_import.py --undo sync/reports/<report>.md` reverts it; files changed since the import are kept. |
 
 ## Updating deployed knowledge bases
 
@@ -375,8 +386,12 @@ launcher finds the source repo automatically; use `--repo-root PATH` or
 `AI_KNOWLEDGE_ENGINE_HOME` when it lives elsewhere.
 
 For a directory of bases, use
-`--all-root /path/to/parent` (immediate `kb-*` children). If a file is truly
-safe to replace, prefer repeatable `--accept FILE` over global `--force`.
+`--all-root /path/to/parent` (immediate `kb-*` children). When both you and the
+engine changed a file, your copy stays and the new version lands next to it as
+`<file>.new`. Merge what you need and keep yours with `--accept-local FILE`, or
+take the engine's with `--accept FILE` (your copy is backed up first);
+`--force` accepts every customized file. The upgrade also refreshes the
+instruction modules in `kb-docs/` and the managed blocks of `AGENTS.md`.
 See [the upgrading guide](docs/UPGRADING.md) for examples and safety rules.
 
 ### The upgrade only syncs files — `!heal` catches up the contents
@@ -452,7 +467,8 @@ python3 tools/ai-skills-fixer/scripts/run.py source add <skill-repo-url-or-path>
 # see what is installed and where it came from
 python3 tools/ai-skills-fixer/scripts/run.py inventory
 
-# decide what you keep (repeat per skill, or let your agent run the questionnaire)
+# decide what you keep (repeat per skill, or let your agent run the questionnaire;
+# a single-skill source's ID is just <source>)
 python3 tools/ai-skills-fixer/scripts/run.py profile set <source>:<skill> enabled \
     --targets claude codex cursor antigravity
 
@@ -484,7 +500,7 @@ machine converges to the same skill set as the others.
 ai-knowledge-engine/
 ├── quick-start/                 Lite mode: codebase indexing guide
 ├── knowledge-base/
-│   ├── 00_…16_*.md             17 ordered instruction modules
+│   ├── 00_…18_*.md             19 ordered instruction modules (kb-docs/ in a deployed base)
 │   ├── scripts/                Python reference pipeline and tests
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              config, agent, structure, and dependency templates
@@ -504,7 +520,7 @@ ai-knowledge-engine/
 | Git | Any recent version | Versioning and optional hooks |
 | AI coding agent | Markdown + file and shell access | Guided deployment and AI-assisted commands |
 
-Core Python dependencies are listed in [`requirements.txt`](knowledge-base/templates/requirements.txt). Speech-to-text and OCR are deliberately separated into [`requirements-media.txt`](knowledge-base/templates/requirements-media.txt).
+Core Python dependencies are listed in [`requirements.txt`](knowledge-base/templates/requirements.txt). KeyBERT keywords, which pull in PyTorch, are optional in [`requirements-nlp.txt`](knowledge-base/templates/requirements-nlp.txt); speech-to-text and OCR are deliberately separated into [`requirements-media.txt`](knowledge-base/templates/requirements-media.txt). The virtualenv lives in the project root (`.venv/`), which becomes the base root after finalize.
 
 The instructions are designed for Claude, Codex, GPT, Gemini, Cursor, and other Markdown-capable agents that can inspect files and run commands. Exact behavior still depends on the host application's permissions and tool access.
 

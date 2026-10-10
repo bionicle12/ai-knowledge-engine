@@ -1,8 +1,8 @@
 # 13 — Auto-run: automatic processing on changes
 
-> The knowledge base should refresh **automatically** when new data arrives. Three mechanisms: file watcher (daemon), git hook, cron.
+> The knowledge base should refresh **automatically** when new data arrives. Three mechanisms: file watcher (daemon), git hook, cron — plus a consolidation step inside every full reindex.
 >
-> **Reference implementations:** `knowledge-base/scripts/kb_watch.py`, `knowledge-base/scripts/kb_reflect.py`, `knowledge-base/scripts/kb_nlp_batch.py`, `knowledge-base/shell/watcher.sh`, `knowledge-base/shell/reindex.sh`. The agent copies them at deployment time.
+> **Reference implementations** (they ship with the base; this module describes what they do — read the scripts for the exact code): `scripts/kb_watch.py`, `scripts/kb_reindex.py`, `scripts/kb_reflect.py`, `scripts/kb_nlp_batch.py`, `shell/watcher.sh`, `shell/reindex.sh`, `shell/install-hooks.sh`, `shell/hooks/post-commit`.
 
 ---
 
@@ -16,214 +16,52 @@ Manual `./shell/reindex.sh` after every change is friction — and friction mean
 
 ### Dependencies
 
-```txt
-# In requirements.txt
-watchdog>=4.0
-```
+`watchdog` (in `requirements.txt`). Without it `kb_watch.py` falls back to polling every 2 seconds — slower, same behaviour.
 
-### `scripts/kb_watch.py` contract
+### What `scripts/kb_watch.py` does
 
-```python
-"""
-kb_watch.py — File-system watcher for the knowledge base.
+It watches the folders in `autorun.watch_dirs` (default `raw/*/unsorted/` and `knowledge/`). Entries under `raw/` are ingest inboxes; `raw/*/unsorted/` includes the catch-all `raw/unsorted/`. Any other entry is watched for `.md` edits.
 
-Watches:
-- raw/*/unsorted/  — new files for ingest
-- knowledge/       — edits that should trigger reindex
+| Event | Wait | Action |
+|-------|------|--------|
+| New file in an inbox (nested folders included) | the file stays unchanged for `debounce_raw_seconds` (5) | the ready files are ingested together — `kb_ingest.py` with up to 100 paths per call (`--no-nlp` when `auto_nlp: false`) — then one `kb_reindex.py --no-ingest` |
+| `.md` page created, edited, moved or deleted under `knowledge/` | `debounce_knowledge_seconds` (2) of quiet | `kb_lint.py --quick` (`auto_lint_on_change`), then `kb_reindex.py --no-ingest` (`auto_reindex_on_change`) |
+| Watcher start | — | files already waiting in the inboxes are queued like new ones |
 
-When a new file appears in raw/:
-1. Wait 5 seconds (the file may still be being written)
-2. Run kb_ingest.py for the new file
-3. Run NLP enrichment (if enabled)
-4. If complexity < threshold → auto-process
-5. If complexity >= threshold → review/needs-ai-decision/
-6. Append to log.md
-7. Regenerate the Repomix index
-
-When a knowledge/ file changes:
-1. Wait 2 seconds (debounce)
-2. Refresh deterministic routing pages
-3. Regenerate the Repomix index
-4. Run quick lint (--quick)
-5. Append to log.md
-
-Usage:
-    ./shell/watcher.sh                         # Foreground
-    ./shell/watcher.sh --daemon                # Background
-    ./shell/watcher.sh --stop                  # Stop
-    ./shell/watcher.sh --verbose               # Verbose logging
-
-Exit:
-    Ctrl+C or SIGTERM for graceful shutdown
-"""
-
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import time
-import subprocess
-import os
-
-class RawFileHandler(FileSystemEventHandler):
-    def __init__(self, debounce_seconds=5):
-        self.debounce = debounce_seconds
-        self._pending = {}
-
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        # Debounce: wait until the file is fully written
-        self._pending[event.src_path] = time.time()
-
-    def process_pending(self):
-        now = time.time()
-        ready = [p for p, t in self._pending.items() if now - t > self.debounce]
-        for path in ready:
-            del self._pending[path]
-            self.process_file(path)
-
-    def process_file(self, filepath):
-        print(f"[watch] New file detected: {filepath}")
-        # 1. Ingest
-        subprocess.run(["python3", "scripts/kb_ingest.py", filepath])
-        # 2. Reindex
-        subprocess.run(["./shell/reindex.sh"])
-        print(f"[watch] Processed and reindexed: {filepath}")
-
-
-class KnowledgeChangeHandler(FileSystemEventHandler):
-    def __init__(self, debounce_seconds=2):
-        self.debounce = debounce_seconds
-        self._last_change = 0
-
-    def on_modified(self, event):
-        if event.is_directory or not event.src_path.endswith('.md'):
-            return
-        self._last_change = time.time()
-
-    def should_reindex(self):
-        if self._last_change == 0:
-            return False
-        if time.time() - self._last_change > self.debounce:
-            self._last_change = 0
-            return True
-        return False
-```
+- **Never handed to ingest:** names matching `ingest.ignore_globs` (`.DS_Store`, `~$*`, `*.part`, `*.tmp`, …).
+- **Ignored as edits:** `knowledge/routing/` and `knowledge/routing-table.md`. `kb_reindex.py` regenerates them through `kb_route.py`, which rewrites a page only when its content changes (dates and access counters stay put otherwise) — so the watcher never reacts to its own reindex.
+- `--no-reindex` — never run `kb_reindex.py`; `--verbose` — print every command.
+- **One watcher per base:** it holds `.kb-state/locks/watch.lock`; a second watcher exits with status 1.
+- `--root` may be relative (it is resolved first); a folder without `kb.config.yml` is refused (exit 2).
+- `autorun.watch_enabled: false` — `kb_watch.py` prints a note and exits 0.
+- **Stopping:** on SIGTERM (`./shell/watcher.sh --stop`, systemd) the watcher finishes the step it is running (an ingest or a reindex is not cut in half), then exits. Ctrl+C in a terminal reaches that step's process too and interrupts it.
 
 ### Running via `shell/watcher.sh`
 
-The deployed base includes `shell/watcher.sh` — a wrapper around `kb_watch.py` with auto-venv activation:
-
 ```bash
-#!/bin/bash
-# watcher.sh — File watcher for the Knowledge Base.
-# Runs kb_watch.py with auto-venv activation and process management.
-
-set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
-
-PIDFILE=".watcher.pid"
-LOGFILE=".watcher.log"
-
-# Activate venv if present
-if [ -f ".venv/bin/activate" ]; then
-  source .venv/bin/activate
-elif [ -f "venv/bin/activate" ]; then
-  source venv/bin/activate
-fi
-
-# Verify the script
-if [ ! -f "scripts/kb_watch.py" ]; then
-  echo "❌ scripts/kb_watch.py not found"
-  exit 1
-fi
-
-case "${1:-}" in
-  --stop)
-    if [ -f "$PIDFILE" ]; then
-      PID=$(cat "$PIDFILE")
-      if kill -0 "$PID" 2>/dev/null; then
-        kill "$PID"
-        rm -f "$PIDFILE"
-        echo "✅ Watcher stopped (PID $PID)"
-      else
-        rm -f "$PIDFILE"
-        echo "⚠️  Process $PID was not running; pidfile removed"
-      fi
-    else
-      echo "⚠️  Watcher is not running (no $PIDFILE)"
-    fi
-    ;;
-  --status)
-    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-      echo "✅ Watcher running (PID $(cat "$PIDFILE"))"
-    else
-      echo "⚠️  Watcher not running"
-    fi
-    ;;
-  --daemon)
-    if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
-      echo "⚠️  Watcher already running (PID $(cat "$PIDFILE"))"
-      exit 1
-    fi
-    echo "🔄 Starting watcher in the background..."
-    nohup python3 scripts/kb_watch.py "${@:2}" > "$LOGFILE" 2>&1 &
-    echo $! > "$PIDFILE"
-    echo "✅ Watcher started (PID $!, log: $LOGFILE)"
-    ;;
-  --verbose)
-    echo "👁  Starting watcher (verbose)..."
-    python3 scripts/kb_watch.py --verbose
-    ;;
-  "")
-    echo "👁  Starting watcher..."
-    echo "   Ctrl+C to stop"
-    python3 scripts/kb_watch.py
-    ;;
-  *)
-    echo "Usage: ./shell/watcher.sh [--daemon|--stop|--status|--verbose]"
-    echo ""
-    echo "  (no flag)     Foreground mode (Ctrl+C to stop)"
-    echo "  --daemon      Run in background"
-    echo "  --stop        Stop background watcher"
-    echo "  --status      Check whether the watcher is running"
-    echo "  --verbose     Foreground with verbose logging"
-    ;;
-esac
+./shell/watcher.sh                  # foreground (Ctrl+C to stop); options go to kb_watch.py
+./shell/watcher.sh --verbose        # e.g. foreground with every command printed
+./shell/watcher.sh --daemon         # background: pidfile .watcher.pid, log .watcher.log
+./shell/watcher.sh --status         # is the background watcher running?
+./shell/watcher.sh --stop           # stop it and wait until it has exited
 ```
 
-```bash
-chmod +x shell/watcher.sh
-```
-
-### Commands
-
-```bash
-# Foreground (for development)
-./shell/watcher.sh
-
-# Background
-./shell/watcher.sh --daemon
-
-# Status
-./shell/watcher.sh --status
-
-# Stop
-./shell/watcher.sh --stop
-```
+- The interpreter comes from `shell/_kbpy.sh`: `$KB_PYTHON`, else `.venv/bin/python`, else `python3`.
+- `--daemon` reports an error (and shows the log tail) when the watcher exits right away — for example with `watch_enabled: false` or when another watcher already runs.
+- `--stop` sends SIGTERM and waits up to 30 seconds for the process to exit; it says "stopped" only when it is gone. It first checks that the PID in `.watcher.pid` still belongs to the watcher, so a stale pidfile (reboot, PID reuse) never kills another program.
+- Double-click launchers: `watcher-start.command` (macOS, Linux) and `watcher-start.bat` (Windows) run the watcher in the foreground of their terminal window (Ctrl+C or closing the window stops it); `watcher-stop.command` runs `./shell/watcher.sh --stop` for a `--daemon` watcher.
 
 ### Systemd unit (Linux)
 
 ```ini
-# /etc/systemd/user/kb-watch.service
+# ~/.config/systemd/user/kb-watch.service
 [Unit]
 Description=Knowledge Base File Watcher
-After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=/path/to/knowledge-base
-ExecStart=/path/to/knowledge-base/.venv/bin/python scripts/kb_watch.py
+ExecStart=/path/to/knowledge-base/.venv/bin/python scripts/kb_watch.py --root /path/to/knowledge-base
 Restart=on-failure
 RestartSec=5
 
@@ -232,10 +70,11 @@ WantedBy=default.target
 ```
 
 ```bash
-systemctl --user enable kb-watch
-systemctl --user start kb-watch
+systemctl --user enable --now kb-watch
 systemctl --user status kb-watch
 ```
+
+Do not run the systemd unit and `./shell/watcher.sh --daemon` for the same base — the second watcher exits (status 1) and systemd restarts it forever.
 
 ---
 
@@ -243,255 +82,94 @@ systemctl --user status kb-watch
 
 For bases under git control.
 
-Hard-earned hook rules (each one is a real production failure):
+```bash
+bash shell/install-hooks.sh   # once per clone: .git/hooks/ is not versioned
+```
 
-1. `post-commit` alone is not enough: `git push` never fires it, and
-   pull/merge/rebase change files without a local commit. Install
-   `post-merge` and `post-rewrite` too (and `pre-push` if the index must be
-   fresh before every push).
-2. Git GUIs and IDEs run hooks with a bare `PATH` — a silent
-   `command -v repomix || exit` turns the hook into a no-op for months.
-   Delegate to `kb_reindex.py`: Python resolves repomix itself and *reports*
-   when it is missing instead of silently skipping.
-3. A plain `... &` background job is killed by SIGHUP when the hook exits —
-   use `nohup` and redirect output to a log, never to `/dev/null` (swallowed
-   errors are how indexes silently rot).
+`install-hooks.sh` (plain POSIX sh, so `sh shell/install-hooks.sh` works too) installs `shell/hooks/post-commit` into the repository's hooks folder (`git rev-parse --git-path hooks`) and warns when `core.hooksPath` points elsewhere. Any existing `post-commit` that differs from the shipped one — a foreign hook, or an older or edited copy of ours — is moved to `post-commit.backup-<timestamp>` first, never deleted. A base in a subfolder of the work tree is recorded in `git config kb.root`. The hook starts `kb_reindex.py --hook` in the background and returns at once:
+
+- **Finding the base:** the `kb.root` folder, else the top of the work tree (for example after `finalize.sh` flattened the project). No base there — the hook does nothing.
+- **Hook mode is light:** index + `STATUS.md` only — no ingest, no reflection request. The watcher or a manual reindex does the rest.
+- It takes the pipeline lock with a short timeout and exits quietly when another run holds it.
+- Output goes to `.kb-state/hooks.log` (never to `/dev/null`: swallowed errors are how indexes silently rot); above 1 MB the log moves to `hooks.log.1`.
+- The hook always exits 0 — it never blocks a commit.
+- The installed copy is replaced by the next `install-hooks.sh` run. To combine it with your own post-commit commands, keep your own hook and call `sh <base>/shell/hooks/post-commit` from it instead of running the installer.
+
+Hard-earned hook rules (each one is a real production failure), in case you write your own hook:
+
+1. `post-commit` does not fire on `git pull`, merge or rebase. After those, run `./shell/reindex.sh` (or install the same hook as `post-merge` / `post-rewrite` yourself).
+2. Git GUIs and IDEs run hooks with a bare `PATH` — delegate to `kb_reindex.py`, which *reports* a missing repomix instead of silently skipping.
+3. A plain `... &` background job is killed by SIGHUP when the hook exits — use `nohup` and redirect output to a log file.
 4. Hooks must never block git: always `exit 0`.
-5. `.git/hooks/` is not versioned. Keep hook sources in the repo and document
-   the one-command install after clone.
+5. Keep hook sources in the repo (`shell/hooks/`) and document the one-command install after clone.
 
-### post-commit / post-merge / post-rewrite hook
-
-```bash
-#!/bin/sh
-# .git/hooks/post-commit  (identical for post-merge and post-rewrite)
-root=$(git rev-parse --show-toplevel)
-cd "$root" || exit 0
-PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python
-mkdir -p .repomix
-nohup "$PY" scripts/kb_reindex.py --quick >> .repomix/update.log 2>&1 </dev/null &
-exit 0
-```
-
-```bash
-chmod +x .git/hooks/post-commit .git/hooks/post-merge .git/hooks/post-rewrite
-```
-
-On Windows, git executes these `.sh` hooks through its bundled Git Bash —
-no extra setup needed.
-
-### pre-commit hook (optional)
-
-```bash
-#!/bin/sh
-# .git/hooks/pre-commit
-# Validates frontmatter before committing
-
-if [ -f "scripts/kb_lint.py" ]; then
-  python3 scripts/kb_lint.py --quick --only frontmatter
-  if [ $? -eq 2 ]; then
-    echo "❌ Frontmatter errors found. Fix before committing."
-    exit 1
-  fi
-fi
-```
+**Optional pre-commit check:** `python3 scripts/kb_lint.py --quick --only frontmatter` exits non-zero when a page has frontmatter errors; call it from `.git/hooks/pre-commit` to block such commits.
 
 ---
 
 ## Mode 3: cron (periodic tasks)
 
 ```bash
-# crontab -e
-
-# Every day at 03:00 — full lint + reindex
-0 3 * * * cd /path/to/knowledge-base && ./shell/lint.sh >> log.md 2>&1 && ./shell/reindex.sh >> log.md 2>&1
-
-# Every 6 hours — quick lint
-0 */6 * * * cd /path/to/knowledge-base && python3 scripts/kb_lint.py --quick >> /dev/null 2>&1
-
-# Every Sunday at 02:00 — NLP re-enrichment of all processed files
-0 2 * * 0 cd /path/to/knowledge-base && python3 scripts/kb_nlp_batch.py >> log.md 2>&1
+# crontab -e — a full reindex (with consolidation) every night at 03:00
+0 3 * * * cd /path/to/knowledge-base && mkdir -p .kb-state && .venv/bin/python scripts/kb_reindex.py >> .kb-state/cron.log 2>&1
 ```
 
-> **Important:** the machine may be off — cron does not guarantee execution. The main consolidation block lives inside `reindex.sh` (see below).
+Never append tool output to `log.md`: it has a strict entry format and the scripts write their own entries.
+
+> **Important:** the machine may be off — cron does not guarantee execution. That is why consolidation lives inside every full reindex (below), not in cron.
 
 ---
 
-## Consolidation in reindex (instead of pure cron)
+## Consolidation inside every reindex
 
-Problem: cron tasks do not fire if the machine is off. Solution: bake a check into `reindex.sh` — if more than 24 hours have passed since the last consolidation, run it now.
+Problem: cron tasks do not fire if the machine is off. Solution: every full `kb_reindex.py` run (`./shell/reindex.sh` is a thin wrapper around it) checks whether consolidation is due.
 
-### Mechanism
+- **When:** `.last_consolidation` is older than `autorun.consolidation_interval_hours` (24), or missing. Not in `--quick`, `--index-only` or `--hook` runs.
+- **What:** a full lint report (`lint-report.md`), `kb_nlp_batch.py --incremental`, then — when `autorun.consolidation_on_reindex` is true (the default) — the reflection check `kb_reflect.py --check-threshold`. On `THRESHOLD_MET` it runs `kb_reflect.py --generate`, which appends a `reflect-request` entry to `log.md`.
+- **Then:** every reindex, consolidation or not, ends by rewriting `STATUS.md` (unless `status.enabled: false`) — the short hand-off the agent reads at session start ("reflection due … → !reflect").
 
-```bash
-# Add to reindex.sh before the final repomix call:
+Exact steps: `scripts/kb_reindex.py` and `kb-docs/05_INDEX.md`.
 
-CONSOLIDATION_MARKER=".last_consolidation"
-NOW=$(date +%s)
-DAY_SECONDS=86400
+No script processes review queues or runs level-2 (AI) lint. The `mode_profiles.*.lint` settings (`level2_trigger`, `review_auto_process`) are agent policy — see `kb-docs/07_INTERACTION_LOOP.md` and `kb-docs/09_LINT.md`.
 
-if [ -f "$CONSOLIDATION_MARKER" ]; then
-  LAST=$(cat "$CONSOLIDATION_MARKER")
-  ELAPSED=$((NOW - LAST))
-else
-  ELAPSED=$((DAY_SECONDS + 1))  # First run → consolidate
-fi
+### Reflection trigger (`scripts/kb_reflect.py`)
 
-if [ $ELAPSED -gt $DAY_SECONDS ]; then
-  echo "[reindex] Consolidation needed (${ELAPSED}s since last). Running..."
+The script only decides; the reflection itself is AI work (`!reflect`, ~15K tokens).
 
-  # 1. Full lint (Python, 0 tokens)
-  if [ -f "scripts/kb_lint.py" ]; then
-    python3 scripts/kb_lint.py --output report
-  fi
+| Decision | Meaning |
+|----------|---------|
+| `THRESHOLD_MET` | A reflection is due: the change score since the last reflection reached the threshold |
+| `STAGNANT` | It would be due, but the last two recorded reflections found 0 insights and no ingest arrived since — the scheduled reflection is suppressed; `!reflect` from the owner still runs |
+| `SKIP` | Nothing to do |
 
-  # 2. Count changes since last consolidation
-  CHANGES_SINCE=0
-  if [ -f "log.md" ]; then
-    LAST_DATE=$(date -d "@$LAST" -Iseconds 2>/dev/null || date -r "$LAST" -Iseconds 2>/dev/null || echo "")
-    if [ -n "$LAST_DATE" ]; then
-      CHANGES_SINCE=$(grep -c "^## \[" log.md 2>/dev/null || echo "0")
-      # Better count: scripts/kb_reflect.py --count-changes
-    fi
-  fi
+- **Change score** since the last reflection: every `ingest` entry in `log.md` weighs its importance from the ingest metadata, or `default_ingest_importance` (1) when it has none; every changed `knowledge/` page weighs its `importance` (3 when unset). Generated pages (`generated_by`) and `_archive/` do not count.
+- **Changed page:** `--record-result` stores a digest of every page in `.kb-state/reflection-pages.json`, and a page counts when its content differs from it. Access tracking (`last_accessed`, `access_count`) is not a change, and neither is a touch, checkout or restore that leaves the content as it was. Without that snapshot the evidence is weaker. When the last reflection is the local `.last_reflection` (a base from before 0.16, until its first `--record-result`), the file's mtime decides. When it is only a `reflect` entry in `log.md` (a fresh clone, or a reflection recorded on another machine), mtimes say nothing — a clone resets them all — so a page counts only when its `extracted_at`, `last_verified` or `valid_from` date is on or after the day of that reflection.
+- **Threshold:** `mode_profiles.<mode>.reflection.importance_threshold` of the active mode (`knowledge_base.mode`). Weekly profiles (`trigger: "threshold+weekly"`): once `min_interval_days` have passed, the threshold drops to 1 — any change is due (0 with `require_changes: false`).
+- **Last reflection:** the newer of `.last_reflection` and the last `reflect` entry in `log.md`, so a fresh clone without the gitignored marker does not recount its ingests. The entries after it are taken by position in `log.md`, so an ingest logged in the same second as `--record-result` still counts. A base that never reflected counts `min_interval_days` from its deployment: the older of `deployed_at` in `kb.config.yml` and the first `log.md` entry. Its first ingest is therefore not due on its own; `elapsed_days` in `--json` is then the days since deployment.
+- **Who writes what:** only `--record-result N` writes state — `.last_reflection`, the page snapshot and a `reflect | insights: N` log entry (0 insights is a valid, expected result). `--generate` appends one `reflect-request` entry only on `THRESHOLD_MET`, and not again while one is pending; on `SKIP` or `STAGNANT` it logs nothing. Every other call is read-only: no flags, `--json`, `--check-threshold [--json]`, `--count-changes`. `--dry-run` is accepted but deprecated (nothing else writes anyway).
+- `--check-threshold --json` prints `{decision, changes, threshold, mode, count, trigger, reason}`: `changes` is the weighted score compared with `threshold`, `count` the number of changed items, `trigger` `importance` or `weekly`.
+- `--json` (no `--check-threshold`) adds the agent's brief: `max_insights_per_run` (a ceiling, not a quota), `meta_insight_allowed` (new ingests since the last reflection), `stagnation`, and `exploration` — at most two pairs of pages from disconnected graph components (overlap `< 0.8`) the agent may use as reflection questions. An empty list is valid. The pairs need the whole page graph, so only `--json` and a logged request build it.
 
-  # 3. Reflection check (mode-aware)
-  #    mode=default: importance_threshold=25, min_interval=7d, require_changes=true
-  #    mode=super:   importance_threshold=5,  min_interval=0,  require_changes=false
-  MODE=$(python3 -c "import yaml; print(yaml.safe_load(open('kb.config.yml')).get('mode','default'))" 2>/dev/null || echo "default")
-
-  REFLECT_TRIGGERED_BY_THRESHOLD=false
-  if [ -f "scripts/kb_reflect.py" ]; then
-    # --check-threshold prints "THRESHOLD_MET" if sum(importance) > threshold (mode-dependent)
-    THRESHOLD_RESULT=$(python3 scripts/kb_reflect.py --check-threshold --dry-run 2>&1)
-    if echo "$THRESHOLD_RESULT" | grep -q "THRESHOLD_MET"; then
-      echo "[reindex] Importance threshold met → auto-triggering reflection (mode=$MODE)"
-      python3 scripts/kb_reflect.py --generate
-      REFLECT_TRIGGERED_BY_THRESHOLD=true
-      echo "$NOW" > ".last_reflection"
-    fi
-  fi
-
-  # 4. Weekly reflection (ONLY if there were changes AND not already triggered by threshold)
-  REFLECTION_MARKER=".last_reflection"
-  WEEK_SECONDS=604800
-  if [ -f "$REFLECTION_MARKER" ]; then
-    LAST_REFLECT=$(cat "$REFLECTION_MARKER")
-    REFLECT_ELAPSED=$((NOW - LAST_REFLECT))
-  else
-    REFLECT_ELAPSED=$((WEEK_SECONDS + 1))
-  fi
-
-  REFLECT_STATUS="skipped"
-  if [ "$REFLECT_TRIGGERED_BY_THRESHOLD" = true ]; then
-    REFLECT_STATUS="triggered (importance threshold, mode=$MODE)"
-  elif [ "$MODE" = "super" ]; then
-    # super mode: threshold=5 covers most, but if it didn't trigger and changes exist — run
-    if [ "$CHANGES_SINCE" -gt 0 ] 2>/dev/null; then
-      echo "[reindex] Super mode reflection: $CHANGES_SINCE changes found → running"
-      if [ -f "scripts/kb_reflect.py" ]; then
-        python3 scripts/kb_reflect.py --generate
-      fi
-      echo "$NOW" > "$REFLECTION_MARKER"
-      REFLECT_STATUS="triggered (super mode, $CHANGES_SINCE changes)"
-    else
-      REFLECT_STATUS="skipped (super, no changes)"
-    fi
-  elif [ $REFLECT_ELAPSED -gt $WEEK_SECONDS ]; then
-    if [ "$CHANGES_SINCE" -gt 0 ] 2>/dev/null; then
-      echo "[reindex] Weekly reflection: $CHANGES_SINCE changes found → running"
-      if [ -f "scripts/kb_reflect.py" ]; then
-        python3 scripts/kb_reflect.py --generate
-      fi
-      echo "$NOW" > "$REFLECTION_MARKER"
-      REFLECT_STATUS="triggered (weekly, $CHANGES_SINCE changes)"
-    else
-      echo "[reindex] Weekly reflection: no changes since last → skipping"
-      REFLECT_STATUS="skipped (no changes, ${REFLECT_ELAPSED}s elapsed)"
-      # Do NOT update the marker — let days accumulate (10, 15...).
-      # Will fire when changes appear.
-    fi
-  else
-    REFLECT_STATUS="skipped (< 7 days)"
-  fi
-
-  # 5. NLP re-enrichment (if enabled, 0 tokens)
-  if [ -f "scripts/kb_nlp_batch.py" ]; then
-    python3 scripts/kb_nlp_batch.py --incremental
-  fi
-
-  # 6. Super mode: auto-process review queue
-  REVIEW_STATUS="skipped"
-  if [ "$MODE" = "super" ] && [ -d "review/needs-ai-decision" ]; then
-    REVIEW_COUNT=$(find review/needs-ai-decision/ -name '*.md' 2>/dev/null | wc -l)
-    if [ "$REVIEW_COUNT" -gt 0 ]; then
-      echo "[reindex] Super mode: $REVIEW_COUNT items in review queue → AI processing"
-      REVIEW_STATUS="auto-processed ($REVIEW_COUNT items)"
-      # The AI agent processes them on the next IDE session, or via a script
-    fi
-  fi
-
-  # 7. Super mode: lint L2 (AI review) on consolidation
-  LINT_L2_STATUS="skipped"
-  if [ "$MODE" = "super" ]; then
-    echo "[reindex] Super mode: running lint L2 (AI review)"
-    LINT_L2_STATUS="triggered (super mode)"
-    # The AI agent runs lint L2 on the next IDE session
-  fi
-
-  # 8. Update consolidation marker
-  echo "$NOW" > "$CONSOLIDATION_MARKER"
-  echo "" >> log.md
-  echo "## [$(date -Iseconds)] consolidation | Daily consolidation (via reindex)" >> log.md
-  echo "- Mode: $MODE" >> log.md
-  echo "- Elapsed since last: ${ELAPSED}s" >> log.md
-  echo "- Lint: completed" >> log.md
-  echo "- Changes detected: $CHANGES_SINCE" >> log.md
-  echo "- Reflection: $REFLECT_STATUS" >> log.md
-  echo "- Review queue: $REVIEW_STATUS" >> log.md
-  echo "- Lint L2: $LINT_L2_STATUS" >> log.md
-else
-  echo "[reindex] Consolidation not needed (${ELAPSED}s < ${DAY_SECONDS}s)"
-fi
-```
-
-### What consolidation does
-
-| Step | Action | Frequency |
-|------|--------|-----------|
-| Full lint (Python) | All level-1 checks from `09_LINT.md` | Once per day, 0 tokens |
-| Change detection | Count entries in log.md since last reflection | Once per day, 0 tokens |
-| Importance check | If `sum(importance)` > threshold → auto-`!reflect` | Once per day, ~15K if fired |
-| Weekly reflection | Generate insights (LLM) | ≥7 days **AND** changes, ~15K tokens |
-| NLP batch | Incremental re-enrichment of new processed/ | Once per day, 0 tokens |
-| Access decay | Update recency scores in routing tables | Once per day, 0 tokens |
-
-### Smart reflection schedule
+### Smart reflection schedule (default mode)
 
 ```
 Days without reflection:  1  2  3  4  5  6  7  8  9  10  ...
 Were there changes?       -  -  -  -  -  -  -  -  ✓  -   ...
                                                     ↑
-                                          Run! (>7 days + changes)
+                                          Due! (≥7 days + changes)
 ```
 
-- **≤7 days** → don't run (still early)
-- **>7 days** but **no changes** → don't run, keep counting (10, 15, 20...)
-- **>7 days** and **changes present** → run, reset marker
-- **importance threshold** reached → **run immediately** (regardless of days)
-
-The last point matters: in active sessions reflection fires before 7 days, preventing stagnation.
-
-`kb_reflect.py --json` also returns `exploration`: at most two pairs of
-pages from disconnected graph components (overlap `< 0.8`). The agent
-may use them as reflection questions. An empty list is valid.
+- **< 7 days** (since the last reflection, or since deployment when there is none yet) → due only when the change score reaches `importance_threshold` (25)
+- **≥ 7 days**, no changes → not due; days keep counting
+- **≥ 7 days** and changes → due
+- the agent finishes with `--record-result N`, which resets the count
 
 ### Guarantees
 
-- Consolidation runs **at most once per day** (`.last_consolidation` marker)
-- Fires on **any** `reindex.sh` call — manual, watcher, git hook
-- If the machine was off for 3 days — first reindex performs consolidation
-- Does not block the main reindex — lint and reflection run **before** repomix
+- Consolidation runs **at most once per `consolidation_interval_hours`** (`.last_consolidation` marker).
+- It fires on **any** full reindex — manual, launcher (`reindex.command` / `reindex.bat`), watcher.
+- If the machine was off for 3 days, the first full reindex catches up.
+- Lint and the reflection check run **before** the index is rebuilt.
 
 ---
 
@@ -500,21 +178,21 @@ may use them as reflection questions. An empty list is valid.
 | Event | Action | Source |
 |-------|--------|--------|
 | `!view` | Start or reopen the local read-only graph viewer | `python3 scripts/kb_view.py --background` |
-| New file in `raw/*/unsorted/` | Ingest → NLP → Process → Reindex | `./shell/watcher.sh` |
-| Edit in `knowledge/` | Reindex + quick lint | `./shell/watcher.sh` or git hook |
+| `!status` | Show what needs attention | `python3 scripts/kb_status.py --print` |
+| New file in `raw/*/unsorted/` or `raw/unsorted/` | Ingest (+ NLP) → Reindex | `./shell/watcher.sh` |
+| Edit in `knowledge/` | Quick lint + Reindex | `./shell/watcher.sh` |
+| Git commit | Index + `STATUS.md` (`kb_reindex.py --hook`) | git hook |
 | `!save` in AI session | Session capture (with enrichment) → Reindex | AI agent |
-| `!reflect` | Reflection: insight generation (~15K tokens) | AI agent |
+| `!reflect` | Reflection: insight generation (~15K tokens), then `kb_reflect.py --record-result N` | AI agent |
 | `!audit` | Per-pack L2 review from `.repomix/audit/<pack>__request.md` | AI agent |
 | `!profile-review` | Interview `knowledge/profile/` (3 questions at a time) | AI agent |
 | `!quiz` | Five questions about what is already in the base; costliest mistakes first | AI agent |
 | `!heal` | Catch-up after upgrade (`kb_heal.py --plan` / `--apply auto`) | AI agent |
-| `!refactor` | Two-step instruction trim (`17_REFACTOR.md`) | AI agent |
-| Lint found and fixed issues | Reindex | `kb_lint.py --fix` |
+| `!refactor` | Two-step instruction trim (`kb-docs/17_REFACTOR.md`) | AI agent |
+| `kb_lint.py --fix` edited pages | Quick lint + Reindex (seen as `knowledge/` edits) | `./shell/watcher.sh` |
 | AI did query-writeback | Write page → Reindex | AI agent |
-| Git commit | Quick lint + Reindex | git hook |
-| Daily | Full lint (Python) + Reindex | cron |
-| reindex (>24h) | Consolidation (lint + NLP batch + reflection) | `reindex.sh` |
-| reindex (>7d) | Weekly reflection (LLM insights) | `reindex.sh` |
+| Nightly (optional) | Full reindex with consolidation | cron |
+| Full reindex, consolidation due (> 24h) | Lint report + NLP batch + reflection check; `reflect-request` when `THRESHOLD_MET` | `kb_reindex.py` |
 
 ---
 
@@ -522,28 +200,39 @@ may use them as reflection questions. An empty list is valid.
 
 ```yaml
 autorun:
-  watch_enabled: true
-  watch_dirs:
+  watch_enabled: true               # false: kb_watch.py exits at once
+  watch_dirs:                       # raw/… entries = ingest inboxes; others = .md edits
     - "raw/*/unsorted/"
     - "knowledge/"
-  debounce_raw_seconds: 5
-  debounce_knowledge_seconds: 2
-  auto_nlp: true                    # NLP enrichment on ingest
-  auto_lint_on_change: true         # Quick lint on knowledge/ edits
-  auto_reindex_on_change: true      # Reindex on knowledge/ edits
-  complexity_auto_threshold: 0.5    # below → auto-extract; above → review
-  consolidation_interval_hours: 24  # Min interval between consolidations
-  consolidation_on_reindex: true    # Check on every reindex
+  debounce_raw_seconds: 5           # a new file must stay unchanged this long
+  debounce_knowledge_seconds: 2     # quiet time after knowledge/ edits
+  auto_nlp: true                    # false: the watcher ingests with --no-nlp
+  auto_lint_on_change: true         # quick lint on knowledge/ edits
+  auto_reindex_on_change: true      # reindex on knowledge/ edits
+  consolidation_interval_hours: 24  # min interval between consolidations
+  consolidation_on_reindex: true    # consolidation requests a reflection when due
+  # complexity_auto_threshold: deprecated — nlp.complexity_threshold is the only threshold
+
+mode_profiles:
+  default:
+    reflection:
+      trigger: "threshold+weekly"
+      importance_threshold: 25
+      min_interval_days: 7
+      require_changes: true
+      max_insights_per_run: 3
+      # default_ingest_importance: 1  # weight of an ingest without importance
 ```
+
+Every key has a code default: an older `kb.config.yml` without them keeps working.
 
 ---
 
 ## Integration
 
-- **03_PIPELINE:** watch invokes ingest on a new file; surprise filter checks duplicates
-- **05_INDEX:** watch triggers reindex on changes
-- **07_INTERACTION_LOOP:** consolidation checks reflection threshold and triggers insights
-- **09_LINT:** watch → quick lint; consolidation → full lint
-- **10_LOG:** all auto operations are appended to log.md, including consolidation
-- **11_PROVENANCE:** consolidation refreshes recency scores and checks bi-temporal validity
-- **12_NLP:** watch runs NLP on ingest; consolidation runs batch re-enrichment
+- **03_PIPELINE:** the watcher runs ingest for new inbox files, in batches
+- **05_INDEX:** the watcher and the git hook run `kb_reindex.py`; every reindex ends with `STATUS.md`
+- **07_INTERACTION_LOOP:** `kb_reflect.py` decides when a reflection is due; `!reflect` ends with `--record-result N`
+- **09_LINT:** watcher → quick lint; consolidation → full lint report
+- **10_LOG:** scripts append their own entries (`ingest`, `reflect-request`, `reflect`, …) to `log.md`
+- **12_NLP:** the watcher runs NLP on ingest (`auto_nlp`); consolidation runs `kb_nlp_batch.py --incremental`

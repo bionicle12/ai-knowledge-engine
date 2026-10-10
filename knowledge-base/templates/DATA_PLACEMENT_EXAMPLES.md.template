@@ -6,8 +6,8 @@
 > **This file is a starting skeleton.** During deployment, the AI agent reads
 > `examples/<role>.yml` (the `placement_examples:` section) and replaces this
 > file with role-specific guidance via the workflow described in
-> `14_INITIAL_POPULATION.md`. If you see only the generic table below, the
-> agent did not run the population step — ask it to do so explicitly.
+> `kb-docs/14_INITIAL_POPULATION.md`. If you see only the generic table below, the
+> agent did not run the population step — say `!populate`.
 
 ## General rule
 
@@ -35,10 +35,10 @@ If you attach a file directly in chat, the AI agent must ask before adding it to
 
 ## After dropping
 
-1. (If watcher is running) — files are picked up automatically within ~5 seconds
+1. (If watcher is running) — files are picked up a few seconds after they stop changing
 2. (Manual) — run `./shell/reindex.sh` to trigger the pipeline
-3. Watch `log.md` to see what happened
-4. Check `review/needs-ai-decision/` if anything needs your AI agent's attention
+3. Check `STATUS.md` (what is waiting, and the command that resolves it) and `log.md` (what happened)
+4. Say `!review` — the AI agent works through the `review/` queues and the `processed/` items still waiting for extraction, and writes `knowledge/` pages
 5. Check `knowledge/` to see freshly extracted knowledge
 
 ## What NOT to drop
@@ -48,9 +48,10 @@ If you attach a file directly in chat, the AI agent must ask before adding it to
 - Medical or legal data of others
 - Material that would be embarrassing or harmful if leaked
 
-If a file is useful but sensitive, the pipeline routes it to `review/needs-redaction/`.
-You can also place it there manually.
+By default (the `privacy:` section of `kb.config.yml`), chats, personal context
+and files in which the pipeline spots credential-looking strings go to
+`review/needs-redaction/` first. You can also place a sensitive file there manually.
 
 ---
 
-> 🔧 Note: If the agent ran `14_INITIAL_POPULATION.md` properly, this file should contain a "Role-specific examples" section below. If it doesn't, ask the agent: *"Re-run initial population for my role."*
+> 🔧 Note: If the agent ran `kb-docs/14_INITIAL_POPULATION.md` properly, this file should contain a "Role-specific examples" section below. If it doesn't, say `!populate`.

@@ -7,9 +7,11 @@ and can never override the store location.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import socket
+import tempfile
 from pathlib import Path
 from typing import Mapping
 
@@ -60,6 +62,23 @@ def store_lock(store_root: Path):
         yield
     finally:
         lock.unlink(missing_ok=True)
+
+
+def write_json_atomic(path: Path, data) -> None:
+    """Write a sorted-key JSON artifact via a temp file and ``os.replace``.
+
+    Apply records double as the apply journal, so a crash must leave
+    either the previous or the new version on disk, never a torn file.
+    """
+    path = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True))
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 def repo_root_from_here() -> Path:

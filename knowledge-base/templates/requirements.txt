@@ -14,19 +14,22 @@ striprtf>=0.0.29,<1.0
 pandas>=2.2,<3.0
 openpyxl>=3.1,<4.0
 
-# NLP enrichment (see 12_NLP_PREPROCESS.md)
+# NLP enrichment (see kb-docs/12_NLP_PREPROCESS.md). After installing:
+#   python3 -m spacy download <language model, e.g. ru_core_news_md>
+#   python3 -m nltk.downloader stopwords punkt punkt_tab   # RAKE finds no keywords without it
+# KeyBERT keywords are optional and pull in PyTorch: see requirements-nlp.txt.
 spacy>=3.7,<4.0
 rake-nltk>=1.0,<2.0
-keybert>=0.8,<1.0
 
-# File watcher (see 13_AUTORUN.md)
+# File watcher (see kb-docs/13_AUTORUN.md)
 watchdog>=4.0,<5.0
 
 # Media: transcription (STT) & OCR are OPTIONAL and live in a separate file so
 # the base install stays light. Install when you need audio/video/image input:
 #   pip install -r requirements-media.txt
-# (faster-whisper transcribes WITHOUT a system ffmpeg; rapidocr does OCR
-#  without a system tesseract — both work out of the box on all platforms.)
+# (faster-whisper transcribes WITHOUT a system ffmpeg on all platforms;
+#  rapidocr does OCR without a system tesseract, but reads only Chinese and
+#  English — for other languages see the Tesseract notes in that file.)
 
 # Testing (dev only — install with: pip install -r requirements-dev.txt)
 # pytest>=8.0,<9.0

@@ -149,8 +149,8 @@ placement_examples:
     - "Положи README.md любого своего рабочего проекта → raw/reference/unsorted/"
     - "Любая заметка про принятое арх. решение (даже одна строка) → raw/reference/unsorted/"
     - "Скриншот архитектурной диаграммы из Excalidraw/Miro → raw/media/unsorted/"
-    - "Запусти ./shell/reindex.sh — через минуту знания будут в knowledge/"
-    - "Открой .repomix/output.xml — теперь твой AI знает твой стек"
+    - "Запусти ./shell/reindex.sh — файлы разойдутся по processed/ и review/ (итог — в STATUS.md)"
+    - "Скажи агенту !review — он разложит обработанное в knowledge/, дальше спрашивай его про свой стек"
 
   do_not_drop:
     - "Чужой код без явной лицензии"

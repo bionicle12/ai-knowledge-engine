@@ -1,6 +1,7 @@
 """Tests for rollback of applied plans (spec §18, Phase 3 criterion)."""
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 
@@ -53,7 +54,7 @@ def test_rollback_restores_adopted_copy_byte_identical(env):
     original_hash = content_hash(dest)
 
     plan = build_plan(store, "m1", home=home)
-    record = apply_plan(store, plan["plan_id"])
+    record = apply_plan(store, plan["plan_id"], home=home)
     assert dest.resolve() != dest.absolute()
 
     rolled = rollback_apply(store, record["apply_id"])
@@ -68,7 +69,7 @@ def test_rollback_removes_installed_link(env):
     store, home = env
     set_profile_state(store, "awesome:foo", "enabled", targets=["claude"])
     plan = build_plan(store, "m1", home=home)
-    record = apply_plan(store, plan["plan_id"])
+    record = apply_plan(store, plan["plan_id"], home=home)
     dest = home / ".claude" / "skills" / "foo"
     assert dest.resolve() != dest.absolute()
 
@@ -84,7 +85,7 @@ def test_rollback_restores_quarantined_copy(env):
     original_hash = content_hash(dest)
 
     plan = build_plan(store, "m1", home=home)
-    record = apply_plan(store, plan["plan_id"])
+    record = apply_plan(store, plan["plan_id"], home=home)
     assert not dest.exists()
 
     rollback_apply(store, record["apply_id"])
@@ -96,7 +97,7 @@ def test_rollback_twice_is_an_error(env):
     store, home = env
     set_profile_state(store, "awesome:foo", "enabled", targets=["claude"])
     plan = build_plan(store, "m1", home=home)
-    record = apply_plan(store, plan["plan_id"])
+    record = apply_plan(store, plan["plan_id"], home=home)
     rollback_apply(store, record["apply_id"])
     with pytest.raises(RollbackError):
         rollback_apply(store, record["apply_id"])
@@ -114,7 +115,7 @@ def test_rollback_refuses_when_backup_is_missing(env):
     dest = home / ".claude" / "skills" / "foo"
     shutil.copytree(store / "sources" / "awesome" / "skills" / "foo", dest)
     plan = build_plan(store, "m1", home=home)
-    record = apply_plan(store, plan["plan_id"])
+    record = apply_plan(store, plan["plan_id"], home=home)
 
     (op_result,) = record["operations"]
     shutil.rmtree(store / op_result["backup_path"])
@@ -124,3 +125,63 @@ def test_rollback_refuses_when_backup_is_missing(env):
     assert dest.resolve() != dest.absolute(), (
         "destination must stay untouched when backup is gone"
     )
+
+
+def test_rollback_is_resumable_after_a_blocked_undo(env):
+    """B7: the first run restored `foo`, stopped at the modified `bar`; the
+    retry then failed forever with `backup missing for adopt of …/foo`."""
+    store, home = env
+    root = home / ".claude" / "skills"
+    originals = {}
+    for name in ("bar", "foo"):
+        set_profile_state(store, f"awesome:{name}", "enabled", targets=["claude"])
+        shutil.copytree(store / "sources" / "awesome" / "skills" / name, root / name)
+        originals[name] = content_hash(root / name)
+    record = apply_plan(store, build_plan(store, "m1", home=home)["plan_id"], home=home)
+    assert [r["type"] for r in record["operations"]] == ["adopt", "adopt"]
+
+    # The user replaces the managed `bar` link with an edited real folder.
+    (root / "bar").unlink()
+    (root / "bar").mkdir()
+    (root / "bar" / "SKILL.md").write_text("---\nname: bar\n---\nmy edit\n")
+
+    with pytest.raises(RollbackError, match="run rollback .* again"):
+        rollback_apply(store, record["apply_id"])
+    assert content_hash(root / "foo") == originals["foo"], "foo restored first"
+    saved = json.loads(
+        (store / "state" / "plans" / f"{record['apply_id']}.json").read_text()
+    )
+    statuses = {r["skill_id"]: r["status"] for r in saved["operations"]}
+    assert statuses == {"awesome:bar": "needs-recovery", "awesome:foo": "rolled-back"}
+    assert "rolled_back_at" not in saved
+
+    # The user moves their edit aside; the retry finishes the job.
+    (root / "bar").rename(home / "bar-mine")
+    rolled = rollback_apply(store, record["apply_id"])
+    assert rolled["rolled_back_at"]
+    assert content_hash(root / "bar") == originals["bar"]
+    assert content_hash(root / "foo") == originals["foo"]
+
+
+@pytest.mark.parametrize(
+    "apply_id", ["../../registry/repositories", "plan-0123456789ab.apply-x"]
+)
+def test_rollback_rejects_malformed_apply_ids(env, apply_id):
+    store, _ = env
+    with pytest.raises(RollbackError, match="unknown apply id"):
+        rollback_apply(store, apply_id)
+
+
+def test_rollback_never_deletes_an_unverifiable_directory(env):
+    """An install record without a release hash cannot prove the folder at
+    its destination is the tool's own copy."""
+    from ai_skills_fixer.rollback import undo_operation
+
+    store, home = env
+    dest = home / ".claude" / "skills" / "foo"
+    dest.mkdir()
+    (dest / "SKILL.md").write_text("mine\n")
+    with pytest.raises(RollbackError, match="refusing to delete"):
+        undo_operation(store, {"type": "install", "destination": str(dest),
+                               "release_hash": None})
+    assert (dest / "SKILL.md").read_text() == "mine\n"

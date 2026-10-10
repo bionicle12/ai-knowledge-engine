@@ -21,6 +21,10 @@ Hard rules:
 - Plugin- and system-managed skills (`root_kind` of `plugin`/`system`)
   are never name-matched and are changed only through the owning
   client's own mechanism (spec §18).
+- `excluded` in the profile quarantines an installed copy only when it
+  is `exact` for that skill or a managed link into that skill's
+  releases. Any other same-named folder — `unknown`, `modified-copy`,
+  or nested inside a user folder — is left in place as a `review` op.
 - A hash mismatch against today's checkout does not mean the copy was
   edited — the source may simply have moved on. Commit history
   resolution arrives with the lockfile; until then say "differs from

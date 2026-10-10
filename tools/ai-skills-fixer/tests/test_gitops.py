@@ -5,8 +5,10 @@ import subprocess
 
 import pytest
 
+from ai_skills_fixer import gitops
 from ai_skills_fixer.gitops import (
-    GitError, checkout, clone, current_commit, fetch, is_dirty, rev_parse,
+    GitError, checkout, clone, current_commit, fetch, is_dirty, redact_url,
+    rev_parse,
 )
 
 
@@ -79,3 +81,56 @@ def test_is_dirty(tmp_path):
 def test_git_error_is_raised_not_leaked(tmp_path):
     with pytest.raises(GitError):
         rev_parse(tmp_path, "HEAD")
+
+
+def test_clone_never_parses_the_url_as_an_option(tmp_path, monkeypatch):
+    """B1: `git clone -- <url>` — a source named like an option is a path.
+
+    Without the `--`, git reads `-origin` as `-o rigin` and the clone
+    fails (or, with a crafted URL, runs with attacker-chosen options).
+    """
+    sha = make_repo(tmp_path / "-origin")
+    monkeypatch.chdir(tmp_path)
+    clone("-origin", tmp_path / "dest")
+    assert current_commit(tmp_path / "dest") == sha
+
+
+@pytest.mark.parametrize("ref", ["--orphan=x", "-b", ""])
+def test_refs_that_look_like_options_are_refused(tmp_path, ref):
+    origin = tmp_path / "origin"
+    make_repo(origin)
+    with pytest.raises(GitError, match="refusing git ref"):
+        checkout(origin, ref)
+    with pytest.raises(GitError, match="refusing git ref"):
+        rev_parse(origin, ref)
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("https://x-access-token:ghp_SECRET@github.com/o/r.git",
+         "https://github.com/o/r.git"),
+        ("https://ghp_SECRET@github.com/o/r.git", "https://github.com/o/r.git"),
+        ("ssh://git:SECRET@host/o/r.git", "ssh://git@host/o/r.git"),
+        ("ssh://git@host/o/r.git", "ssh://git@host/o/r.git"),
+        ("git@github.com:o/r.git", "git@github.com:o/r.git"),
+        ("/srv/skills/repo", "/srv/skills/repo"),
+    ],
+)
+def test_redact_url_drops_credentials_only(url, expected):
+    assert redact_url(url) == expected
+
+
+def test_clone_error_never_echoes_url_credentials(tmp_path, monkeypatch):
+    """B9: a failing clone of a token URL must not print the token."""
+    def fake_run(args, cwd=None):
+        raise GitError(
+            f"git {' '.join(args)} failed (rc=128): fatal: unable to access "
+            f"'{args[-2]}': could not resolve host"
+        )
+
+    monkeypatch.setattr(gitops, "_run", fake_run)
+    with pytest.raises(GitError) as info:
+        clone("https://user:ghp_SECRET@example.invalid/o/r.git", tmp_path / "d")
+    assert "SECRET" not in str(info.value)
+    assert "example.invalid/o/r.git" in str(info.value)

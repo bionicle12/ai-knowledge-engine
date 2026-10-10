@@ -14,7 +14,11 @@
     "#7d9e68",
   ];
 
-  const STALE_MS = 180 * 24 * 60 * 60 * 1000;
+  // Stop the initial physics layout after this long: a 2000-page graph
+  // otherwise keeps the page busy for tens of seconds.
+  const LAYOUT_BUDGET_MS = 6000;
+  // Kamada-Kawai seeding is quadratic; larger graphs start from random spots.
+  const IMPROVED_LAYOUT_MAX_NODES = 300;
   const HEALTH_COLORS = {
     orphans: "#e4a72f",
     broken: "#ef665f",
@@ -314,11 +318,9 @@
     );
   }
 
+  // The server applies kb_lint's stale rule (kb_common.stale_status).
   function isStale(node) {
-    if (!node.lastVerified) return true;
-    const timestamp = Date.parse(node.lastVerified);
-    if (Number.isNaN(timestamp)) return true;
-    return Date.now() - timestamp > STALE_MS;
+    return node.stale === true;
   }
 
   function renderStats() {
@@ -329,6 +331,14 @@
     el["count-broken"].textContent = String(stats.broken);
     el["count-stale"].textContent = String(state.staleIds.size);
     el["count-ambiguous"].textContent = String(stats.ambiguous);
+    const staleDays = Number(state.graph.rules?.staleWarningDays);
+    const staleChip = el["health-chips"].querySelector('[data-health="stale"]');
+    if (staleChip && Number.isFinite(staleDays)) {
+      staleChip.title =
+        "Newest of last_verified / extracted_at is more than " +
+        `${staleDays} days old (kb_lint's rule). Undated, permanent, generated ` +
+        "and _archive/ pages, and pages whose valid_until has not passed, are never stale.";
+    }
   }
 
   function renderFilters() {
@@ -534,11 +544,7 @@
   }
 
   function staleAge(node) {
-    if (!node?.lastVerified) return "never verified";
-    const timestamp = Date.parse(node.lastVerified);
-    if (Number.isNaN(timestamp)) return "never verified";
-    const days = Math.floor((Date.now() - timestamp) / (24 * 60 * 60 * 1000));
-    return `verified ${days} days ago`;
+    return node?.staleReason || "stale";
   }
 
   function renderFixGroup(fragment, kind, heading, items) {
@@ -676,7 +682,7 @@
           zoomView: true,
         },
         layout: {
-          improvedLayout: true,
+          improvedLayout: networkNodes.length <= IMPROVED_LAYOUT_MAX_NODES,
           clusterThreshold: 180,
         },
         physics: {
@@ -693,7 +699,7 @@
           stabilization: {
             enabled: true,
             iterations: 280,
-            updateInterval: 25,
+            updateInterval: 10,
             fit: true,
           },
         },
@@ -723,8 +729,12 @@
       selectNode(nodeId, { move: false });
       setFocus(true);
     });
+    const layoutStarted = performance.now();
     state.network.on("stabilizationProgress", ({ iterations, total }) => {
       setStatus(`Laying out graph · ${Math.round((iterations / total) * 100)}%`);
+      if (performance.now() - layoutStarted > LAYOUT_BUDGET_MS) {
+        state.network.stopSimulation();
+      }
     });
     state.network.once("stabilizationIterationsDone", () => {
       state.network.setOptions({ physics: false });
@@ -1676,7 +1686,10 @@
     setStatus("Refreshing knowledge…");
     try {
       const selected = state.selectedId;
-      const graph = await request("/api/refresh", { method: "POST" });
+      const graph = await request("/api/refresh", {
+        method: "POST",
+        headers: { "X-KB-Viewer": "1" },
+      });
       await loadGraph(graph);
       if (selected && state.nodesById.has(selected)) await selectNode(selected);
       else if (selected) clearSelection();

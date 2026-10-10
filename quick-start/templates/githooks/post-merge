@@ -1,4 +1,8 @@
 #!/bin/sh
 # Fires after `git pull` / `git merge`: teammates' changes must reach the index.
-root=$(git rev-parse --show-toplevel)
-exec "$root/scripts/update-repomix-index.sh" --background
+# Project-specific steps belong in .githooks/post-merge.local (executable).
+root=$(git rev-parse --show-toplevel) || exit 0
+[ -x "$root/.githooks/post-merge.local" ] && "$root/.githooks/post-merge.local" "$@"
+script="$root/scripts/update-repomix-index.sh"
+[ -f "$script" ] || exit 0
+exec sh "$script" --background

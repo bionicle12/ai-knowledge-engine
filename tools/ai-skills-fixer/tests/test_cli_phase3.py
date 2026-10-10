@@ -50,7 +50,7 @@ def test_cli_adopt_apply_and_rollback_flow(tmp_path, capsys):
     main(["reconcile", *base, "--machine-id", "m1", "--home", str(home), "--json"])
     plan = json.loads(capsys.readouterr().out)
 
-    rc = main(["reconcile", *base, "--apply", plan["plan_id"], "--json"])
+    rc = main(["reconcile", *base, "--apply", plan["plan_id"], "--home", str(home), "--json"])
     assert rc == 0
     record = json.loads(capsys.readouterr().out)
     assert record["success"] is True
@@ -71,7 +71,7 @@ def test_cli_apply_drift_returns_3(tmp_path, capsys):
     main(["profile", "set", "origin-repo:bar", "enabled", "--targets", "claude", *base])
     capsys.readouterr()
 
-    rc = main(["reconcile", *base, "--apply", plan["plan_id"]])
+    rc = main(["reconcile", *base, "--apply", plan["plan_id"], "--home", str(home)])
     assert rc == 3
 
 
@@ -79,3 +79,52 @@ def test_cli_rollback_unknown_apply_id_is_safe_stop(tmp_path, capsys):
     store, _, _, base = setup(tmp_path, capsys)
     rc = main(["rollback", "plan-x.apply-20260101T000000Z", *base])
     assert rc == 2
+
+
+def test_cli_edited_plan_is_safe_stop(tmp_path, capsys):
+    """B5: an approved plan edited on disk is refused with exit code 2."""
+    store, _, home, base = setup(tmp_path, capsys)
+    main(["profile", "set", "origin-repo:foo", "enabled", "--targets", "claude", *base])
+    capsys.readouterr()
+    main(["reconcile", *base, "--machine-id", "m1", "--home", str(home), "--json"])
+    plan = json.loads(capsys.readouterr().out)
+    path = store / "state" / "plans" / f"{plan['plan_id']}.json"
+    path.write_text(path.read_text().replace('"risk": "low"', '"risk": "none"'))
+
+    rc = main(["reconcile", *base, "--apply", plan["plan_id"], "--home", str(home)])
+    assert rc == 2
+    assert "edited after reconcile" in capsys.readouterr().err
+    assert not (home / ".claude" / "skills" / "foo").exists()
+
+
+def test_cli_reconcile_prints_review_reasons(tmp_path, capsys):
+    store, _, home, base = setup(tmp_path, capsys)
+    mine = home / ".claude" / "skills" / "bar"
+    mine.mkdir()
+    (mine / "SKILL.md").write_text("---\nname: bar\ndescription: mine\n---\n")
+    main(["profile", "set", "origin-repo:bar", "excluded", *base])
+    capsys.readouterr()
+
+    assert main(["reconcile", *base, "--machine-id", "m1", "--home", str(home)]) == 0
+    out = capsys.readouterr().out
+    assert "[review    ] origin-repo:bar -> claude" in out
+    assert "review origin-repo:bar -> claude: excluded, but" in out
+
+
+def test_cli_apply_hint_repeats_home_and_apply_checks_it(tmp_path, capsys):
+    """B5: apply compares the plan's user roots with discovery for --home."""
+    store, _, home, base = setup(tmp_path, capsys)
+    main(["profile", "set", "origin-repo:foo", "enabled", "--targets", "claude", *base])
+    capsys.readouterr()
+    main(["reconcile", *base, "--machine-id", "m1", "--home", str(home), "--json"])
+    plan = json.loads(capsys.readouterr().out)
+
+    assert main(["reconcile", *base, "--machine-id", "m1", "--home", str(home)]) == 0
+    assert f"reconcile --apply {plan['plan_id']} --home {home}" in capsys.readouterr().out
+
+    other = tmp_path / "other-home"
+    (other / ".claude" / "skills").mkdir(parents=True)
+    rc = main(["reconcile", *base, "--apply", plan["plan_id"], "--home", str(other)])
+    assert rc == 2
+    assert "same --home" in capsys.readouterr().err
+    assert not (home / ".claude" / "skills" / "foo").exists()

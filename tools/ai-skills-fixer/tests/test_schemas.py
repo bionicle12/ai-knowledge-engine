@@ -67,6 +67,10 @@ def test_plan_and_lock_proposal_validate(tmp_path):
     plan = build_plan(store, "m1", home=home)
     assert validate("change-plan", plan) == []
     assert validate("lock", plan["lock_proposal"]) == []
+    assert plan["user_roots"]["claude"] == str(home / ".claude" / "skills")
+
+    plan["operations"][0]["type"] = "update"  # emitted after `source promote`
+    assert validate("change-plan", plan) == []
 
 
 def test_inventory_payload_validates(tmp_path):

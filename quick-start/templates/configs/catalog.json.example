@@ -1,6 +1,6 @@
 {
   "$schema": "https://repomix.com/schemas/latest/schema.json",
-  "$comment": "Catalog pack: metadata only (files:false) — directory tree + file inventory without code bodies. Target size: 5-15K tokens. This is the routing map an agent reads FIRST. The include roots below are placeholders — point them at the directories that matter in THIS project.",
+  "$comment": "Catalog pack: metadata only (files:false) — directory tree + file inventory without code bodies. Target size: 5-15K tokens. This is the routing map an agent reads FIRST. The include roots below are placeholders — point them at the directories that matter in THIS project. Keep files:false (a catalog holds no file bodies, so the coverage check does not count it) and keep the secret patterns at the end of customPatterns.",
   "output": {
     "filePath": ".repomix/catalog.xml",
     "style": "xml",
@@ -20,7 +20,7 @@
   "ignore": {
     "useGitignore": true,
     "useDefaultPatterns": true,
-    "customPatterns": ["**/vendor/**", "**/node_modules/**", "**/var/**", ".repomix/**", "AGENTS.md", "CLAUDE.md"]
+    "customPatterns": ["**/vendor/**", "**/node_modules/**", "**/var/**", ".repomix/**", "AGENTS.md", "CLAUDE.md", "**/.env", "**/**/.env.*", "**/*.env", "**/*.pem", "**/*.key", "**/*.p12", "**/*.pfx", "**/*.jks", "**/*.keystore", "**/**/id_rsa*", "**/**/id_ecdsa*", "**/**/id_ed25519*"]
   },
   "security": { "enableSecurityCheck": true },
   "tokenCount": { "encoding": "o200k_base" }

@@ -2,8 +2,18 @@
 from __future__ import annotations
 
 import json
+import re
+from pathlib import Path
+
+import pytest
 
 from ai_skills_fixer.cli import main
+
+SKILL_MD = Path(__file__).resolve().parents[1] / "SKILL.md"
+SPEC_MD = (
+    Path(__file__).resolve().parents[3]
+    / "docs" / "superpowers" / "specs" / "2026-08-19-ai-skills-fixer-design.md"
+)
 
 
 def write_skill(root, rel, name=None, description="Use when testing."):
@@ -69,3 +79,38 @@ def test_inventory_without_sources_still_works(tmp_path, capsys):
     assert data["summary"]["skills_total"] == 3
     levels = {s["provenance"]["level"] for s in data["skills"] if s["provenance"]}
     assert levels == {"unknown"}
+
+
+def test_skill_md_lists_only_commands_the_cli_has(capsys):
+    """B9: the spec's `eval` command does not exist; SKILL.md must not
+    present it (or any other missing command) as available."""
+    text = SKILL_MD.read_text(encoding="utf-8")
+    section = text.split("## Commands", 1)[1].split("\n## ", 1)[0]
+    documented = set(re.findall(r"^- `([a-z]+)", section, re.M))
+    assert {"inventory", "source", "reconcile", "rollback", "eval"} <= documented
+
+    for command in sorted(documented - {"eval"}):
+        with pytest.raises(SystemExit) as info:
+            main([command, "--help"])
+        assert info.value.code == 0, command
+    with pytest.raises(SystemExit) as info:
+        main(["eval", "--help"])
+    assert info.value.code == 2
+    capsys.readouterr()
+    assert re.search(r"`eval`[^\n]*is not implemented", section)
+
+
+def test_spec_marks_eval_unimplemented_and_states_the_apply_guards():
+    """B9/B5/B8: the design spec listed `eval` as a core command and left out
+    the release and apply guards the code enforces."""
+    if not SPEC_MD.is_file():
+        pytest.skip("design spec is not next to the tool (installed copy)")
+    spec = " ".join(SPEC_MD.read_text(encoding="utf-8").split())
+    assert "ai-skills-fixer eval <skill-id> # Phase 5 (§16, §22) — not implemented yet" in spec
+    assert "`.git` folders are never copied into them" in spec
+    assert "installed into host roots under a folder named `<source-id>`" in spec
+    from ai_skills_fixer.sources import SOURCE_ID_RE
+
+    assert f"matching `{SOURCE_ID_RE.pattern}`" in spec
+    assert "must equal the user roots discovered at apply time" in spec
+    assert "The apply record is a write-ahead journal" in spec

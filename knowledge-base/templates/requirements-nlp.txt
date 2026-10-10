@@ -1,0 +1,11 @@
+# AI Knowledge Engine — optional NLP extras (KeyBERT keywords)
+# Without this file ingest extracts keywords with RAKE (rake-nltk, in
+# requirements.txt). Install it only if you want KeyBERT keywords.
+#
+# KeyBERT pulls in PyTorch, and plain `pip` picks the CUDA build (gigabytes,
+# many minutes). Install the CPU-only wheel first, then this file:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-nlp.txt
+
+keybert>=0.8,<1.0

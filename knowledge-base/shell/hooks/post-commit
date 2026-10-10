@@ -1,0 +1,69 @@
+#!/bin/sh
+# ai-knowledge-engine post-commit hook — installed by shell/install-hooks.sh.
+#
+# After every commit it starts `scripts/kb_reindex.py --hook` in the
+# background (index packs + STATUS.md only: no ingest, no reflection; it
+# exits quietly when another pipeline run holds the lock) and appends its
+# output to <base>/.kb-state/hooks.log. The hook never blocks or fails a
+# commit.
+#
+# The base root is `git config kb.root` (a path relative to the top of the
+# work tree, recorded by install-hooks.sh when the base sits in a subfolder),
+# else the top of the work tree. No base there -> the hook does nothing.
+# The interpreter comes from shell/_kbpy.sh ($KB_PYTHON, the base's .venv,
+# else python3).
+#
+# Do not edit the installed copy: shell/install-hooks.sh replaces it (keeping
+# a backup when it differs). To combine it with your own post-commit commands,
+# keep your own hook and call this file from it (`sh <base>/shell/hooks/post-commit`)
+# instead of running install-hooks.sh.
+
+top=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+_kb_is_base() {
+  [ -f "$1/kb.config.yml" ] && [ -f "$1/scripts/kb_reindex.py" ] && [ -f "$1/shell/_kbpy.sh" ]
+}
+
+base=""
+rel=$(git config --get kb.root 2>/dev/null) || rel=""
+if [ -n "$rel" ]; then
+  case $rel in
+    /*|[A-Za-z]:*) candidate=$rel ;;
+    *) candidate="$top/$rel" ;;
+  esac
+  if _kb_is_base "$candidate"; then
+    base=$candidate
+  fi
+fi
+if [ -z "$base" ] && _kb_is_base "$top"; then
+  base=$top
+fi
+[ -n "$base" ] || exit 0
+
+head=$(git rev-parse --short HEAD 2>/dev/null) || head=""
+# Git exports GIT_DIR, GIT_INDEX_FILE, ... to hooks; keep them away from the
+# scripts started below.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_PREFIX
+
+KB_SHELL_DIR="$base/shell"
+. "$KB_SHELL_DIR/_kbpy.sh" >/dev/null 2>&1 || exit 0
+python=$(kb_python 2>/dev/null) || exit 0
+
+state="$KB_ROOT/.kb-state"
+mkdir -p "$state" 2>/dev/null || exit 0
+# Same as kb_common.state_dir(): the folder ignores itself in git.
+[ -f "$state/.gitignore" ] || printf '*\n' > "$state/.gitignore" 2>/dev/null
+log="$state/hooks.log"
+# Keep one previous log once the current one passes 1 MB.
+if [ -f "$log" ] && [ "$(wc -c < "$log" | tr -d ' ')" -gt 1048576 ]; then
+  mv -f "$log" "$log.1" 2>/dev/null
+fi
+printf '\n== %s post-commit %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$head" >> "$log" 2>/dev/null
+
+cd "$KB_ROOT" || exit 0
+if command -v nohup >/dev/null 2>&1; then
+  nohup "$python" scripts/kb_reindex.py --hook < /dev/null >> "$log" 2>&1 &
+else
+  "$python" scripts/kb_reindex.py --hook < /dev/null >> "$log" 2>&1 &
+fi
+exit 0

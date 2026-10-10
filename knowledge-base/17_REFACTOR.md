@@ -2,7 +2,7 @@
 
 > Two-step trim of live instruction files. Analysis is separated from
 > the rewrite so the owner chooses, and the agent does not invent extra
-> rules. Counterpart to `!heal` stage 4 (`18_HEAL.md`).
+> rules. Counterpart to `!heal` stage 4 (`kb-docs/18_HEAL.md`).
 >
 > There is **no** `kb_refactor.py`. The agent follows this module.
 
@@ -10,8 +10,8 @@
 
 ## When
 
-Lint warns `agents-bytes`, `instruction-absolutes`, or `work-ordering`;
-`instructions_review.reviewed_at` is stale; a new model generation arrived;
+Lint warns `agents-bytes`, `instruction-absolutes`, `work-ordering` or
+`instructions-review` (`instructions_review.reviewed_at` is stale); a new model generation arrived;
 or the owner said `!refactor`.
 
 A base that is already under the lint thresholds and recently reviewed is
@@ -44,37 +44,58 @@ Never:
 
 - `AI-KE:INVARIANT` bodies (`forbidden`, `language`) — report if they
   conflict with something else; do not rewrite the wording
-- `AI-KE:INDEX` / `AI-KE:VIEW` unless you also update the matching
-  blocks in the engine `kb_upgrade.py` (deployed bases: leave them;
-  they are managed)
+- Managed blocks `AI-KE:INDEX`, `AI-KE:VIEW`, `AI-KE:STATUS` — leave
+  them. `kb_upgrade.py` owns them: it compares each with the engine's
+  `templates/AGENTS.md.template`, keeps a local edit only while that
+  reference block is unchanged, and asks for a merge when it changes
 - Files outside the base, including `~/.codex/AGENTS.md`
 - `knowledge/**` content pages (that is `!audit` / `!review`)
 
 ---
+
+## Fresh sessions
+
+The eval runs need a **fresh session** — one that has not seen this
+refactor. You cannot open one yourself. Ask the owner, in one message:
+"Please open a new chat in this base, paste the three questions from
+`eval/QUESTIONS.md`, and save the answers as `eval/results/<file>`" — or
+start a sub-agent with a clean context if the tool has one. Never answer
+the questions in the session that audits or rewrites.
 
 ## Cycle
 
 1. **Baseline.** Fresh session. Answer `eval/QUESTIONS.md`. Write
    `eval/results/<YYYY-MM-DD>__before-refactor.md`. If the three
    questions are missing, stop and treat that as a `!heal` human item
-   (stage 3). Do not trim without a measure.
-2. **Step 1 — audit (no writes).** Line-by-line, same five categories
-   as C1 (`docs/proposals/agents-md-audit.md` in the engine, or the
-   table below). Output a table: id, excerpt, category, proposed
+   (stage 3). If a page a question `must cite` does not exist yet (a
+   young base), the question measures nothing — ask the owner to swap it
+   for one the base can already answer. Do not trim without a measure.
+2. **Step 1 — audit (no writes).** Line-by-line, in the five categories
+   of the table below. Output a table: id, excerpt, category, proposed
    action, why. **Stop.** Ask the owner concrete questions with
    answer options. Do not rewrite yet.
 3. **Step 2 — rewrite from decisions only.** After the owner answers:
    assemble the new text from those verdicts. Add nothing they did
-   not choose. Backup first: copy the scoped files into
-   `.kb-backups/<timestamp>/`. Write the new `AGENTS.md` (and other
+   not choose. Backup first: copy every file you will change into
+   `.kb-state/refactor-backups/<YYYYMMDDTHHMMSS>/`, keeping its path
+   relative to the base root. Not into `.kb-backups/`: that folder holds
+   `kb_heal.py`'s own runs, and heal's `--verify` / `--rollback` skip a
+   folder heal did not write. Write the new `AGENTS.md` (and other
    scoped files only if a verdict said so).
 4. **After.** Fresh session. Answer the same three questions →
-   `eval/results/<YYYY-MM-DD>__after-refactor.md`. If the after file
-   says `eval: regressed` / `verdict: failed` / `регресс`, restore
-   the backup and **stop**.
-5. **Stamp.** Set `instructions_review.reviewed_at` to today,
+   `eval/results/<YYYY-MM-DD>__post-refactor.md`. The owner compares
+   before and after against the `must cite` / `must mention` /
+   `must NOT propose` lines and adds one verdict line on its own:
+   `eval: ok` or `eval: regressed`. The verdict is not the rewriting
+   session's call. Use no other wording. On `eval: regressed` copy
+   every file from the backup folder back to its path and **stop**.
+   `kb_heal.py --verify` never undoes a refactor: it judges heal runs by
+   the `*after*` files in `eval/results/` — which is why this file is
+   named `post-refactor`.
+5. **Stamp.** In `kb.config.yml` (edit those lines only; keep the
+   comments) set `instructions_review.reviewed_at` to today,
    `reviewed_model` to the model that just ran, `clean_run_baseline`
-   to the after-refactor result path. Log operation `refactor`.
+   to the post-refactor result path. Log operation `refactor`.
 
 ---
 
@@ -98,13 +119,14 @@ in the decision set.
 When the owner switches primary model (or `instructions_review` is
 stale):
 
-1. One fresh session **without** treating `AGENTS.md` as law — raw
-   capability on `eval/QUESTIONS.md`. Save as
-   `eval/results/<date>__clean-run.md`.
+1. One fresh session **without** `AGENTS.md` — raw capability on
+   `eval/QUESTIONS.md`. Ask the owner to run it outside the base (a
+   chat opened in an empty folder, so `AGENTS.md` is not loaded) and
+   save the answers as `eval/results/<date>__clean-run.md`.
 2. One fresh session **with** the base loaded as usual. Save as
    `eval/results/<date>__instructed.md`.
-3. If instructed is worse than clean-run, the instructions are the
-   debt — run `!refactor` from step 1. If instructed is better or
+3. The owner compares the two. If instructed is worse than
+   clean-run, the instructions are the debt — run `!refactor` from step 1. If instructed is better or
    equal, stamp `instructions_review` and stop.
 
 ---
@@ -115,7 +137,7 @@ stale):
 |-------|------|
 | Honest zero | Nothing over threshold and review is fresh → stop |
 | No measure | No `eval/QUESTIONS.md` → do not write a shorter `AGENTS.md` |
-| Eval regression | Restore `.kb-backups/` and stop |
+| Eval regression | Verdict line `eval: regressed` → copy the files back from `.kb-state/refactor-backups/<stamp>/` and stop |
 | `--global` | Report only; never write outside the base |
 | INVARIANT | Never change the wording inside the wrappers |
 
@@ -127,9 +149,9 @@ stale):
 instructions_review:
   reviewed_at: "2026-08-23"
   reviewed_model: "gpt-5.6-codex"
-  clean_run_baseline: "eval/results/2026-08-23__after-refactor.md"
+  clean_run_baseline: "eval/results/2026-08-23__post-refactor.md"
 ```
 
-Lint (`09_LINT.md`) warns when `reviewed_at` is older than
+Lint (`kb-docs/09_LINT.md`) warns when `reviewed_at` is older than
 `instructions_lint.review_stale_days` (default 90). Missing
 `reviewed_at` is not a warning — heal can append the block.

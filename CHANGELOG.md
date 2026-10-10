@@ -6,17 +6,290 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 `instructions_version` field in deployed `kb.config.yml` should match this VERSION.
-On mismatch, `kb_upgrade.py` (Phase 4) helps migrate.
+On mismatch, `kb_upgrade.py` (Phase 4) helps migrate. There was no 0.14.0
+release (0.13.0 was followed by 0.15.0).
 
 > 🤖 **Note for AI agents reading this file:** the entries below are
 > historical and may reference scripts/files that no longer exist by those
 > names (e.g., `install.sh` was renamed to `finalize.sh` in 0.9.1). For the
 > current canonical state, **always rely on what is actually present in
 > `knowledge-base/shell/` and the live instruction modules**, not on
-> CHANGELOG history. The `## [Unreleased]` section reflects pending work
+> CHANGELOG history. A section dated `Unreleased` reflects pending work
 > only; the latest released version is the source of truth.
 
-## [Unreleased]
+## [0.16.0] - Unreleased
+
+Closes the loop between the scripts and the agent (a `STATUS.md` hand-off,
+an extraction registry, runtime modules in `kb-docs/`) and fixes the data
+loss, privacy leaks and non-converging upgrades found by the 2026-09-23 audit
+(`docs/proposals/2026-09-23-audit.md`). Deployed bases catch up through
+`kb_upgrade.py` and heal (`MIGRATIONS.md`, section 0.16.0).
+
+### Added
+- **`STATUS.md` hand-off** (`scripts/kb_status.py`). It lists only what needs
+  attention: review, merge and heal queues, the extraction backlog, files stuck
+  in `raw/**/unsorted/`, reflection due, index problems, sessions awaiting
+  meta-review and lint counts. Each line carries the command that resolves it,
+  or the file says `- all clear`. Every reindex refreshes it (`status.enabled`,
+  `status.file`); `--print` / `--json` write nothing. A new `AI-KE:STATUS` block
+  in `AGENTS.md` has the agent read it at session start. New commands:
+  `!status` and `!meta-review`.
+- **Extraction registry.** Every ingested file carries `extraction: pending`
+  until the agent records `kb_ingest.py --mark-extracted <path> --to <page>` or
+  `--mark-skipped <path> --reason "…"`, and `!review` works this backlog too.
+  `kb_ingest.py --status [--json]` shows what waits.
+- **Runtime modules in `kb-docs/`.** `finalize.sh`, `kb_upgrade.py` and heal
+  keep the instruction modules there, and templates and modules cite
+  `kb-docs/NN_NAME.md`.
+- Ingest: `review/needs-classification/` for unknown types, `--set-category`
+  for files ingested before 0.16, magic-byte type detection, and the
+  `ingest.ignore_globs` / `max_file_mb` / `duplicates_dir` keys and archive
+  limits are honoured.
+- `templates/requirements-nlp.txt` (optional KeyBERT; install CPU-only
+  PyTorch first) and `kb_ocr.py --check` (OCR languages, missing Tesseract
+  language data).
+- `kb_watch.py` implements `autorun.watch_enabled`, `watch_dirs`, `auto_nlp`,
+  `auto_lint_on_change` and `auto_reindex_on_change`. It batches inbox files and
+  allows one watcher per base. `kb_reflect.check()` and
+  `kb_reflect.py --check-threshold --json` report the decision.
+- Index: `.repomix/manifest.json` (hashes of each pack's last successful
+  build), `kb_reindex.py --hook`, and a pinned npx fallback
+  (`index.repomix_version`, default `1.14.0`; `index.npx_fallback`).
+- Lint checks `citation`, `low-importance`, `frontmatter-yaml` and
+  `frontmatter-type`. Lint also writes `.kb-state/lint-summary.json` and takes
+  `--log`. Doctor checks: `index:repomix`, `index:packs`, `scripts:consistency`,
+  `upgrade:sidecars`, `kb-docs`, `venv:*` and `nlp:nltk-data`.
+- Heal: `HEAL_PLAN.md` starts with a `heal-summary` comment (`--plan --json`
+  prints it too), and heal advances `heal.stage` itself. New 0.16.0 migrations:
+  `kb-docs-dir`, `module-pointers-kb-docs`, `extraction-registry`, `status-md`,
+  `gitignore-private-dirs`, `gitignore-kb-backups`, `media-sync-sections`,
+  `requirements-split`, `nested-venv`, `private-index-names`,
+  `session-redacted-flag`, `meta-review-backlog`, `populate-notes-marker`,
+  `gitattributes-line-endings`, `git-hook-file`, `agents-md-0-16`,
+  `base-docs-0-16` and `finalize-script-guard`.
+- Upgrade: `kb_upgrade.py --accept-local FILE` and the plan states `kept`,
+  `held`, `accepted` and `accepted_local`. `scripts/build_known_hashes.py` and
+  `scripts/known_hashes.json` recognise pristine copies without git tags. An
+  `[INFO]` line appears when the installed git hook is an outdated copy of ours.
+- Merge: `kb_import.py --undo <report>` (with `--dry-run`), the provenance
+  stamps `merge_source_meta_fingerprint` / `merge_source_other_meta_fingerprint`
+  / `merge_source_exported_at`, and a routing rebuild after every import.
+- The Full-mode git hook ships as files: `shell/install-hooks.sh` and
+  `shell/hooks/post-commit`, which runs `kb_reindex.py --hook` and logs to
+  `.kb-state/hooks.log`. `templates/.gitattributes.template` pins LF/CRLF for
+  scripts and launchers. `finalize.sh --resume` uses `.kb-finalize.journal`.
+- `kb_populate.py --role` accepts a role title, and with no role it uses
+  `knowledge_base.roles.primary`. `--entities-from <role>` fills `entities:` in
+  `kb.config.yml`. `kb_save_session.py --session` groups the saves of one
+  dialogue.
+- Lite: a `post-checkout` hook, the `.githooks/<hook>.local` extension point,
+  `update-repomix-index.sh --check`, a coverage report (`coverage_ignore`) and
+  `quick-start/.gitattributes`.
+
+### Changed
+- **`kb.config.yml` is edited line by line everywhere** (`kb_common.config_set`,
+  `config_append_block`, `update_config_file`), so heal, upgrade and populate
+  keep comments.
+- **Pipeline lock.** Ingest, reindex, watcher, hook, import and undo share
+  `.kb-state/locks/pipeline.lock`. A concurrent reindex waits up to 10 minutes;
+  import exits 2.
+- **Packs.** Freshness is decided by content hashes of the config, the member
+  pages and the ignore files. Each pack is built into a temporary file that
+  replaces the index only on success. `PACKS_STATUS.md` is written on every run
+  with `rebuilt` / `fresh` / `FAILED` / `STALE` and `⚠ OVER`, and orphan packs
+  are removed. `shell/reindex.sh` is a thin wrapper over `kb_reindex.py`.
+- **One stale rule** (`kb_common.stale_status`) for lint and viewer. It uses
+  `lifecycle.stale_warning_days`, `lifecycle.by_folder` (decisions/, profile/,
+  principles/ are permanent) and `valid_until`. `_archive/` and generated pages
+  are never stale or orphan.
+- **Reflection** decisions are `THRESHOLD_MET` / `STAGNANT` / `SKIP`. Only
+  `--record-result N` writes state. Only content changes to `knowledge/` count,
+  with weights: an unscored ingest weighs 1, a page its `importance`.
+- **`kb_doctor.py` passes = exit 0.** Warnings no longer fail it, exit 2 means
+  an error, it no longer writes `log.md`, and it survives a partial upgrade. A
+  lint crash exits 2, never 1.
+- **`kb_upgrade.py` maintains the whole engine layer**: every
+  `scripts/kb_*.py`, the viewer, `shell/` except `finalize.sh`, launchers,
+  `requirements*.txt` and `kb-docs/`. Managed `AGENTS.md` blocks come from the
+  template, and a missing `STATUS` block is inserted. Files wait (`held`) for a
+  customized file they depend on. Heal runs as the base's own `kb_heal.py` in a
+  separate process. `--force` touches only files that would get a `.new`.
+- `keybert` left the base `requirements.txt`, so no PyTorch by default
+  (RAKE keywords otherwise). `media.ocr.language` is honoured. STT, OCR and NLP
+  models load once per process.
+- Ingest: `nlp.skip_extensions` skips only NLP (CSV/XLSX are ingested),
+  unsorted/ subfolders and archive members are ingested in the same run, and
+  re-processing keeps the agent's Description and extraction record.
+- Merge: semantic metadata merges three-way. Review packages are named after
+  the full page path and refreshed in place. A changed `assets-index/` entry
+  goes to review. `generated_by` pages are neither exported nor merged.
+- Review routing: `review/needs-merge/` goes to `!merge` and `needs-heal` to
+  `!heal`. `!review` covers `needs-redaction`, `needs-ai-decision`,
+  `needs-classification` and the extraction backlog. `review_auto_process` makes
+  the agent offer `!review`, never run it.
+- `kb_save_session.py` writes one timestamped file per save under
+  `interactions/sessions/<date>__<dialogue>/`, with `redaction_required:` and
+  `meta_reviewed: false`.
+- `finalize.sh` runs only from the kit, merges an existing project
+  `.gitignore` / `.gitattributes`, moves `--force` conflicts to
+  `.kb-finalize-backup/` and writes `CLAUDE.md` for `claude-code` without
+  asking. Wrappers and launchers pick Python through `shell/_kbpy.sh` and pass
+  exit codes through.
+- The docs describe the code: modules 00–18, `AGENTS.md.template` (every
+  managed block, within 9 KiB), `06_AGENTS_TEMPLATE.md` (points at the
+  template), `ARCHITECTURE.md`, `TROUBLESHOOTING.md`, `UPGRADING.md`, and
+  `MAINTENANCE.md` (one release commit bumps VERSION, `ENGINE_VERSION`, the
+  CHANGELOG heading, the badges and `known_hashes.json`).
+- Viewer: `/api/refresh` re-parses only changed pages, and the layout time is
+  bounded. `kb_view.exploration_pairs` handles 5000 pages with 35000 links in
+  about 0.1 s.
+- Lite: `PACKS_STATUS.md` has Tokens / Ceiling / State / Built columns, banners
+  and a Problems section. Hooks never wait for a running build. The `.gitignore`
+  block is `.repomix/*` + `!.repomix/configs/`. `AGENTS_SECTION.md` carries no
+  token numbers.
+- Translations: drift is measured on content, so badge-only and line-ending
+  changes do not count. `sync_translations.py` edits only the frontmatter and
+  stamps only what it is asked to.
+- ai-skills-fixer: `reconcile --apply` must use the plan's `--home`. Plans
+  record `user_roots`. Source IDs are lowercased. `eval` is documented as not
+  implemented.
+- Deprecated: `scripts/sync_deployed_bases.py` (now runs `kb_upgrade`),
+  `kb_reflect.py --dry-run`, `kb_reindex.py --no-watch` (alias of `--quick`),
+  and `kb_upgrade.VIEW_BLOCK` / `INDEX_BLOCK`. Ingest no longer writes
+  `is_surprise` / `surprise_engine`.
+
+### Fixed
+- **Data loss.** `finalize.sh --force` deleted the project's `.git` and
+  `.venv`, and a base's own `finalize.sh` deleted the base.
+  `kb_save_session.py` overwrote same-titled sessions, and `kb_populate.py`
+  re-runs dropped the agent's notes. Same-stem files overwrote each other's
+  processed copy. A failed ingest left files marked ingested with no asset. Heal
+  stripped `kb.config.yml` comments, and `--rollback` undid later edits. An
+  older bundle rolled back a newer import, and a same-named page elsewhere
+  overwrote a local page.
+- **Upgrade and heal converge.** A base with customizations no longer exits 2
+  forever, and `heal.last_run.version` never moves backwards. Old `.new`
+  sidecars are removed. An eval rollback needs an exact `eval: regressed` /
+  `verdict: failed` line. Heal plans are finite: stale and orphan pages belong
+  to lint.
+- The watcher no longer triggers itself and sees created, moved and deleted
+  pages. The reflection trigger resets, and the stagnation brake works.
+- A deleted page no longer stays in its pack, and an invalid
+  `repomix.config.json` no longer drops its ignore list. Incomplete index runs
+  exit 1. Reindex, watcher, route, reflect and NLP batch no longer turn a folder
+  without `kb.config.yml` into a phantom base.
+- `kb_lint.py --fix` no longer writes a second frontmatter over broken YAML,
+  and one odd page no longer stops lint. Wikilinks resolve like in Obsidian
+  (sections, aliases, partial paths).
+- Ingest decodes cp1251, UTF-16 and `;`-separated CSV, and DOCX/XLSX tables
+  are valid Markdown. STT/OCR errors say whether setup or the file is at fault.
+  OCR works on non-English bases that have only English Tesseract data.
+- Import: two imports in one second no longer share a backup or report. Case
+  twins, list frontmatter and oversized manifests are handled. An import that
+  stops part-way still writes its report and undo journal.
+- Viewer: the stale and orphan rules match lint, and a broken config or
+  `.nan` values no longer break it.
+- Import: a page copied to another folder and edited there is added as new,
+  with a review package, instead of overwriting the original (only an
+  unchanged body proves a move; a page moved and edited is handled the same
+  way). An older bundle no longer refreshes a pending conflict package, nor
+  overwrites a page in conflict with `prefer-incoming`. A fast-forward keeps
+  local edits to `title`, `source`, `aliases` and other metadata; changes on
+  both sides are a conflict.
+- Viewer: a slow health check no longer deletes a running viewer's state, so
+  `--stop` still finds it and `--background` does not start a second server.
+  `exploration_pairs` scores at most 50,000 pairs (2,000 pages sharing most of
+  their tags took 9 s).
+- `.bat` launchers resolved the wrong root, and `.command` launchers exited 1
+  without a terminal.
+- Lite: `update-repomix-index.sh` checks ceilings on every run, follows deleted
+  and renamed files, reports coverage gaps, records repomix's real exit code,
+  keeps a FAILED row for a failed pack and detects a config that writes another
+  file.
+- Translations: no false "in sync" without git or for a symbolic
+  `source_commit`. `sync_translations.py` no longer rewrites document bodies.
+  The pre-commit hook covers `README.md`, deletions and renames.
+- ai-skills-fixer: `reconcile --apply` is transactional, `rollback` can be
+  resumed and releases are immutable. Single-skill sources install without
+  `.git`, and `excluded` never quarantines the owner's own skill.
+- `STATUS.md` sends lint findings to `python3 scripts/kb_lint.py` (there is no
+  `!lint` command). `kb_heal.py --plan` and `--apply auto` refresh `STATUS.md`,
+  and `--apply auto` rewrites `HEAL_PLAN.md`, so neither announces fixed items.
+  `kb_lint.py` refuses a folder without `kb.config.yml` (exit 2) instead of
+  creating `.kb-state/` there. The core pack no longer takes in the project's
+  `README.md`. `kb_doctor.py` warns when the base has no `.venv`
+  (`venv:missing`) or when the only venv is one the wrappers never use
+  (`venv:stranded`).
+- Upgrade: `--accept-local kb_common.py` is refused while the local copy lacks
+  names the new scripts use (the `.new` stays, dependents stay held). A new
+  launcher joins the others in `shell/` when the base keeps them there. A
+  `kb-docs/` module the base does not have yet waits only for scripts the base
+  lacks.
+- Context budget: the core pack no longer repeats `kb.config.yml`, which the
+  agent already reads at session start. The config template moved its long
+  comments into the `kb-docs/` modules, so a deployed config stays under
+  10 KB. `02_INIT.md` Phase 3 names the modules to read in full at deployment;
+  the others are read when their command runs.
+- A fresh base is no longer due for reflection at its first ingest: without a
+  recorded reflection the weekly interval counts from deployment (`deployed_at`,
+  or the first `log.md` entry). `watcher.sh --daemon` writes its log as it
+  runs, not at exit. `kb_lock` is no longer shared between two threads of one
+  process.
+- Ingest: `Project X/README.md` and `Project Y/README.md` are no longer
+  versions of each other. New metadata records `raw_path`, and a new version
+  must come from the same place. After an old version was re-processed, the
+  next version linked to that old one; it now links to the latest version.
+  `kb_nlp_batch.py` no longer undoes a `--mark-extracted` made while NLP ran:
+  it re-reads the metadata under the pipeline lock. The watcher now also
+  ingests the catch-all `raw/unsorted/`. `--dry-run` prints each file's
+  `assets/…` target and flags duplicates within the batch. Review packages
+  no longer show an empty NLP section.
+
+### Security
+- Nested archives no longer get past `media.archives` limits: only one level
+  is unpacked. An archive inside an archive is listed under "Not unpacked",
+  and the outer archive goes to `review/needs-ai-decision/`. Before, an 8 KB
+  zip nested three levels deep unpacked 9.6 MB against a 0.2 MB cap.
+- Privacy routing: files from `privacy.redact_categories`, and files in which
+  the secret scan finds credentials, go to `review/needs-redaction/`. Their
+  assets-index and log entries show `<category> item <sha8>`, never the file
+  name. The secret scans of ingest and export run in linear time (a 150 KB file
+  used to take over 30 minutes) and match PGP private keys.
+- `kb_export.py` writes no bundle that contains credentials (exit 3;
+  `--allow-secrets` overrides), with the patterns ingest and lint use
+  (`password: …`, JSON keys, Stripe test keys), and leaves out symlinks that
+  lead outside the base. Import treats bundle content as data, and a crafted
+  `exported_at` can no longer write outside `log-archive/`. A `manifest.yml`
+  larger than its archive can need is refused before parsing (a 16 KB zip
+  took 30 s to parse under the pipeline lock).
+- A privacy floor keeps `raw/`, `review/`, `interactions/` (unless allowed),
+  `processed/`, `assets/`, state, logs and secret files out of every pack,
+  whatever `repomix.config.json` says. Lite lists the files repomix's security
+  check excluded and scans packs for secret-like strings. The floor also
+  covers `.git/**` and `node_modules/**`.
+- A secret in `knowledge/` is no longer lost silently: `kb_lint.py` check
+  `secret` reports it (kind and line, never the value), and `kb_reindex.py`
+  lists the pack members repomix's security check left out in
+  `PACKS_STATUS.md` and `STATUS.md`.
+- `kb_heal.py --rollback` refuses backup-manifest paths that lead outside the
+  base.
+- Viewer: `Host` / `Origin` checks block DNS rebinding, and `/api/refresh`
+  needs `X-KB-Viewer`. Pages whose real path leaves `knowledge/` are left out.
+  The state file lives in a private per-user folder, and frontmatter payloads
+  are capped.
+- `kb_save_session.py` never writes through a symlink outside
+  `interactions/sessions/`.
+- ai-skills-fixer: source IDs cannot escape the store or bypass approval, and
+  apply re-verifies the approved plan. Symlink chains that leave a skill are
+  caught. Tokens in source URLs never reach artifacts.
+
+Translation impact: EN instruction modules 00–18, `knowledge-base/README.md`,
+the root `README.md` and `quick-start/` docs changed. All 22 RU translations
+were refreshed to the current text on 2026-10-11. Their `source_commit`
+stamps record the canonical source revision; `i18n/TRANSLATION_STATUS.md`
+reports the result of the drift check.
+
+## [0.15.1] - 2026-08-24
 
 ### Fixed
 - **`ai-skills-fixer` now reconciles skills cross-platform.** Local source IDs
@@ -428,380 +701,71 @@ Translation impact: none; no canonical EN instruction text changed.
 - `i18n/ru/knowledge-base/00_OVERVIEW.md` refreshed for finalize layout and
   module 15.
 
-## [0.1.0] - 2026-05-16
+## [0.9.3] - 2026-05-17
 
-### Added
-- Initial public structure: `knowledge-base/` (13 instruction modules), `quick-start/INIT_GUIDE.md`, `examples/` (3 role templates)
-- Bilingual `README.md` / `README.ru.md`
-- MIT License
-
-## [0.2.0] - 2026-05-16
-
-> Phase 1 (reference implementations) complete.
-
-### Added
-- `knowledge-base/templates/` directory with all configuration templates:
-  - `kb.config.yml.template` (with full `mode_profiles` for default/super)
-  - `repomix.config.json.template`
-  - `AGENTS.md.template`
-  - `KNOWLEDGE_STRUCTURE.md.template`
-  - `DATA_PLACEMENT_EXAMPLES.md.template`
-  - `requirements.txt`, `requirements-dev.txt`
-  - `.gitignore.template`
-- `knowledge-base/scripts/` directory with reference Python implementations:
-  - `kb_common.py` — shared utilities (frontmatter, hashing, logging, wikilinks)
-  - `kb_doctor.py` — post-deploy smoke test (env, deps, structure, spaCy)
-  - `kb_ingest.py` — full pipeline (raw → processed → metadata, NLP, routing)
-  - `kb_lint.py` — Level 1 health check (11 rules, lifecycle-aware, auto-fix)
-  - `kb_watch.py` — watchdog-based file watcher with polling fallback
-  - `kb_reflect.py` — reflection trigger logic (importance threshold + weekly)
-  - `kb_nlp_batch.py` — incremental NLP re-enrichment
-- `knowledge-base/scripts/tests/` — pytest suite (59 tests) covering common,
-  lint, ingest, and reflect logic
-- `knowledge-base/shell/` directory with POSIX-safe wrappers:
-  - `reindex.sh` (with daily consolidation block)
-  - `watcher.sh` (start/stop/status/daemon)
-  - `lint.sh`, `doctor.sh`
-- `knowledge-base/00_OVERVIEW.md` — agent's deployment map: what to read,
-  what to copy, in what order
-- `docs/ARCHITECTURE.md` — contributor-oriented architecture overview
+> Polish: cleaner final layout. `*.sh` wrappers live only in `shell/`, while
+> `*.command` / `*.bat` launchers are promoted to the project root by
+> `finalize.sh` so they're discoverable for double-clicking.
 
 ### Changed
-- Instruction modules now point to reference implementations:
-  `01_PREREQUISITES.md`, `02_INIT.md`, `03_PIPELINE.md`, `05_INDEX.md`,
-  `06_AGENTS_TEMPLATE.md`, `09_LINT.md`, `13_AUTORUN.md`
-- `knowledge-base/README.md` — updated reading order, mentions
-  `templates/`, `scripts/`, `shell/`
-- `09_LINT.md` — `--only` flag added to the kb_lint contract
-
-### Translation impact
-- All instruction modules touched in this release will need re-translation
-  in Phase 2. Russian counterparts in `i18n/ru/` (to be created) should be
-  marked as stale until updated.
-
-## [0.3.0] - 2026-05-16
-
-> Phase 3 (Initial Population Helper) complete.
-
-### Added
-- `knowledge-base/14_INITIAL_POPULATION.md` — new module describing role-aware
-  generation of `DATA_PLACEMENT_EXAMPLES.md`
-- `placement_examples:` section in all three role templates:
-  - `examples/programmer-senior.yml` (7 artifacts + quickstart + don't-drop)
-  - `examples/marketing-director.yml` (8 artifacts)
-  - `examples/creative-hybrid.yml` (8 artifacts)
-
-### Changed
-- `02_INIT.md` — Phase 3 hook directing the agent to `14_INITIAL_POPULATION.md`
-  after structure creation
-- `templates/DATA_PLACEMENT_EXAMPLES.md.template` — clarified its role as a
-  starting skeleton replaced during deployment
-- `knowledge-base/README.md`, `00_OVERVIEW.md` — reading order includes module 14
-
-### Translation impact
-- `02_INIT.md`, `14_INITIAL_POPULATION.md`, README, and 00_OVERVIEW need new
-  Russian translations once Phase 2 begins.
-
-## [0.4.0] - 2026-05-16
-
-> Phase 2 (localization infrastructure) partially complete: framework + critical
-> entry-point translations. Modules 03–13 and `INIT_GUIDE.md` remain in Russian
-> (with a "pending English translation" banner) for incremental translation.
+- `shell/finalize.sh` now performs two extra cleanup steps after promoting
+  `knowledge-base/` to the project root:
+  1. **Promotes launchers** — moves every `*.command` and `*.bat` from
+     `shell/` up to the project root so Finder / Explorer can launch them.
+     Skips files that already exist at the root (preserves user customizations).
+  2. **Deduplicates `*.sh`** — if a `*.sh` exists both at the root and in
+     `shell/` and they are byte-identical, removes the root copy. Different
+     content (user customization) is preserved untouched.
+- Documentation updated to reflect the cleaner layout:
+  - `README.md`, `i18n/ru/README.md` — Linux invocation now shown as
+    `./shell/watcher.sh` etc.; project-root tree no longer lists `*.sh` at
+    the top level.
+  - `00_OVERVIEW.md`, `02_INIT.md` — same.
+  - `templates/START_HERE.md.template` — Linux instructions point at
+    `./shell/...`, troubleshooting tips updated.
 
 ### Added
-- `i18n/ru/` directory with all 17 Russian instruction files copied from the
-  canonical sources, each carrying frontmatter:
-  `translation_of`, `source_commit`, `source_version`, `translated_at`, `translator`
-- `scripts/check_translations.py` — drift report generator
-- `i18n/TRANSLATION_STATUS.md` — auto-generated drift report (currently all
-  in-sync, will mark stale as canonical EN files evolve)
-- `docs/TRANSLATING.md` — contributor guide for adding/maintaining translations
-
-### Changed
-- **Translated to English (canonical):**
-  - `knowledge-base/README.md`
-  - `knowledge-base/01_PREREQUISITES.md`
-  - `knowledge-base/02_INIT.md`
-  - `knowledge-base/14_INITIAL_POPULATION.md`
-- Modules 03–13 and `quick-start/INIT_GUIDE.md` now display a "Pending English
-  translation" banner at the top, with a pointer to the Russian copy in
-  `i18n/ru/`. Technical contracts inside (file names, code, command names) are
-  language-agnostic and remain usable.
-- `README.md` link now points to `i18n/ru/README.md`
-- `README.ru.md` is now a redirect page to `i18n/ru/README.md`
-
-### Translation impact
-- Once the canonical EN versions of modules 03–13 are written, the existing
-  `i18n/ru/` copies will be automatically marked as stale by
-  `check_translations.py` (their `source_commit` will fall behind HEAD).
-  This is the intended workflow.
-
-## [0.5.0] - 2026-05-16
-
-> Phase 2 fully complete: every canonical instruction module is now in English.
-
-### Changed
-- Translated to English (replacing Russian originals):
-  - `knowledge-base/03_PIPELINE.md`
-  - `knowledge-base/04_REVIEW.md`
-  - `knowledge-base/05_INDEX.md`
-  - `knowledge-base/06_AGENTS_TEMPLATE.md`
-  - `knowledge-base/07_INTERACTION_LOOP.md`
-  - `knowledge-base/08_PORTABLE.md`
-  - `knowledge-base/09_LINT.md`
-  - `knowledge-base/10_LOG.md`
-  - `knowledge-base/11_PROVENANCE.md`
-  - `knowledge-base/12_NLP_PREPROCESS.md`
-  - `knowledge-base/13_AUTORUN.md`
-  - `quick-start/INIT_GUIDE.md`
-- All "Pending English translation" banners removed; English is now the
-  unambiguous canonical version.
-
-### Translation impact
-- Russian copies under `i18n/ru/` still carry their original `source_commit`
-  values. After this release, `python3 scripts/check_translations.py` will
-  flag every RU file as **stale** (their commit lags the canonical EN sources).
-  Re-translation is tracked via Phase 4 / future commits.
-- `i18n/ru/` files remain functional (they continue to describe the same system);
-  the divergence is structural (English wording vs Russian wording), not
-  semantic.
-
-## [0.6.0] - 2026-05-16
-
-> Phase 4 baseline: upgrade tooling, troubleshooting docs, contributor guide,
-> drift hook.
-
-### Added
-- `scripts/kb_upgrade.py` — upgrade tool for deployed KBs:
-  - Diffs deployed scripts against the source repo
-  - Detects user customizations via SHA-256 against the previous git tag
-  - Writes `.new` sidecars for customized files instead of overwriting
-  - Bumps `instructions_version` after a clean upgrade
-  - Modes: `--dry-run`, `--diff`, `--force`
-- `docs/UPGRADING.md` — step-by-step upgrade guide for KB owners
-- `docs/TROUBLESHOOTING.md` — common installation, pipeline, lint, watcher,
-  repomix, reflection, and translation problems with solutions
-- `docs/CONTRIBUTING.md` — contributor onboarding
-- `scripts/hooks/pre-commit-translation-drift.sh` — opt-in git pre-commit hook
-  that warns (without blocking) when canonical files are committed without
-  matching translation updates
-
-### Translation impact
-- New EN documents in `docs/` (TROUBLESHOOTING, UPGRADING, CONTRIBUTING) are
-  EN-only by design (contributor-facing). They are not part of the user-facing
-  knowledge-base/ instructions and don't need `i18n/ru/` mirrors.
-
-## [0.7.0] - 2026-05-16
-
-> Phase 4 expanded: more role templates, KB health metrics, edge-case tests,
-> top-level scripts coverage, GitHub Actions CI, badges.
-
-### Added
-- Four new role templates with full `placement_examples` (artifacts +
-  quickstart + don't-drop):
-  - `examples/founder.yml` (startup founder)
-  - `examples/researcher.yml` (researcher / analyst)
-  - `examples/product-manager.yml`
-  - `examples/content-creator.yml`
-- `kb_lint --metrics` flag — KB health metrics:
-  - Lifecycle distribution (permanent / evolving / temporal / unset)
-  - Pages per subfolder
-  - Importance avg, median, distribution
-  - Freshness buckets (≤30d / 30–90d / >90d / no date)
-  - Wikilink density, orphan rate, entity coverage
-  - Routing depth, insight ratio, annotation overflow count
-- Test fixtures in `knowledge-base/scripts/tests/fixtures/`:
-  - `with-frontmatter.md`, `no-frontmatter.md`, `empty.md`,
-    `broken-frontmatter.md`, `sample.txt`
-- Edge-case tests `test_edge_cases.py` (16 tests) covering empty files,
-  Unicode filenames, broken frontmatter, idempotency under churn, scaling
-  to 50 pages
-- Tests for `scripts/check_translations.py` (10 tests)
-- Tests for `scripts/kb_upgrade.py` (14 tests)
-- `pyproject.toml` with pytest config (importlib mode, dual testpaths)
-- `.github/workflows/ci.yml` with five jobs:
-  - Tests (Python 3.11, 3.12, macOS-latest)
-  - Coverage upload to Codecov
-  - kb_doctor self-test
-  - Shell-script syntax + shellcheck
-  - YAML config and role-example validation
-  - Translation drift report
-
-### Changed
-- `README.md` — updated badges (tests, coverage, version), expanded role
-  templates table (7 roles), added module 00 and 14 to instruction list
+- 4 new regression tests in `test_finalize_sh.py`:
+  - `test_finalize_promotes_command_launchers_to_root`
+  - `test_finalize_keeps_sh_in_shell_only`
+  - `test_finalize_preserves_root_sh_when_different`
+  - `test_finalize_promotion_does_not_overwrite_existing_root_launcher`
 
 ### Test stats
-- 108 tests passing (was 67)
-- ~69% overall coverage; kb_common 91%, kb_lint 84%, kb_reflect 70%
+- 162 tests passing (was 158)
 
-### Translation impact
-- The new role templates and updated `README.md` need re-translation in
-  `i18n/ru/`. `check_translations.py` will mark them stale automatically.
+## [0.9.2] - 2026-05-17
 
-## [0.7.1] - 2026-05-16
+> Hotfix: shell wrappers and macOS launchers were resolving paths relative
+> to their own folder instead of the project root, so they couldn't find
+> `scripts/kb_watch.py`. Reported from a real macOS deployment.
 
-> Patch release: Russian translations synchronized with current canonical EN.
-
-### Added
-- `i18n/ru/knowledge-base/00_OVERVIEW.md` — Russian translation of the
-  deployment-overview module
-- `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` — Russian translation of
-  the initial-population module (was an EN copy in the previous release)
-- `scripts/sync_translations.py` — utility that bumps `source_commit`,
-  `source_version`, and `translated_at` in translated frontmatter after manual
-  re-verification (modes: `--to-head`, `--to-version`, `--lang`, `--files`,
-  `--dry-run`)
-
-### Changed
-- `i18n/ru/README.md` — refreshed to mirror canonical EN: badges, 7-role table,
-  15 instruction modules (00–14), `kb_lint --metrics` mention, `kb_upgrade.py`
-  callout, links to `docs/TRANSLATING.md` and `docs/CONTRIBUTING.md`
-- `i18n/ru/knowledge-base/README.md` — reading order now includes modules 00
-  and 14; pointer to canonical EN added
-- All 18 RU translation files bumped to `source_version: 0.7.0` and
-  `translated_at: 2026-05-16`
-- `docs/TRANSLATING.md` — documented the post-commit workflow:
-  `git commit → sync_translations.py --to-head → check_translations.py --update-status`
-
-### Translation impact
-- After this release lands and is committed, `check_translations.py` will
-  flag the 18 RU files as stale (their `source_commit` will lag the new
-  HEAD). Run `python3 scripts/sync_translations.py --to-head --lang ru`
-  immediately after committing to reset the markers.
-
-## [0.8.0] - 2026-05-16
-
-> Adds deterministic generation of `DATA_PLACEMENT_EXAMPLES.md` and a custom-role
-> workflow.
+### Fixed
+- `shell/watcher.sh`, `shell/reindex.sh`, `shell/lint.sh`, `shell/doctor.sh`
+  now resolve **the project root** (parent of `shell/`) and `cd` there
+  before locating `scripts/`. Previously they did
+  `cd "$(dirname "$0")"` and ended up inside `shell/`, where
+  `scripts/kb_*.py` does not exist.
+- `shell/watcher-start.command`, `shell/watcher-stop.command`,
+  `shell/reindex.command` (macOS launchers) now detect the project root
+  whether the launcher lives in `shell/` or at the project root, with a
+  clear error message if `scripts/` cannot be found.
+- `shell/watcher-start.bat`, `shell/reindex.bat` (Windows launchers) — same
+  resolution logic.
+- All wrappers now report **where they looked** when a script is missing,
+  pointing at the resolved project root path.
 
 ### Added
-- `scripts/kb_populate.py` — pure-templating yaml → markdown generator:
-  - Reads `placement_examples` from `examples/<role>.yml`
-  - Emits a structured `DATA_PLACEMENT_EXAMPLES.md` with all sections
-    (intro, generic table, role-specific quick map, detailed examples,
-    quickstart, do-not-drop, footer)
-  - `--from <path>` for custom role files
-  - `--create-samples` writes `raw/_samples/<artifact>.example.md` placeholders
-  - `--dry-run`, `--json`, `--output <name>` flags
-  - 0 tokens to generate; deterministic across all AI agents
-- `knowledge-base/templates/role.yml.template` — scaffold for the custom-role
-  flow (Path B). The agent now must save `examples/<slug>.yml` before invoking
-  `kb_populate.py`.
-- `scripts/tests/test_kb_populate.py` — 25 tests covering YAML parsing,
-  markdown rendering, edge cases, all CLI flags, and a parametrized
-  integration test that runs against every shipped role template.
-
-### Changed
-- `knowledge-base/14_INITIAL_POPULATION.md` rewritten around the two-path
-  workflow:
-  - **Path A (built-in role)**: `kb_populate.py --role <role>` directly
-  - **Path B (custom role)**: build YAML from `role.yml.template` first, then Path A
-  - Added an explicit "AI review pass" step where the agent appends a
-    `## Project notes` section with project-specific tips (not capturable in YAML)
-  - Updated the agent checklist to enforce the new ordering
-- `knowledge-base/02_INIT.md` Phase 3 section now points to the
-  populate-script-first workflow
+- `knowledge-base/scripts/tests/test_shell_wrappers.py` — 8 regression
+  tests covering:
+  - Wrappers called from project root
+  - Wrappers called via absolute path from arbitrary CWD
+  - Helpful error message when `scripts/` is missing
+  - `.command` launcher located in `shell/` (default)
+  - `.command` launcher copied to project root (alternative layout)
 
 ### Test stats
-- 133 tests passing (was 108)
-- New parametrized tests catch placement_examples regressions in any role
-  template before they ship
-
-### Translation impact
-- `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` and
-  `i18n/ru/knowledge-base/02_INIT.md` need re-translation. After committing,
-  run:
-  ```
-  python3 scripts/sync_translations.py --to-head --lang ru
-  python3 scripts/check_translations.py --update-status
-  ```
-
-## [0.8.1] - 2026-05-16
-
-### Added
-- `examples/fiction-writer.yml` — role template for fiction writers. Pillars:
-  - **Craft theory** entities (story structure, dialogue, POV, scene mechanics, show-don't-tell)
-  - **Influences** entity (excerpts from books the writer loves, dissected for *why* they work — the AI's voice anchor)
-  - **Genre conventions** entity (tropes, comp titles, reader expectations)
-  - **Project hierarchy** (current WIP with outline, characters, worldbuilding subfolders)
-  - 11-artifact `placement_examples` covering excerpts, drafts, outlines, character bibles, worldbuilding, beta feedback, voice memos, genre research, queries, anti-patterns
-  - `ai_assistant_tasks` focused on *analytical critique* — pacing audits, voice checks, POV slip detection, show-vs-tell passes, structural mapping
-- `README.md` and `i18n/ru/README.md` — added the new role to the templates table
-
-### Test stats
-- 134 tests passing (one new parametrized integration entry for fiction-writer)
-
-## [0.8.2] - 2026-05-16
-
-### Changed
-- **CI workflows disabled.** The repo is currently local-only with no public
-  GitHub Actions instance, so the workflow file was renamed to prevent
-  unintended runs:
-  - `.github/workflows/ci.yml` → `.github/workflows/ci.yml.disabled`
-  - GitHub Actions only picks up `*.yml`/`*.yaml` files in this directory,
-    so the `.disabled` suffix turns the workflow into a no-op.
-  - Re-enabling is a single `git mv` away (see `.github/workflows/README.md`).
-- Added `.github/workflows/README.md` with explicit "do not enable without
-  the project owner's request" note + re-enable instructions.
-
-### Added
-- `.github/workflows/README.md` — disabled-state documentation
-- `examples/fiction-writer.yml` (released earlier this day, expanded with the
-  long-form-book artifact entry)
-- `kb_ingest.py` heuristic `_looks_like_long_book` — detects PDF/EPUB/DOCX
-  with ≥25 000 words and adds a "long-form reference book" warning block to
-  the generated review package, advising the agent to keep prose in
-  `assets/` and write a takeaways note instead. Metadata now records
-  `long_book_hint: true/false`.
-- `03_PIPELINE.md` — new section "Handling long reference materials" with
-  the asset-as-reference + notes-as-knowledge pattern and an explicit
-  decision tree.
-- 8 new tests in `test_kb_ingest.py` for the long-book detection and review-
-  package wording.
-
-### Removed
-- `i18n/ru/knowledge-base/templates/` — empty leftover folder. Templates,
-  scripts, and shell wrappers are language-agnostic and live only in the
-  canonical `knowledge-base/`.
-
-### Test stats
-- 142 tests passing (was 134)
-
-### Translation impact
-- After committing, all 18 RU files become stale (HEAD moved). Run:
-  ```
-  python3 scripts/sync_translations.py --to-head --lang ru
-  python3 scripts/check_translations.py --update-status
-  ```
-
-## [0.9.0] - 2026-05-16
-
-> Real-world feedback round: deployed on macOS, found six UX issues, fixed all of them.
-
-### Added
-- `knowledge-base/shell/install.sh` — flattens the `setup/` payload into the project root and removes the empty `setup/` folder afterward. Eliminates the nested-`knowledge-base/` problem reported from a real macOS deployment.
-- macOS double-click launchers (Finder-friendly, no terminal navigation needed):
-  - `shell/watcher-start.command` — opens a Terminal window with the watcher running
-  - `shell/watcher-stop.command` — stops a daemonized watcher
-  - `shell/reindex.command` — one-shot manual reindex
-- Windows equivalents: `shell/watcher-start.bat`, `shell/reindex.bat`
-- `templates/START_HERE.md.template` — auto-generated post-deployment cheat sheet that reminds the user to start every new chat with the "Read AGENTS.md…" line
-- `!review` command — drains the review queue, processes each item with explicit reporting, honors the long-form-book hint, asks the user one question per item when input is required
-- `!populate` command — regenerates `DATA_PLACEMENT_EXAMPLES.md` after a role YAML edit
-
-### Changed
-- **Deployment flow** rewritten in `02_INIT.md` and `00_OVERVIEW.md`:
-  - User copies `knowledge-base/` to their project as `setup/`
-  - Agent runs `bash setup/shell/install.sh` to flatten the payload into the project root
-  - No more nested `knowledge-base/` inside the project — files live at the project root
-- `kb_populate.py` moved from `scripts/` → `knowledge-base/scripts/` (it's a deployment-time tool, not a maintainer tool); path resolution updated to find `examples/` in either layout
-- `templates/AGENTS.md.template` — explicit "Read AGENTS.md first" workflow callout at the top, plus `!review` and `!populate` rows in the commands table
-- `04_REVIEW.md` — added a full `!review` command spec with long-form-book guard, defer-to-user pattern, batched questions
-- Main `README.md` and `i18n/ru/README.md` — new "Running the watcher" section with platform-specific instructions, updated commands table with `!review`/`!populate`, project-root layout reflecting the new deployment flow, explicit "Read AGENTS.md first" warning
-
-### Test stats
-- 142 tests still passing (the kb_populate move didn't change behavior)
+- 158 tests passing (was 150)
 
 ### Translation impact
 - After committing, the 18 RU files become stale (HEAD moved). Run:
@@ -855,38 +819,33 @@ Translation impact: none; no canonical EN instruction text changed.
   python3 scripts/check_translations.py --update-status
   ```
 
-## [0.9.2] - 2026-05-17
+## [0.9.0] - 2026-05-16
 
-> Hotfix: shell wrappers and macOS launchers were resolving paths relative
-> to their own folder instead of the project root, so they couldn't find
-> `scripts/kb_watch.py`. Reported from a real macOS deployment.
-
-### Fixed
-- `shell/watcher.sh`, `shell/reindex.sh`, `shell/lint.sh`, `shell/doctor.sh`
-  now resolve **the project root** (parent of `shell/`) and `cd` there
-  before locating `scripts/`. Previously they did
-  `cd "$(dirname "$0")"` and ended up inside `shell/`, where
-  `scripts/kb_*.py` does not exist.
-- `shell/watcher-start.command`, `shell/watcher-stop.command`,
-  `shell/reindex.command` (macOS launchers) now detect the project root
-  whether the launcher lives in `shell/` or at the project root, with a
-  clear error message if `scripts/` cannot be found.
-- `shell/watcher-start.bat`, `shell/reindex.bat` (Windows launchers) — same
-  resolution logic.
-- All wrappers now report **where they looked** when a script is missing,
-  pointing at the resolved project root path.
+> Real-world feedback round: deployed on macOS, found six UX issues, fixed all of them.
 
 ### Added
-- `knowledge-base/scripts/tests/test_shell_wrappers.py` — 8 regression
-  tests covering:
-  - Wrappers called from project root
-  - Wrappers called via absolute path from arbitrary CWD
-  - Helpful error message when `scripts/` is missing
-  - `.command` launcher located in `shell/` (default)
-  - `.command` launcher copied to project root (alternative layout)
+- `knowledge-base/shell/install.sh` — flattens the `setup/` payload into the project root and removes the empty `setup/` folder afterward. Eliminates the nested-`knowledge-base/` problem reported from a real macOS deployment.
+- macOS double-click launchers (Finder-friendly, no terminal navigation needed):
+  - `shell/watcher-start.command` — opens a Terminal window with the watcher running
+  - `shell/watcher-stop.command` — stops a daemonized watcher
+  - `shell/reindex.command` — one-shot manual reindex
+- Windows equivalents: `shell/watcher-start.bat`, `shell/reindex.bat`
+- `templates/START_HERE.md.template` — auto-generated post-deployment cheat sheet that reminds the user to start every new chat with the "Read AGENTS.md…" line
+- `!review` command — drains the review queue, processes each item with explicit reporting, honors the long-form-book hint, asks the user one question per item when input is required
+- `!populate` command — regenerates `DATA_PLACEMENT_EXAMPLES.md` after a role YAML edit
+
+### Changed
+- **Deployment flow** rewritten in `02_INIT.md` and `00_OVERVIEW.md`:
+  - User copies `knowledge-base/` to their project as `setup/`
+  - Agent runs `bash setup/shell/install.sh` to flatten the payload into the project root
+  - No more nested `knowledge-base/` inside the project — files live at the project root
+- `kb_populate.py` moved from `scripts/` → `knowledge-base/scripts/` (it's a deployment-time tool, not a maintainer tool); path resolution updated to find `examples/` in either layout
+- `templates/AGENTS.md.template` — explicit "Read AGENTS.md first" workflow callout at the top, plus `!review` and `!populate` rows in the commands table
+- `04_REVIEW.md` — added a full `!review` command spec with long-form-book guard, defer-to-user pattern, batched questions
+- Main `README.md` and `i18n/ru/README.md` — new "Running the watcher" section with platform-specific instructions, updated commands table with `!review`/`!populate`, project-root layout reflecting the new deployment flow, explicit "Read AGENTS.md first" warning
 
 ### Test stats
-- 158 tests passing (was 150)
+- 142 tests still passing (the kb_populate move didn't change behavior)
 
 ### Translation impact
 - After committing, the 18 RU files become stale (HEAD moved). Run:
@@ -895,35 +854,349 @@ Translation impact: none; no canonical EN instruction text changed.
   python3 scripts/check_translations.py --update-status
   ```
 
-## [0.9.3] - 2026-05-17
-
-> Polish: cleaner final layout. `*.sh` wrappers live only in `shell/`, while
-> `*.command` / `*.bat` launchers are promoted to the project root by
-> `finalize.sh` so they're discoverable for double-clicking.
+## [0.8.2] - 2026-05-16
 
 ### Changed
-- `shell/finalize.sh` now performs two extra cleanup steps after promoting
-  `knowledge-base/` to the project root:
-  1. **Promotes launchers** — moves every `*.command` and `*.bat` from
-     `shell/` up to the project root so Finder / Explorer can launch them.
-     Skips files that already exist at the root (preserves user customizations).
-  2. **Deduplicates `*.sh`** — if a `*.sh` exists both at the root and in
-     `shell/` and they are byte-identical, removes the root copy. Different
-     content (user customization) is preserved untouched.
-- Documentation updated to reflect the cleaner layout:
-  - `README.md`, `i18n/ru/README.md` — Linux invocation now shown as
-    `./shell/watcher.sh` etc.; project-root tree no longer lists `*.sh` at
-    the top level.
-  - `00_OVERVIEW.md`, `02_INIT.md` — same.
-  - `templates/START_HERE.md.template` — Linux instructions point at
-    `./shell/...`, troubleshooting tips updated.
+- **CI workflows disabled.** The repo is currently local-only with no public
+  GitHub Actions instance, so the workflow file was renamed to prevent
+  unintended runs:
+  - `.github/workflows/ci.yml` → `.github/workflows/ci.yml.disabled`
+  - GitHub Actions only picks up `*.yml`/`*.yaml` files in this directory,
+    so the `.disabled` suffix turns the workflow into a no-op.
+  - Re-enabling is a single `git mv` away (see `.github/workflows/README.md`).
+- Added `.github/workflows/README.md` with explicit "do not enable without
+  the project owner's request" note + re-enable instructions.
 
 ### Added
-- 4 new regression tests in `test_finalize_sh.py`:
-  - `test_finalize_promotes_command_launchers_to_root`
-  - `test_finalize_keeps_sh_in_shell_only`
-  - `test_finalize_preserves_root_sh_when_different`
-  - `test_finalize_promotion_does_not_overwrite_existing_root_launcher`
+- `.github/workflows/README.md` — disabled-state documentation
+- `examples/fiction-writer.yml` (released earlier this day, expanded with the
+  long-form-book artifact entry)
+- `kb_ingest.py` heuristic `_looks_like_long_book` — detects PDF/EPUB/DOCX
+  with ≥25 000 words and adds a "long-form reference book" warning block to
+  the generated review package, advising the agent to keep prose in
+  `assets/` and write a takeaways note instead. Metadata now records
+  `long_book_hint: true/false`.
+- `03_PIPELINE.md` — new section "Handling long reference materials" with
+  the asset-as-reference + notes-as-knowledge pattern and an explicit
+  decision tree.
+- 8 new tests in `test_kb_ingest.py` for the long-book detection and review-
+  package wording.
+
+### Removed
+- `i18n/ru/knowledge-base/templates/` — empty leftover folder. Templates,
+  scripts, and shell wrappers are language-agnostic and live only in the
+  canonical `knowledge-base/`.
 
 ### Test stats
-- 162 tests passing (was 158)
+- 142 tests passing (was 134)
+
+### Translation impact
+- After committing, all 18 RU files become stale (HEAD moved). Run:
+  ```
+  python3 scripts/sync_translations.py --to-head --lang ru
+  python3 scripts/check_translations.py --update-status
+  ```
+
+## [0.8.1] - 2026-05-16
+
+### Added
+- `examples/fiction-writer.yml` — role template for fiction writers. Pillars:
+  - **Craft theory** entities (story structure, dialogue, POV, scene mechanics, show-don't-tell)
+  - **Influences** entity (excerpts from books the writer loves, dissected for *why* they work — the AI's voice anchor)
+  - **Genre conventions** entity (tropes, comp titles, reader expectations)
+  - **Project hierarchy** (current WIP with outline, characters, worldbuilding subfolders)
+  - 11-artifact `placement_examples` covering excerpts, drafts, outlines, character bibles, worldbuilding, beta feedback, voice memos, genre research, queries, anti-patterns
+  - `ai_assistant_tasks` focused on *analytical critique* — pacing audits, voice checks, POV slip detection, show-vs-tell passes, structural mapping
+- `README.md` and `i18n/ru/README.md` — added the new role to the templates table
+
+### Test stats
+- 134 tests passing (one new parametrized integration entry for fiction-writer)
+
+## [0.8.0] - 2026-05-16
+
+> Adds deterministic generation of `DATA_PLACEMENT_EXAMPLES.md` and a custom-role
+> workflow.
+
+### Added
+- `scripts/kb_populate.py` — pure-templating yaml → markdown generator:
+  - Reads `placement_examples` from `examples/<role>.yml`
+  - Emits a structured `DATA_PLACEMENT_EXAMPLES.md` with all sections
+    (intro, generic table, role-specific quick map, detailed examples,
+    quickstart, do-not-drop, footer)
+  - `--from <path>` for custom role files
+  - `--create-samples` writes `raw/_samples/<artifact>.example.md` placeholders
+  - `--dry-run`, `--json`, `--output <name>` flags
+  - 0 tokens to generate; deterministic across all AI agents
+- `knowledge-base/templates/role.yml.template` — scaffold for the custom-role
+  flow (Path B). The agent now must save `examples/<slug>.yml` before invoking
+  `kb_populate.py`.
+- `scripts/tests/test_kb_populate.py` — 25 tests covering YAML parsing,
+  markdown rendering, edge cases, all CLI flags, and a parametrized
+  integration test that runs against every shipped role template.
+
+### Changed
+- `knowledge-base/14_INITIAL_POPULATION.md` rewritten around the two-path
+  workflow:
+  - **Path A (built-in role)**: `kb_populate.py --role <role>` directly
+  - **Path B (custom role)**: build YAML from `role.yml.template` first, then Path A
+  - Added an explicit "AI review pass" step where the agent appends a
+    `## Project notes` section with project-specific tips (not capturable in YAML)
+  - Updated the agent checklist to enforce the new ordering
+- `knowledge-base/02_INIT.md` Phase 3 section now points to the
+  populate-script-first workflow
+
+### Test stats
+- 133 tests passing (was 108)
+- New parametrized tests catch placement_examples regressions in any role
+  template before they ship
+
+### Translation impact
+- `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` and
+  `i18n/ru/knowledge-base/02_INIT.md` need re-translation. After committing,
+  run:
+  ```
+  python3 scripts/sync_translations.py --to-head --lang ru
+  python3 scripts/check_translations.py --update-status
+  ```
+
+## [0.7.1] - 2026-05-16
+
+> Patch release: Russian translations synchronized with current canonical EN.
+
+### Added
+- `i18n/ru/knowledge-base/00_OVERVIEW.md` — Russian translation of the
+  deployment-overview module
+- `i18n/ru/knowledge-base/14_INITIAL_POPULATION.md` — Russian translation of
+  the initial-population module (was an EN copy in the previous release)
+- `scripts/sync_translations.py` — utility that bumps `source_commit`,
+  `source_version`, and `translated_at` in translated frontmatter after manual
+  re-verification (modes: `--to-head`, `--to-version`, `--lang`, `--files`,
+  `--dry-run`)
+
+### Changed
+- `i18n/ru/README.md` — refreshed to mirror canonical EN: badges, 7-role table,
+  15 instruction modules (00–14), `kb_lint --metrics` mention, `kb_upgrade.py`
+  callout, links to `docs/TRANSLATING.md` and `docs/CONTRIBUTING.md`
+- `i18n/ru/knowledge-base/README.md` — reading order now includes modules 00
+  and 14; pointer to canonical EN added
+- All 18 RU translation files bumped to `source_version: 0.7.0` and
+  `translated_at: 2026-05-16`
+- `docs/TRANSLATING.md` — documented the post-commit workflow:
+  `git commit → sync_translations.py --to-head → check_translations.py --update-status`
+
+### Translation impact
+- After this release lands and is committed, `check_translations.py` will
+  flag the 18 RU files as stale (their `source_commit` will lag the new
+  HEAD). Run `python3 scripts/sync_translations.py --to-head --lang ru`
+  immediately after committing to reset the markers.
+
+## [0.7.0] - 2026-05-16
+
+> Phase 4 expanded: more role templates, KB health metrics, edge-case tests,
+> top-level scripts coverage, GitHub Actions CI, badges.
+
+### Added
+- Four new role templates with full `placement_examples` (artifacts +
+  quickstart + don't-drop):
+  - `examples/founder.yml` (startup founder)
+  - `examples/researcher.yml` (researcher / analyst)
+  - `examples/product-manager.yml`
+  - `examples/content-creator.yml`
+- `kb_lint --metrics` flag — KB health metrics:
+  - Lifecycle distribution (permanent / evolving / temporal / unset)
+  - Pages per subfolder
+  - Importance avg, median, distribution
+  - Freshness buckets (≤30d / 30–90d / >90d / no date)
+  - Wikilink density, orphan rate, entity coverage
+  - Routing depth, insight ratio, annotation overflow count
+- Test fixtures in `knowledge-base/scripts/tests/fixtures/`:
+  - `with-frontmatter.md`, `no-frontmatter.md`, `empty.md`,
+    `broken-frontmatter.md`, `sample.txt`
+- Edge-case tests `test_edge_cases.py` (16 tests) covering empty files,
+  Unicode filenames, broken frontmatter, idempotency under churn, scaling
+  to 50 pages
+- Tests for `scripts/check_translations.py` (10 tests)
+- Tests for `scripts/kb_upgrade.py` (14 tests)
+- `pyproject.toml` with pytest config (importlib mode, dual testpaths)
+- `.github/workflows/ci.yml` with five jobs:
+  - Tests (Python 3.11, 3.12, macOS-latest)
+  - Coverage upload to Codecov
+  - kb_doctor self-test
+  - Shell-script syntax + shellcheck
+  - YAML config and role-example validation
+  - Translation drift report
+
+### Changed
+- `README.md` — updated badges (tests, coverage, version), expanded role
+  templates table (7 roles), added module 00 and 14 to instruction list
+
+### Test stats
+- 108 tests passing (was 67)
+- ~69% overall coverage; kb_common 91%, kb_lint 84%, kb_reflect 70%
+
+### Translation impact
+- The new role templates and updated `README.md` need re-translation in
+  `i18n/ru/`. `check_translations.py` will mark them stale automatically.
+
+## [0.6.0] - 2026-05-16
+
+> Phase 4 baseline: upgrade tooling, troubleshooting docs, contributor guide,
+> drift hook.
+
+### Added
+- `scripts/kb_upgrade.py` — upgrade tool for deployed KBs:
+  - Diffs deployed scripts against the source repo
+  - Detects user customizations via SHA-256 against the previous git tag
+  - Writes `.new` sidecars for customized files instead of overwriting
+  - Bumps `instructions_version` after a clean upgrade
+  - Modes: `--dry-run`, `--diff`, `--force`
+- `docs/UPGRADING.md` — step-by-step upgrade guide for KB owners
+- `docs/TROUBLESHOOTING.md` — common installation, pipeline, lint, watcher,
+  repomix, reflection, and translation problems with solutions
+- `docs/CONTRIBUTING.md` — contributor onboarding
+- `scripts/hooks/pre-commit-translation-drift.sh` — opt-in git pre-commit hook
+  that warns (without blocking) when canonical files are committed without
+  matching translation updates
+
+### Translation impact
+- New EN documents in `docs/` (TROUBLESHOOTING, UPGRADING, CONTRIBUTING) are
+  EN-only by design (contributor-facing). They are not part of the user-facing
+  knowledge-base/ instructions and don't need `i18n/ru/` mirrors.
+
+## [0.5.0] - 2026-05-16
+
+> Phase 2 fully complete: every canonical instruction module is now in English.
+
+### Changed
+- Translated to English (replacing Russian originals):
+  - `knowledge-base/03_PIPELINE.md`
+  - `knowledge-base/04_REVIEW.md`
+  - `knowledge-base/05_INDEX.md`
+  - `knowledge-base/06_AGENTS_TEMPLATE.md`
+  - `knowledge-base/07_INTERACTION_LOOP.md`
+  - `knowledge-base/08_PORTABLE.md`
+  - `knowledge-base/09_LINT.md`
+  - `knowledge-base/10_LOG.md`
+  - `knowledge-base/11_PROVENANCE.md`
+  - `knowledge-base/12_NLP_PREPROCESS.md`
+  - `knowledge-base/13_AUTORUN.md`
+  - `quick-start/INIT_GUIDE.md`
+- All "Pending English translation" banners removed; English is now the
+  unambiguous canonical version.
+
+### Translation impact
+- Russian copies under `i18n/ru/` still carry their original `source_commit`
+  values. After this release, `python3 scripts/check_translations.py` will
+  flag every RU file as **stale** (their commit lags the canonical EN sources).
+  Re-translation is tracked via Phase 4 / future commits.
+- `i18n/ru/` files remain functional (they continue to describe the same system);
+  the divergence is structural (English wording vs Russian wording), not
+  semantic.
+
+## [0.4.0] - 2026-05-16
+
+> Phase 2 (localization infrastructure) partially complete: framework + critical
+> entry-point translations. Modules 03–13 and `INIT_GUIDE.md` remain in Russian
+> (with a "pending English translation" banner) for incremental translation.
+
+### Added
+- `i18n/ru/` directory with all 17 Russian instruction files copied from the
+  canonical sources, each carrying frontmatter:
+  `translation_of`, `source_commit`, `source_version`, `translated_at`, `translator`
+- `scripts/check_translations.py` — drift report generator
+- `i18n/TRANSLATION_STATUS.md` — auto-generated drift report (currently all
+  in-sync, will mark stale as canonical EN files evolve)
+- `docs/TRANSLATING.md` — contributor guide for adding/maintaining translations
+
+### Changed
+- **Translated to English (canonical):**
+  - `knowledge-base/README.md`
+  - `knowledge-base/01_PREREQUISITES.md`
+  - `knowledge-base/02_INIT.md`
+  - `knowledge-base/14_INITIAL_POPULATION.md`
+- Modules 03–13 and `quick-start/INIT_GUIDE.md` now display a "Pending English
+  translation" banner at the top, with a pointer to the Russian copy in
+  `i18n/ru/`. Technical contracts inside (file names, code, command names) are
+  language-agnostic and remain usable.
+- `README.md` link now points to `i18n/ru/README.md`
+- `README.ru.md` is now a redirect page to `i18n/ru/README.md`
+
+### Translation impact
+- Once the canonical EN versions of modules 03–13 are written, the existing
+  `i18n/ru/` copies will be automatically marked as stale by
+  `check_translations.py` (their `source_commit` will fall behind HEAD).
+  This is the intended workflow.
+
+## [0.3.0] - 2026-05-16
+
+> Phase 3 (Initial Population Helper) complete.
+
+### Added
+- `knowledge-base/14_INITIAL_POPULATION.md` — new module describing role-aware
+  generation of `DATA_PLACEMENT_EXAMPLES.md`
+- `placement_examples:` section in all three role templates:
+  - `examples/programmer-senior.yml` (7 artifacts + quickstart + don't-drop)
+  - `examples/marketing-director.yml` (8 artifacts)
+  - `examples/creative-hybrid.yml` (8 artifacts)
+
+### Changed
+- `02_INIT.md` — Phase 3 hook directing the agent to `14_INITIAL_POPULATION.md`
+  after structure creation
+- `templates/DATA_PLACEMENT_EXAMPLES.md.template` — clarified its role as a
+  starting skeleton replaced during deployment
+- `knowledge-base/README.md`, `00_OVERVIEW.md` — reading order includes module 14
+
+### Translation impact
+- `02_INIT.md`, `14_INITIAL_POPULATION.md`, README, and 00_OVERVIEW need new
+  Russian translations once Phase 2 begins.
+
+## [0.2.0] - 2026-05-16
+
+> Phase 1 (reference implementations) complete.
+
+### Added
+- `knowledge-base/templates/` directory with all configuration templates:
+  - `kb.config.yml.template` (with full `mode_profiles` for default/super)
+  - `repomix.config.json.template`
+  - `AGENTS.md.template`
+  - `KNOWLEDGE_STRUCTURE.md.template`
+  - `DATA_PLACEMENT_EXAMPLES.md.template`
+  - `requirements.txt`, `requirements-dev.txt`
+  - `.gitignore.template`
+- `knowledge-base/scripts/` directory with reference Python implementations:
+  - `kb_common.py` — shared utilities (frontmatter, hashing, logging, wikilinks)
+  - `kb_doctor.py` — post-deploy smoke test (env, deps, structure, spaCy)
+  - `kb_ingest.py` — full pipeline (raw → processed → metadata, NLP, routing)
+  - `kb_lint.py` — Level 1 health check (11 rules, lifecycle-aware, auto-fix)
+  - `kb_watch.py` — watchdog-based file watcher with polling fallback
+  - `kb_reflect.py` — reflection trigger logic (importance threshold + weekly)
+  - `kb_nlp_batch.py` — incremental NLP re-enrichment
+- `knowledge-base/scripts/tests/` — pytest suite (59 tests) covering common,
+  lint, ingest, and reflect logic
+- `knowledge-base/shell/` directory with POSIX-safe wrappers:
+  - `reindex.sh` (with daily consolidation block)
+  - `watcher.sh` (start/stop/status/daemon)
+  - `lint.sh`, `doctor.sh`
+- `knowledge-base/00_OVERVIEW.md` — agent's deployment map: what to read,
+  what to copy, in what order
+- `docs/ARCHITECTURE.md` — contributor-oriented architecture overview
+
+### Changed
+- Instruction modules now point to reference implementations:
+  `01_PREREQUISITES.md`, `02_INIT.md`, `03_PIPELINE.md`, `05_INDEX.md`,
+  `06_AGENTS_TEMPLATE.md`, `09_LINT.md`, `13_AUTORUN.md`
+- `knowledge-base/README.md` — updated reading order, mentions
+  `templates/`, `scripts/`, `shell/`
+- `09_LINT.md` — `--only` flag added to the kb_lint contract
+
+### Translation impact
+- All instruction modules touched in this release will need re-translation
+  in Phase 2. Russian counterparts in `i18n/ru/` (to be created) should be
+  marked as stale until updated.
+
+## [0.1.0] - 2026-05-16
+
+### Added
+- Initial public structure: `knowledge-base/` (13 instruction modules), `quick-start/INIT_GUIDE.md`, `examples/` (3 role templates)
+- Bilingual `README.md` / `README.ru.md`
+- MIT License

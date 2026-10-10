@@ -1,7 +1,8 @@
 # Evaluation (spec §16) — post-MVP, Phase 5
 
-Not implemented yet. When it lands, each selected skill gets two
-suites:
+Not implemented yet: the CLI has no `eval` command, even though spec §17
+lists `ai-skills-fixer eval <skill-id>`. When it lands, each selected
+skill gets two suites:
 
 - **Activation suite** — direct/indirect/incomplete/negative/ambiguous
   requests; metrics: activation precision and recall, false and missed

@@ -1,0 +1,18 @@
+# AI Knowledge Engine — deployed KB .gitattributes
+# Copy to your KB root as `.gitattributes` (rename, removing .template).
+#
+# Line endings that must not follow the checkout platform: POSIX shells
+# refuse CRLF scripts ("bad interpreter: /bin/bash^M"), and cmd.exe misreads
+# LF-only batch files. Everything else keeps git's automatic detection.
+
+* text=auto
+
+# POSIX wrappers, macOS launchers and the git hook: always LF
+*.sh text eol=lf
+*.command text eol=lf
+shell/hooks/* text eol=lf
+*.py text eol=lf
+
+# Windows launchers: always CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf

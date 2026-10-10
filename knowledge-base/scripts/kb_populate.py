@@ -10,31 +10,42 @@ Workflow integration:
     2. For custom roles, agent creates examples/<role>.yml (see templates/role.yml.template)
     3. Run kb_populate.py to generate DATA_PLACEMENT_EXAMPLES.md
     4. (Optional) Agent reviews the result and adds project-specific notes
+       below the end-of-generated-content marker; re-runs keep them
 
 Usage:
     python3 scripts/kb_populate.py --role programmer-senior
-    python3 scripts/kb_populate.py --role custom --from path/to/role.yml
-    python3 scripts/kb_populate.py --kb-root /path/to/deployed-kb
+    python3 scripts/kb_populate.py --role "Senior Software Engineer"   # role title works too
+    python3 scripts/kb_populate.py --kb-root .            # role = knowledge_base.roles.primary
+    python3 scripts/kb_populate.py --from path/to/role.yml
     python3 scripts/kb_populate.py --output FILENAME
     python3 scripts/kb_populate.py --create-samples       # also drop raw/_samples/
     python3 scripts/kb_populate.py --dry-run              # print to stdout
     python3 scripts/kb_populate.py --json                 # machine-readable
+    python3 scripts/kb_populate.py --entities-from programmer-senior   # entities: → kb.config.yml
+    python3 scripts/kb_populate.py --entities-from programmer-senior --dry-run   # preview only
 
 Exit codes:
-    0 — generated successfully (or dry-run printed)
-    1 — role file not found / invalid YAML / missing placement_examples
-    2 — KB root invalid
+    0 — generated successfully (or dry-run printed, or entities copied/kept)
+    1 — role file not found / invalid YAML / missing placement_examples / no entities
+    2 — KB root invalid (for --entities-from: no kb.config.yml)
 """
 from __future__ import annotations
 
 import argparse
 import datetime as _dt
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import kb_common as kbc  # noqa: E402
+
+REPO_ROOT = SCRIPT_DIR.parent
 
 # Examples directory resolution:
 # - When deployed to a KB root, examples/ is sibling of scripts/ (i.e. REPO_ROOT/examples)
@@ -45,40 +56,167 @@ _LEGACY_EXAMPLES = REPO_ROOT / "knowledge-base" / "examples"
 EXAMPLES_DIR = _DEFAULT_EXAMPLES if _DEFAULT_EXAMPLES.is_dir() else _LEGACY_EXAMPLES
 DEFAULT_OUTPUT = "DATA_PLACEMENT_EXAMPLES.md"
 
+# Last line of the generated part. Whatever follows it belongs to the owner
+# or the agent and survives a re-run; files generated before the marker
+# existed keep their `## Project notes` section instead.
+END_MARKER = (
+    "<!-- kb_populate: everything above is regenerated; "
+    "notes added below this line are kept on re-run -->"
+)
+_MARKER_PREFIX = "<!-- kb_populate:"
+_PROJECT_NOTES_RE = re.compile(r"^##\s+Project notes\b", re.IGNORECASE)
+
 
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
 
 
+def _require_yaml() -> None:
+    if kbc.yaml is None:
+        raise SystemExit("PyYAML is required. Install: pip install pyyaml")
+
+
 def load_role_yaml(path: Path) -> dict[str, Any]:
-    try:
-        import yaml  # type: ignore[import-untyped]
-    except ImportError as e:
-        raise SystemExit("PyYAML is required. Install: pip install pyyaml") from e
+    _require_yaml()
     if not path.is_file():
         raise FileNotFoundError(path)
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    data = kbc.yaml_load(path.read_text(encoding="utf-8-sig")) or {}
     if not isinstance(data, dict):
         raise ValueError(f"{path}: expected a YAML mapping, got {type(data).__name__}")
     return data
 
 
-def resolve_role_path(role: str | None, from_path: Path | None) -> Path:
+def _role_dirs(kb_root: Path | None) -> list[Path]:
+    """The base's own examples/ first (custom roles), then the engine's."""
+    dirs: list[Path] = []
+    candidates = ([kb_root / "examples"] if kb_root is not None else []) + [EXAMPLES_DIR]
+    for folder in candidates:
+        if folder.is_dir() and folder.resolve() not in [d.resolve() for d in dirs]:
+            dirs.append(folder)
+    return dirs
+
+
+def _role_files(folder: Path) -> list[Path]:
+    return sorted([*folder.glob("*.yml"), *folder.glob("*.yaml")])
+
+
+def resolve_role_path(
+    role: str | None, from_path: Path | None, *, kb_root: Path | None = None
+) -> Path:
+    """Find a role YAML by file name (``programmer-senior`` or
+    ``programmer-senior.yml``) or by its ``role:`` title (``Senior Software
+    Engineer`` — what ``knowledge_base.roles.primary`` holds),
+    case-insensitively."""
     if from_path:
         return from_path.resolve()
     if not role:
         raise ValueError("Either --role or --from must be provided")
-    candidate = EXAMPLES_DIR / f"{role}.yml"
-    if candidate.is_file():
-        return candidate
-    candidate_yaml = EXAMPLES_DIR / f"{role}.yaml"
-    if candidate_yaml.is_file():
-        return candidate_yaml
+    dirs = _role_dirs(kb_root)
+    wanted = role.strip()
+    name = wanted
+    if Path(name).suffix.lower() in (".yml", ".yaml"):
+        name = name[: -len(Path(name).suffix)]
+    stems = [name] if name and Path(name).name == name else []
+    for stem in dict.fromkeys([*stems, kbc.slugify(name)]):
+        for folder in dirs:
+            for ext in (".yml", ".yaml"):
+                candidate = folder / f"{stem}{ext}"
+                if candidate.is_file():
+                    return candidate
+    _require_yaml()
+    title = wanted.casefold()
+    for folder in dirs:
+        for candidate in _role_files(folder):
+            try:
+                data = load_role_yaml(candidate)
+            except (OSError, ValueError, kbc.yaml.YAMLError):
+                continue
+            if _safe(data.get("role")).casefold() == title:
+                return candidate
+    known = sorted({p.stem for folder in dirs for p in _role_files(folder)})
+    where = ", ".join(str(d) for d in dirs) or str(EXAMPLES_DIR)
     raise FileNotFoundError(
-        f"Role '{role}' not found in {EXAMPLES_DIR}. "
+        f"Role '{role}' not found in {where} (neither a file name nor a `role:` title). "
+        f"Known roles: {', '.join(known) or 'none'}. "
         f"Use --from to point at a custom YAML."
     )
+
+
+def configured_role(kb_root: Path) -> str | None:
+    """``knowledge_base.roles.primary`` from the base's kb.config.yml, if set."""
+    if not kbc.kb_config_path(kb_root).is_file():
+        return None
+    _require_yaml()
+    section = kbc.load_config(kb_root).raw.get("knowledge_base")
+    roles = section.get("roles") if isinstance(section, dict) else None
+    primary = roles.get("primary") if isinstance(roles, dict) else None
+    if not isinstance(primary, str) or not primary.strip() or "{{" in primary:
+        return None
+    return primary.strip()
+
+
+def kept_notes(existing: str) -> str:
+    """The part of an existing output file that a re-run must keep."""
+    lines = existing.splitlines(keepends=True)
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith(_MARKER_PREFIX):
+            return "".join(lines[i + 1:])
+    for i, line in enumerate(lines):
+        if _PROJECT_NOTES_RE.match(line):
+            return "".join(lines[i:])
+    return ""
+
+
+def with_kept_notes(markdown: str, notes: str) -> str:
+    if not notes.strip():
+        return markdown
+    return markdown + "\n" + notes.lstrip("\n")
+
+
+# ---------------------------------------------------------------------------
+# entities: → kb.config.yml
+# ---------------------------------------------------------------------------
+
+
+def entities_block(role_path: Path, role_data: dict[str, Any]) -> str:
+    """The ``entities:`` block (with a provenance comment) for kb.config.yml."""
+    entities = role_data.get("entities")
+    if not isinstance(entities, dict) or not entities:
+        raise ValueError(f"{role_path.name}: no `entities:` mapping to copy")
+    source = (
+        role_path.relative_to(REPO_ROOT).as_posix()
+        if role_path.is_relative_to(REPO_ROOT)
+        else role_path.name
+    )
+    body = kbc.yaml.safe_dump(
+        {"entities": entities},
+        allow_unicode=True,
+        sort_keys=False,
+        default_flow_style=False,
+        width=4096,
+    )
+    return f"# Copied from {source} by kb_populate.py --entities-from; edit freely.\n{body}"
+
+
+def copy_entities(
+    kb_root: Path, role_path: Path, role_data: dict[str, Any], *, dry_run: bool = False
+) -> bool:
+    """Add the role's ``entities:`` to the base config (line-based edit).
+
+    Returns False when the config already has non-empty entities: those are
+    the owner's and stay untouched. ``dry_run`` only reports whether the
+    config would change; nothing is written.
+    """
+    block = entities_block(role_path, role_data)
+
+    def edit(text: str) -> str:
+        return kbc.config_append_block(text, "entities", block)
+
+    if dry_run:
+        text = kbc.kb_config_path(kb_root).read_bytes().decode("utf-8-sig")
+        return edit(text) != text
+    return kbc.update_config_file(kb_root, [edit])
 
 
 # ---------------------------------------------------------------------------
@@ -220,13 +358,18 @@ def render_markdown(role_data: dict[str, Any], *, source_path: Path) -> str:
     lines.append("")
     lines.append("1. Drop a few files into the matching `raw/*/unsorted/` folder")
     lines.append("2. Run `./shell/reindex.sh` (or start `./shell/watcher.sh` for auto-processing)")
-    lines.append("3. Check `log.md` to see what happened")
-    lines.append("4. Open `.repomix/output.xml` once the AI has indexed your knowledge")
+    lines.append("3. Check `STATUS.md` and `log.md` to see what happened")
+    lines.append(
+        "4. Say `!review`: the AI agent turns what waits in `review/` and "
+        "`processed/` into `knowledge/` pages"
+    )
     lines.append("")
     lines.append(
-        "If something feels off, edit the source YAML and re-run "
-        "`python3 scripts/kb_populate.py --role <role>`."
+        "If something feels off, edit the source YAML and say `!populate` "
+        "(or re-run `python3 scripts/kb_populate.py --role <role>`)."
     )
+    lines.append("")
+    lines.append(END_MARKER)
     lines.append("")
     return "\n".join(lines)
 
@@ -309,11 +452,56 @@ def write_samples(kb_root: Path, role_data: dict[str, Any]) -> list[Path]:
 # ---------------------------------------------------------------------------
 
 
+def _copy_entities_cli(args: argparse.Namespace, kb_root: Path) -> int:
+    config = kbc.kb_config_path(kb_root)
+    if not config.is_file():
+        print(f"❌ No {config.name} in {kb_root} — create the config first", file=sys.stderr)
+        return 2
+    try:
+        role_path = resolve_role_path(args.entities_from, None, kb_root=kb_root)
+        role_data = load_role_yaml(role_path)
+        changes = copy_entities(kb_root, role_path, role_data, dry_run=args.dry_run)
+    except (FileNotFoundError, ValueError, kbc.yaml.YAMLError) as e:
+        print(f"❌ {e}", file=sys.stderr)
+        return 1
+    keys = [str(k) for k in role_data["entities"]]
+    copied = changes and not args.dry_run
+    if args.json:
+        summary = {
+            "entities_from": str(role_path),
+            "config": str(config),
+            "copied": copied,
+            "entities": keys,
+        }
+        if args.dry_run:
+            summary.update(dry_run=True, would_copy=changes)
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    elif args.dry_run and changes:
+        print(f"🔍 Dry run: would copy {len(keys)} entities from {role_path.name} "
+              f"into {config.name} (nothing written):")
+        print("")
+        print(entities_block(role_path, role_data), end="")
+    elif args.dry_run:
+        print(f"ℹ️  {config.name} already has entities — nothing would change (dry run).")
+    elif copied:
+        print(f"✅ Copied {len(keys)} entities from {role_path.name} into {config.name}: "
+              f"{', '.join(keys)}")
+        print("   Review them with the owner and drop what does not fit.")
+    else:
+        print(f"ℹ️  {config.name} already has entities — left unchanged. "
+              "Empty `entities:` (or edit it by hand) to copy again.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate DATA_PLACEMENT_EXAMPLES.md from a role template"
     )
-    parser.add_argument("--role", help="Role name (matches examples/<role>.yml)")
+    parser.add_argument(
+        "--role",
+        help="Role file name (examples/<role>.yml) or its `role:` title; "
+        "default: knowledge_base.roles.primary from kb.config.yml",
+    )
     parser.add_argument("--from", dest="from_path", type=Path,
                         help="Path to a custom role YAML")
     parser.add_argument("--kb-root", type=Path,
@@ -323,19 +511,47 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--create-samples", action="store_true",
                         help="Also create raw/_samples/ with placeholder files")
     parser.add_argument("--dry-run", action="store_true",
-                        help="Print result to stdout without writing")
+                        help="Print result to stdout without writing (with "
+                        "--entities-from: show the block, leave kb.config.yml as is)")
     parser.add_argument("--json", action="store_true",
                         help="Machine-readable summary")
+    parser.add_argument(
+        "--entities-from",
+        metavar="ROLE",
+        help="Copy the role's entities: into kb.config.yml (only while the "
+        "config has none) and exit",
+    )
     args = parser.parse_args(argv)
+    _require_yaml()
+    kb_root = (args.kb_root or Path.cwd()).resolve()
 
-    if not args.role and not args.from_path:
-        parser.error("Either --role or --from must be specified")
-        return 1
+    if args.entities_from:
+        return _copy_entities_cli(args, kb_root)
+
+    role = args.role
+    if not role and not args.from_path:
+        try:
+            role = configured_role(kb_root)
+        except kbc.yaml.YAMLError as e:
+            print(f"❌ {kbc.DEFAULT_CONFIG_FILENAME}: {e}", file=sys.stderr)
+            return 1
+        if not role:
+            parser.error(
+                "Either --role or --from must be specified "
+                "(kb.config.yml has no knowledge_base.roles.primary)"
+            )
 
     try:
-        role_path = resolve_role_path(args.role, args.from_path)
+        role_path = resolve_role_path(role, args.from_path, kb_root=kb_root)
     except FileNotFoundError as e:
         print(f"❌ {e}", file=sys.stderr)
+        if not args.role and not args.from_path:
+            print(
+                f"   The role came from knowledge_base.roles.primary ({role!r}) in "
+                f"{kbc.DEFAULT_CONFIG_FILENAME}: set it to the YAML's file name or "
+                "its `role:` title, or pass --role / --from.",
+                file=sys.stderr,
+            )
         return 1
 
     try:
@@ -365,7 +581,8 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         print(
-            "   See knowledge-base/examples/programmer-senior.yml for the schema.",
+            "   See templates/role.yml.template (or examples/programmer-senior.yml) "
+            "for the schema.",
             file=sys.stderr,
         )
         return 1
@@ -376,8 +593,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"❌ {e}", file=sys.stderr)
         return 1
 
-    kb_root = (args.kb_root or Path.cwd()).resolve()
     output_path = kb_root / args.output
+    notes = kept_notes(kbc.read_text_auto(output_path)[0]) if output_path.is_file() else ""
+    text = with_kept_notes(markdown, notes)
+    kept = bool(notes.strip())
 
     samples_written: list[Path] = []
     if args.create_samples and not args.dry_run:
@@ -391,32 +610,51 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({
                 "role_source": str(role_path),
                 "would_write": str(output_path),
-                "markdown_length": len(markdown),
+                "markdown_length": len(text),
+                "kept_notes": kept,
             }, indent=2))
         else:
-            print(markdown)
+            print(text)
         return 0
 
     if not kb_root.is_dir():
         print(f"❌ KB root not found: {kb_root}", file=sys.stderr)
         return 2
 
-    output_path.write_text(markdown, encoding="utf-8")
+    kbc.atomic_write_text(output_path, text)
+    # Only a real base gets a log entry; a scratch folder stays untouched.
+    logged = kbc.kb_config_path(kb_root).is_file()
+    if logged:
+        kbc.append_log(
+            operation="populate",
+            title=f"{Path(args.output).stem} generated",
+            details=[
+                f"Role: {_safe(role_data.get('role')) or role_path.stem}",
+                f"Source: {role_path.name}",
+                f"Kept notes below the marker: {'yes' if kept else 'no'}",
+            ],
+            root=kb_root,
+        )
 
     if args.json:
         print(json.dumps({
             "role_source": str(role_path),
             "written": str(output_path),
-            "markdown_length": len(markdown),
+            "markdown_length": len(text),
+            "kept_notes": kept,
+            "logged": logged,
             "samples_created": [str(p) for p in samples_written],
         }, indent=2))
     else:
         print(f"✅ Wrote {output_path.relative_to(kb_root) if output_path.is_relative_to(kb_root) else output_path}")
+        if kept:
+            print("📝 Kept the notes below the end-of-generated-content marker")
         if samples_written:
             print(f"📂 Created {len(samples_written)} sample file(s) in raw/_samples/")
         print("")
-        print("Next: ask the AI agent to review the file and add any project-")
-        print("specific notes that aren't capturable in YAML.")
+        print("Next: ask the AI agent to review the file and add project-specific")
+        print("notes (e.g. `## Project notes`) BELOW the `<!-- kb_populate: … -->`")
+        print("line at the end — re-runs keep everything below it.")
     return 0
 
 

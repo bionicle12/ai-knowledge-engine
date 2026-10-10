@@ -2,19 +2,24 @@
 """check_translations — drift report for translated docs.
 
 For every file under `i18n/<lang>/`, parses its `translation_of:` frontmatter
-field and checks whether the source file in the repo has been modified since
-the recorded `source_commit`. Emits status:
+field and compares the EN source as it is now (working tree, uncommitted edits
+included) with the same file at the recorded `source_commit`. Emits status:
 
-  ✅ in sync   — source has not changed since `source_commit`
-  ⚠️ stale     — source changed; translation may need update
-  ❌ missing   — translation is referenced in a config but does not exist yet
+  ✅ in sync   — the source text is unchanged since `source_commit`
+  ⚠️ stale     — the source text changed; translation may need update
+  ❔ unknown   — drift cannot be measured (no git history for the source,
+                 or `source_commit` is missing from this clone)
+  ❌ missing   — an EN source has no translation in this language yet
   ℹ️ orphan    — translation exists but `translation_of` target is missing
+
+Line endings and the version number on a shields.io badge line do not count
+as drift: a release rewrites the README badge, the translation keeps its own.
 
 Usage:
     python3 scripts/check_translations.py
     python3 scripts/check_translations.py --update-status   # write i18n/TRANSLATION_STATUS.md
     python3 scripts/check_translations.py --json
-    python3 scripts/check_translations.py --strict          # exit 1 if any drift
+    python3 scripts/check_translations.py --strict          # exit 1 unless every file is in sync
 """
 from __future__ import annotations
 
@@ -23,12 +28,18 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 I18N_DIR = REPO_ROOT / "i18n"
 STATUS_FILE = I18N_DIR / "TRANSLATION_STATUS.md"
+
+# EN sources every language is expected to translate. Recursive, so a new
+# folder of docs is covered; code, fixtures and templates are not prose to
+# translate. scripts/hooks/pre-commit-translation-drift.sh mirrors this set.
+CANONICAL_GLOBS = ("README.md", "knowledge-base/**/*.md", "quick-start/**/*.md")
+NON_DOC_DIRS = frozenset({"scripts", "templates", "tests", "vendor"})
 
 
 def _enable_utf8_stdout() -> None:
@@ -40,7 +51,13 @@ def _enable_utf8_stdout() -> None:
         except (AttributeError, ValueError):  # pragma: no cover
             pass
 
-_FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
+# The leading `---` block only; `[ \t]` so a fence never swallows a newline.
+FRONTMATTER_RE = re.compile(
+    r"\A\ufeff?---[ \t]*\r?\n(?P<block>.*?)^---[ \t]*\r?$",
+    re.DOTALL | re.MULTILINE,
+)
+_SHA_RE = re.compile(r"[0-9a-f]{7,40}")
+_BADGE_VERSION_RE = re.compile(r"\d+\.\d+\.\d+")
 
 
 @dataclass
@@ -53,21 +70,29 @@ class TranslationStatus:
     translator: str = ""
     actual_source_commit: str = ""
     drift_commits: int = 0
-    state: str = "unknown"   # in_sync | stale | missing | orphan
+    state: str = "unknown"   # in_sync | stale | unknown | missing | orphan
     note: str = ""
 
 
+def frontmatter_span(text: str) -> tuple[int, int] | None:
+    """Start/end offsets of the leading frontmatter block (between the fences)."""
+    m = FRONTMATTER_RE.match(text)
+    return m.span("block") if m else None
+
+
 def parse_frontmatter(text: str) -> dict:
-    m = _FRONTMATTER_RE.match(text)
-    if not m:
+    span = frontmatter_span(text)
+    if span is None:
         return {}
-    block = m.group(1)
     out: dict = {}
-    for line in block.splitlines():
+    for line in text[span[0]:span[1]].splitlines():
         if not line.strip() or ":" not in line:
             continue
         k, _, v = line.partition(":")
-        out[k.strip()] = v.strip().strip('"').strip("'")
+        v = v.strip()
+        if not v.startswith(("'", '"')):
+            v = re.split(r"\s+#", v, maxsplit=1)[0]
+        out[k.strip()] = v.strip('"').strip("'")
     return out
 
 
@@ -102,6 +127,44 @@ def git_count_commits_since(path: Path, since_sha: str) -> int | None:
     if result.returncode != 0:
         return None
     return len([line for line in result.stdout.splitlines() if line.strip()])
+
+
+def _git(*args: str) -> subprocess.CompletedProcess | None:
+    try:
+        return subprocess.run(
+            ["git", *args], capture_output=True, cwd=str(REPO_ROOT), check=False
+        )
+    except OSError:
+        return None
+
+
+def git_resolve_commit(rev: str) -> str | None:
+    result = _git("rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}")
+    if result is None or result.returncode != 0:
+        return None
+    return result.stdout.decode("utf-8", "replace").strip() or None
+
+
+def git_file_at(commit: str, source_rel: str) -> bytes | None:
+    """Bytes of `source_rel` (repo-relative) at `commit`; None if absent."""
+    result = _git("show", f"{commit}:./{source_rel}")
+    if result is None or result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def git_has_uncommitted_changes(path: Path) -> bool:
+    result = _git("diff", "--quiet", "HEAD", "--", str(path))
+    return result is not None and result.returncode == 1
+
+
+def drift_text(data: bytes) -> str:
+    """Source text as drift sees it: line endings and badge versions do not count."""
+    text = data.decode("utf-8-sig", errors="replace").replace("\r\n", "\n")
+    return "\n".join(
+        _BADGE_VERSION_RE.sub("X.Y.Z", line) if "img.shields.io/badge/" in line else line
+        for line in text.split("\n")
+    )
 
 
 def collect_translations(i18n_dir: Path) -> list[Path]:
@@ -150,19 +213,60 @@ def evaluate(path: Path) -> TranslationStatus:
         status.state = "stale"
         status.note = "no source_commit recorded"
         return status
-    if actual.startswith(source_commit) or source_commit.startswith(actual):
+    if not actual:
+        status.state = "unknown"
+        status.note = (
+            "no git history for the source (not a git checkout, "
+            "or the file is not committed yet)"
+        )
+        return status
+    if not _SHA_RE.fullmatch(source_commit):
+        # A placeholder, or a name that moves (`HEAD`, a branch): resolving
+        # it would compare the source with its own tip — "in sync" forever.
+        status.state = "stale"
+        status.note = f"source_commit {source_commit!r} is not a commit sha"
+        return status
+    commit = git_resolve_commit(source_commit)
+    if commit is None:
+        status.state = "unknown"
+        status.note = f"source_commit {source_commit[:12]} is not in this clone"
+        return status
+    baseline = git_file_at(commit, source_rel)
+    if baseline is None:
+        status.state = "stale"
+        status.note = f"source did not exist at {source_commit[:12]} (moved?)"
+        return status
+    if drift_text(baseline) == drift_text(source_path.read_bytes()):
         status.state = "in_sync"
         return status
-    drift = git_count_commits_since(source_path, source_commit)
+    drift = git_count_commits_since(source_path, commit)
     status.drift_commits = drift if drift is not None else -1
     status.state = "stale"
-    status.note = (
-        f"source updated since translation "
-        f"({status.drift_commits} commits)"
-        if status.drift_commits >= 0
-        else "source-commit mismatch (could not measure drift)"
+    changes = []
+    if drift:
+        changes.append(f"{drift} commit{'' if drift == 1 else 's'}")
+    elif drift is None:
+        changes.append("commits not counted")
+    if git_has_uncommitted_changes(source_path):
+        changes.append("uncommitted edits")
+    status.note = "source updated since translation" + (
+        f" ({' + '.join(changes)})" if changes else ""
     )
     return status
+
+
+def canonical_sources(repo_root: Path) -> list[Path]:
+    """EN files matched by CANONICAL_GLOBS, outside NON_DOC_DIRS and dot-folders."""
+    found: set[Path] = set()
+    for pattern in CANONICAL_GLOBS:
+        for p in repo_root.glob(pattern):
+            folders = p.relative_to(repo_root).parts[:-1]
+            if not p.is_file() or NON_DOC_DIRS.intersection(folders):
+                continue
+            if any(part.startswith(".") for part in folders):
+                continue
+            found.add(p)
+    return sorted(found)
 
 
 def find_missing(i18n_dir: Path, statuses: list[TranslationStatus]) -> list[TranslationStatus]:
@@ -170,10 +274,7 @@ def find_missing(i18n_dir: Path, statuses: list[TranslationStatus]) -> list[Tran
     if not i18n_dir.is_dir():
         return []
     languages = [d.name for d in i18n_dir.iterdir() if d.is_dir()]
-    canonical = sorted(
-        list((REPO_ROOT / "knowledge-base").glob("*.md"))
-        + list((REPO_ROOT / "quick-start").glob("*.md"))
-    )
+    canonical = canonical_sources(REPO_ROOT)
     out: list[TranslationStatus] = []
     for lang in languages:
         translated_sources = {
@@ -199,19 +300,19 @@ def find_missing(i18n_dir: Path, statuses: list[TranslationStatus]) -> list[Tran
 
 
 def render_report(statuses: list[TranslationStatus]) -> str:
-    icon = {"in_sync": "✅", "stale": "⚠️", "orphan": "ℹ️", "missing": "❌"}
+    # No HEAD sha or date: the committed report changes only when drift does.
+    icon = {"in_sync": "✅", "stale": "⚠️", "unknown": "❔", "orphan": "ℹ️", "missing": "❌"}
     by_lang: dict[str, list[TranslationStatus]] = {}
     for s in statuses:
         by_lang.setdefault(s.lang, []).append(s)
-    lines = ["# Translation Status", ""]
-    try:
-        head = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=str(REPO_ROOT), text=True
-        ).strip()
-        lines.append(f"> Source HEAD: `{head}`")
-    except Exception:  # noqa: BLE001
-        lines.append("> Source HEAD: (git unavailable)")
-    lines.append("")
+    lines = [
+        "# Translation Status",
+        "",
+        "> Generated by `python3 scripts/check_translations.py --update-status`.",
+        "> Drift compares each EN source (working tree) with its text at the",
+        "> translation's `source_commit`.",
+        "",
+    ]
     for lang in sorted(by_lang):
         rows = sorted(by_lang[lang], key=lambda s: s.translation_path)
         lines.append(f"## {lang}")
@@ -221,11 +322,7 @@ def render_report(statuses: list[TranslationStatus]) -> str:
         for s in rows:
             state_str = f"{icon.get(s.state, '?')} {s.state.replace('_', ' ')}"
             commit = s.source_commit[:7] if s.source_commit else "—"
-            drift = (
-                f"{s.drift_commits} commits"
-                if s.drift_commits and s.drift_commits > 0
-                else ("—" if s.state == "in_sync" else s.note)
-            )
+            drift = "—" if s.state == "in_sync" else (s.note or "—")
             lines.append(
                 f"| `{s.translation_path}` | {state_str} | `{commit}` | {drift} |"
             )
@@ -239,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="Write i18n/TRANSLATION_STATUS.md")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--strict", action="store_true",
-                        help="Exit 1 if any file is stale/missing/orphan")
+                        help="Exit 1 if any file is stale/unknown/missing/orphan")
     args = parser.parse_args(argv)
 
     _enable_utf8_stdout()
@@ -264,8 +361,14 @@ def main(argv: list[str] | None = None) -> int:
         report = render_report(statuses)
         if args.update_status:
             STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            STATUS_FILE.write_text(report, encoding="utf-8")
-            print(f"Wrote {STATUS_FILE}")
+            current = (
+                STATUS_FILE.read_text(encoding="utf-8") if STATUS_FILE.is_file() else None
+            )
+            if current == report:
+                print(f"Up to date: {STATUS_FILE}")
+            else:
+                STATUS_FILE.write_text(report, encoding="utf-8")
+                print(f"Wrote {STATUS_FILE}")
         else:
             print(report)
 

@@ -1,0 +1,5 @@
+# Line endings of the Lite templates, whatever core.autocrlf says: sh scripts
+# and hooks break with CRLF ("/bin/sh^M"), cmd labels misbehave with LF.
+templates/githooks/* text eol=lf
+templates/scripts/*.sh text eol=lf
+templates/scripts/*.bat text eol=crlf

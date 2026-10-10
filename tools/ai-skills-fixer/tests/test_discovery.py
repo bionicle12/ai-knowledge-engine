@@ -74,3 +74,14 @@ def test_claude_plugin_cache_root(tmp_path):
     roots = discover_roots(home=tmp_path, env={})
     plugin = [r for r in roots if r.host == "claude" and r.kind == "plugin"]
     assert plugin and plugin[0].exists
+
+
+def test_gemini_config_dir_moves_the_antigravity_plugin_root(tmp_path):
+    """B9: GEMINI_CONFIG_DIR is Antigravity's plugin root, labeled as an override."""
+    alt = tmp_path / "gem"
+    (alt / "plugins").mkdir(parents=True)
+    roots = discover_roots(home=tmp_path, env={"GEMINI_CONFIG_DIR": str(alt)})
+    plugin = by_host_kind(roots)[("antigravity", "plugin")]
+    assert plugin.path == alt / "plugins"
+    assert plugin.evidence == "env-override"
+    assert {r.host for r in roots} == {"claude", "codex", "cursor", "antigravity"}

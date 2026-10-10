@@ -9,20 +9,33 @@
 Every conversation with the AI agent contains valuable conclusions: decisions, preferences, insights, thinking patterns. Without capture they get lost in chat history. The feedback loop saves them and turns them into knowledge.
 
 ```text
-Dialogue → Session Summary → interactions/sessions/
+Dialogue → Session Summary (!save) → interactions/sessions/
                                     ↓
-                          Meta-review (periodic)
+                          Meta-review (!meta-review)
                                     ↓
                           interactions/insights/
                                     ↓
-                          Quality filter
+                          Quality filter + owner confirms
                                     ↓
                           knowledge/ (updates)
                                     ↓
-                          Reindex → Repomix
+                          Reindex → Repomix packs
                                     ↓
                           AI agent gets smarter ←──── next dialogue
 ```
+
+Nothing in this loop writes on its own. Scripts only count what is waiting and report it in `STATUS.md`; the agent writes when the owner asks.
+
+---
+
+## Session start: `STATUS.md` and `!status`
+
+`scripts/kb_status.py` rewrites `STATUS.md` at the end of every reindex: one line per kind of pending work, each ending with the command that resolves it (see `kb-docs/05_INDEX.md`). Lines this module resolves:
+
+- `sessions awaiting meta-review: 5 → !meta-review`
+- `reflection due (changes 31 ≥ 25) → !reflect`
+
+Read `STATUS.md` at session start. Mention its non-zero lines to the owner once; act on them only when asked. `!status` runs `python3 scripts/kb_status.py`, which rewrites the file and prints it.
 
 ---
 
@@ -34,7 +47,7 @@ accumulated" and write on your own.
 
 | Situation | Action |
 |-----------|--------|
-| User issues `!save` | Writes summary immediately (agent writes under `interactions/sessions/`; optional CLI: `python3 scripts/kb_save_session.py`) |
+| User issues `!save` | Writes summary immediately (agent writes under `interactions/sessions/`; optional CLI: `python3 scripts/kb_save_session.py --title … --summary …` with `--session <dialogue folder or topic>`; it writes the layout below, never overwrites — a second save in the same minute gets `.v02` before `.md` — and logs `session-capture`) |
 | User explicitly asks to save | Same as `!save` |
 | User asks not to save | No write |
 
@@ -50,10 +63,7 @@ interactions/sessions/
     └── 2026-05-06T12-00__final-summary.md
 ```
 
-This:
-- Keeps the timeline within a dialogue visible
-- Avoids losing intermediate conclusions
-- Allows later stitching and analysis
+A new save adds a file; it never overwrites an earlier one.
 
 ---
 
@@ -65,6 +75,8 @@ session_date: 2026-05-06
 topic: "Q2 competitor analysis"
 duration_estimate: "45 min"
 quality: high
+redaction_required: true   # a redaction pass is still owed (privacy.require_redaction_for_chats)
+meta_reviewed: false       # !meta-review sets true
 ---
 
 # Session: Q2 competitor analysis
@@ -107,6 +119,11 @@ line, continue. Ask only when the answer changes the outcome. Lint info if
 one `knowledge/<area>/` collects more than 3 assumption bullets in 30 days
 → tighten `DATA_PLACEMENT_EXAMPLES.md` for that area.
 
+`redaction_required: true` says the summary may quote private material that
+nobody has redacted yet. Never write `redacted: true` unless you actually
+removed the private parts. A new summary has no `meta_reviewed: true` — the
+meta-review sets it.
+
 ---
 
 ## Capture rules
@@ -131,17 +148,20 @@ one `knowledge/<area>/` collects more than 3 assumption bullets in 30 days
 - Deliberate base-pollution attempts
 - Full text of uploaded documents (only short summary + key numbers)
 
-### Minimum threshold
+### Quality bar (a recommendation, not a gate)
 
-A session summary is saved only if it has:
+A useful summary has:
 - At least 3 substantive bullet points
 - At least 1 actionable conclusion (decision, update, task)
+
+The bar never overrides the owner: on `!save` write the summary even when it
+is thin, and say so in one line.
 
 ---
 
 ## Session enrichment — what was discussed and what data was seen
 
-While working with AI the user often uploads documents, pastes text snippets, shows screenshots, discusses code. This information is valuable but lost without capture.
+Documents, snippets and screenshots seen in a session are lost unless the summary names them.
 
 ### What to record inline
 
@@ -155,23 +175,6 @@ When writing a session summary, the AI agent **must** include a `## Processed ma
 | Article link | URL + 1-line summary | `nikolenko.ru/llm-memory → review of 11 LLM memory approaches` |
 | Data from API/DB | Source + format + key takeaway | `PostgreSQL EXPLAIN → seq scan on users, index needed` |
 
-### Format
-
-```markdown
-## Processed materials
-- `q2-strategy.pdf` → 12 pages, 3 tables. Key: 15% YoY growth, churn down to 3%
-- Rust snippet (server-rust/crates/services/auth.rs:120-180) → session validation refactor
-- https://nikolenko.ru/blog/llm-memory → LLM memory survey; applicable ideas: importance scoring, recency decay
-- Grafana dashboard screenshot → CPU spike at 14:00, correlates with DragonflyDB flush
-```
-
-### Why this matters
-
-1. **Context for meta-review:** when analyzing sessions, the AI sees not only conclusions but *what they were based on*
-2. **Traceability:** if you revisit a decision a month later, you can see what data backed it
-3. **Deduplication:** the AI can check whether a document was already processed (by filename or URL)
-4. **Routing:** materials from a session can become candidates for ingest into `raw/` → full processing
-
 ### Rules
 
 1. **Brevity:** 1-2 lines per item, do not copy content
@@ -180,26 +183,41 @@ When writing a session summary, the AI agent **must** include a `## Processed ma
 4. **Avoid duplication:** if the document already lives in `assets/` — use only the asset path
 5. **Sensitive data:** if the material contains private info — mark `[REDACTED: reason]`
 
-If the threshold is not met — do not record.
-
 ---
 
-## Meta-review
+## Meta-review (`!meta-review`)
 
-Periodic analysis of accumulated sessions (weekly or by user command).
+Analysis of accumulated session summaries. It runs on `!meta-review` (or
+when the owner asks for it in other words). `STATUS.md` counts the session
+files still waiting (`sessions awaiting meta-review: N → !meta-review`);
+suggest the command when the number grows, do not start it on your own.
 
 ### Process
 
-1. The AI reads all unprocessed `interactions/sessions/`
-2. Looks for repeating patterns:
+1. Find the unprocessed session files: every `.md` under
+   `interactions/sessions/` whose frontmatter does not say
+   `meta_reviewed: true`. `!import` keeps an incoming copy that differs
+   from a local file next to it (`<name>__from-<label>-<sha8>.md`,
+   `kb-docs/16_MERGE.md`): that is the same session — when either copy
+   says `meta_reviewed: true`, mark the other without analyzing it again
+2. Look for repeating patterns:
    - What questions come up most often?
    - What style preferences repeat?
    - Which knowledge areas need updating?
    - Where did the AI answer poorly — and why?
-3. Creates `interactions/insights/YYYY-MM__insight-slug.md`
-4. Proposes concrete updates to `knowledge/`
-5. The user confirms
-6. Marks the processed sessions
+3. Write each pattern (3+ repeats, see Anti-sabotage) to
+   `interactions/insights/YYYY-MM__insight-slug.md`
+4. Write the run report `interactions/meta-reviews/YYYY-MM-DD.md`: the
+   session files analyzed, the patterns found, the proposed `knowledge/`
+   updates
+5. The owner confirms or rejects each proposed update; apply only the
+   confirmed ones
+6. Mark every analyzed session file — add `meta_reviewed: true` to its
+   frontmatter, creating one if the file has none (a YAML boolean; the
+   string `"true"` does not count). Files that taught nothing are marked too
+7. Log operation `meta-review`
+
+No pattern is a valid result: write the report, mark the files, stop.
 
 ### Insight format
 
@@ -227,66 +245,102 @@ add the rule "default to bullet points; prose only for narrative".
 ## Reflection — higher-level insights (mode-aware)
 
 Periodic synthesis: from raw facts → high-level conclusions.
+`scripts/kb_reflect.py` decides **when** a reflection is due; the reflection
+itself is agent work (`!reflect`, ~15K tokens). The active profile is
+`mode_profiles.<knowledge_base.mode>.reflection` in `kb.config.yml`.
 
-### When it triggers
+### When it is due
 
-#### `mode: default` — throttled
+`python3 scripts/kb_reflect.py --check-threshold` compares the **change
+score** since the last reflection with the profile:
 
-| Trigger | How | Cost |
-|---------|-----|------|
-| **Importance threshold** | `sum(importance)` of recent ingests > 25 → auto on reindex | ~15K tokens |
-| **Weekly** | ≥7 days since last reflection **AND** changes in `log.md` | ~15K tokens |
-| **Command `!reflect`** | User explicitly requests reflection | ~15K tokens |
+- every `ingest` entry in `log.md` weighs the `importance` in its ingest
+  metadata, or `default_ingest_importance` (1) when it has none;
+- every `knowledge/` page whose content changed since the last reflection
+  weighs its `importance` (3 when unset); access tracking (`last_accessed`,
+  `access_count`) is not a change, and generated pages (`generated_by:`)
+  and `_archive/` do not count (details: `kb-docs/13_AUTORUN.md`).
 
-#### `mode: super` — on-demand
+| Decision | Meaning |
+|----------|---------|
+| `THRESHOLD_MET` | A reflection is due |
+| `STAGNANT` | It would be due, but the last two reflections found 0 insights and no ingest arrived since |
+| `SKIP` | Nothing to do |
 
-| Trigger | How | Cost |
-|---------|-----|------|
-| **Every significant ingest** | importance ≥ 5 → auto-reflect | ~15K tokens |
-| **Every 3 sessions** | meta-review + insights | ~15K tokens |
-| **Command `!reflect`** | User explicitly requests | ~15K tokens |
-| **No minimum interval** | Not bound by 7-day spacing | — |
+When the check says `THRESHOLD_MET`, `STATUS.md` shows `reflection due … →
+!reflect`, and a reindex that runs consolidation (at most every
+`autorun.consolidation_interval_hours`, when
+`autorun.consolidation_on_reindex` is true) logs a `reflect-request`. Nothing
+runs the reflection itself: suggest `!reflect` to the owner.
 
-> **default:** reflection conserves tokens — it runs only on accumulated significant change or schedule.
-> **super:** reflection is maximally aggressive — every significant ingest immediately produces higher-level insights.
+#### `knowledge_base.mode: default` — throttled
+
+| Trigger | How |
+|---------|-----|
+| **Importance threshold** | Change score ≥ `importance_threshold` (25) |
+| **Weekly** | ≥ `min_interval_days` (7) since the last reflection — or since deployment when there is none yet — **and** at least one change |
+| **Command `!reflect`** | User explicitly requests reflection — always runs |
+
+A base that has never reflected starts the weekly clock at its deployment
+(`deployed_at` in `kb.config.yml`, or the first `log.md` entry when that is
+older): its first ingest is not a reflection on its own. A reflection recorded
+with 0 insights restarts the weekly clock.
+
+#### `knowledge_base.mode: super` — on-demand
+
+| Trigger | How |
+|---------|-----|
+| **Every significant change** | Change score ≥ 5: one changed page of importance 5, two changed pages without importance, or five ingests without importance |
+| **Command `!reflect`** | User explicitly requests |
+| **No minimum interval** | Not bound by 7-day spacing; no change at all → `SKIP` |
+
+Each reflection costs ~15K tokens.
 
 ```yaml
-# In kb.config.yml — driven via mode_profiles:
-reflection:
-  # default profile:
-  trigger: "threshold+weekly"    # auto = importance threshold; weekly = every 7+ days
-  importance_threshold: 25       # auto-!reflect when sum > 25
-  min_interval_days: 7           # min 7 days between reflections
-  require_changes: true          # weekly: only run if there were changes
-  # super profile:
-  # trigger: "on-demand"
-  # importance_threshold: 5      # reflect when importance ≥5
-  # min_interval_days: 0         # no minimum interval
-  # require_changes: false
-  max_insights_per_run: 3        # ceiling, not a quota — 0 insights is valid
+# kb.config.yml — mode_profiles.<mode>.reflection (read by kb_reflect.py):
+mode_profiles:
+  default:
+    reflection:
+      trigger: "threshold+weekly"    # threshold, plus weekly once min_interval_days passed
+      importance_threshold: 25       # due when the change score reaches it
+      min_interval_days: 7           # weekly spacing
+      require_changes: true          # weekly: only with at least one change
+      max_insights_per_run: 3        # ceiling, not a quota — 0 insights is valid
+      # default_ingest_importance: 1 # weight of an ingest without importance
+  super:
+    reflection:
+      trigger: "on-demand"
+      importance_threshold: 5
+      min_interval_days: 0
+      require_changes: false
+      max_insights_per_run: 5
 ```
 
 ### Brakes
 
-- **Honest zero.** No new insight is a valid, expected result. Log it
+- **Honest zero.** No new insight is a valid, expected result. Record it
   (`python3 scripts/kb_reflect.py --record-result 0`) and stop. Do not invent
   insights to fill `max_insights_per_run`.
 - **Meta-insight (level 2)** only if new level-0 facts (ingests) arrived
-  since the last level-1 reflection. `kb_reflect.py` sets
-  `meta_insight_allowed` from that.
-- **Stagnation.** Two consecutive reflections with 0 insights → scheduled
-  reflection (`--check-threshold`) stays `SKIP` until new L0 facts arrive.
+  since the last level-1 reflection. `kb_reflect.py --json` reports that as
+  `meta_insight_allowed`.
+- **Stagnation.** Two consecutive reflections with 0 insights → the check
+  says `STAGNANT` instead of `THRESHOLD_MET` until a new ingest arrives.
   `!reflect` from the user still runs.
 
 ### Process
 
-1. Inspect `log.md`: cumulative importance of recent ingests (informational)
+1. `python3 scripts/kb_reflect.py --json`: change score, `max_insights_per_run`,
+   `meta_insight_allowed`, `exploration` pairs
 2. AI generates 3 important questions about recent experience
 3. For each, search relevant pages via routing + wikilinks
 4. Synthesize a higher-level insight
 5. Write at most `max_insights_per_run` pages to `knowledge/insights/`
-   with `[[wikilinks]]` to source pages — or write none and
-   `--record-result 0`
+   with `[[wikilinks]]` to source pages — or write none
+6. **Always finish with** `python3 scripts/kb_reflect.py --record-result N`
+   (N = insight pages written, 0 is valid). Only this call stamps
+   `.last_reflection` and logs `reflect | insights: N`; without it the change
+   score keeps growing and the reflection stays due
 
 ### Insight format
 
@@ -312,67 +366,38 @@ Related: [[caching]], [[dragonfly-migration]], [[cache-patterns]]
 
 ### Knowledge tree
 
-```
-Level 0: domain/ + playbooks/     ← raw facts
-Level 1: insights/                ← synthesis from facts
-Level 2: insights/ (meta-insights) ← synthesis from insights
-```
-
-Rule: **no more than 3 levels** (more — and the agent drowns in conflicting abstractions).
+Level 0: `domain/` + `playbooks/` (facts) → level 1: `insights/` (synthesis) →
+level 2: meta-insights in `insights/`. **No more than 3 levels.**
 
 ---
 
 ## Self-editing — note evolution (mode-aware)
 
-When new knowledge is related to existing knowledge — the older page is enriched with annotations.
+When new knowledge is related to existing knowledge, the older page gets a
+`context_annotations` entry. There is no Python annotator: annotations are
+agent work in both modes, and `mode_profiles.<mode>.annotations.engine` says
+how much effort to spend.
 
-### When it fires
+### When it applies
 
-- NLP entity resolution found that the new material's entities match an existing `knowledge/` page
-- Query-writeback creates a page that overlaps with an existing one
+- Ingest's entity resolution matched an entity to an existing page:
+  `processed/nlp-meta/<name>.yml` → `entities[].existing_page` (the review
+  package lists them under "NLP enrichment")
+- A query-writeback page overlaps with an existing one
 
-### `mode: default` — Python-only (0 tokens)
+### `engine: "python"` (default mode) — template note
 
-```python
-# In kb_ingest.py — after NLP enrichment:
-def auto_annotate(new_page_path: str, nlp_meta: dict, knowledge_dir: str):
-    """Add a context_annotation to related pages. No LLM."""
-    for entity in nlp_meta.get("entities", []):
-        if entity.get("existing_page"):
-            add_annotation(
-                target=entity["existing_page"],
-                annotation={
-                    "date": today(),
-                    "related": new_page_path,
-                    # note is template-generated, NOT LLM:
-                    "note": f"NLP-match: entity '{entity['canonical']}'"
-                }
-            )
-```
+Append an entry without reading the related page. The `note` is template
+text built from the NLP match: `"NLP-match: entity 'knowledge-base'"`.
 
-### `mode: super` — AI substantive annotations (~1-3K tokens)
+### `engine: "ai"` (super mode) — substantive annotation (~1-3K tokens)
 
-The AI agent **reads** the related page and the new material, then produces:
+The AI agent **reads** the related page and the new material, then writes:
 
 1. **A substantive annotation:** not just "NLP-match" but a description of *what* the link is
 2. **Concrete edit suggestions** for the existing page (if the new material complements/refines it)
 3. **Contradiction detection** between new and existing knowledge
 4. **Merge/split recommendation** when there are >5 annotations
-
-```python
-# In super mode — AI replaces the template:
-def ai_annotate(new_page_path: str, existing_page: str, knowledge_dir: str):
-    """AI generates a substantive annotation. ~1-3K tokens."""
-    # LLM prompt: "Compare the new material with the existing page.
-    # What is new? Any contradictions? Suggest concrete edits."
-    return {
-        "date": today(),
-        "related": new_page_path,
-        "note": "Benchmark showed throughput drop of 15% above 50k rps — extends the Performance section",
-        "suggested_edit": "Add a paragraph about degradation under load after line 42",
-        "contradiction": None  # or contradiction description
-    }
-```
 
 ### `context_annotations` format
 
@@ -394,71 +419,23 @@ context_annotations:
 
 ### Rules
 
-1. **default:** annotations are appended by the Python script (0 tokens), `note` is template text
-2. **super:** annotations are generated by AI (~1-3K tokens), `note` is a substantive link description
-3. **Maximum 5 annotations** per page (more → lint suggests creating an insight)
+1. **default:** `note` is template text; the related page is not read
+2. **super:** `note` is a substantive link description (~1-3K tokens)
+3. **Maximum 5 annotations** per page (more → lint `annotation-overflow` suggests creating an insight)
 4. Files with `lifecycle: permanent` — annotations are added but the body is not touched
 
 ---
 
-## Surprise-based filtering (mode-aware)
+## Surprise-based filtering — not implemented yet
 
-Anti-duplication at the semantic level. Behavior depends on `mode` in `kb.config.yml`.
+`mode_profiles.*.surprise` is reserved (engine `docs/ROADMAP.md`): no script
+scores how new a source is, and ingest writes no `is_surprise`. Until it
+exists, apply the outcome by hand when you extract or write back — check the
+related pages first:
 
-### `mode: default` — Python-first (0 tokens)
-
-| When | Cost | How |
-|------|------|-----|
-| Every ingest | 0 tokens | NLP entity overlap > 80% → "not a surprise" |
-| Document > 3000 words (max 2/day) | ~2K tokens | AI fallback for large materials |
-
-```python
-def is_surprise(nlp_meta: dict, knowledge_dir: str) -> bool:
-    """Decide without LLM: how many entities the base already covers."""
-    entities = nlp_meta.get("entities", [])
-    if not entities:
-        return True  # no entities → treat as surprise
-    
-    resolved = [e for e in entities if e.get("existing_page")]
-    overlap = len(resolved) / len(entities)
-    
-    # > 80% entities already in base → not a surprise
-    return overlap < 0.8
-```
-
-> **Limitations of Python mode:** does not see semantic novelty — a document may share 90% of entities yet contain a fundamentally new conclusion. Does not catch contradictions at the meaning level.
-
-### `mode: super` — AI semantic analysis (~2-5K tokens)
-
-| When | Cost | How |
-|------|------|-----|
-| **Every** ingest | ~2-5K tokens | AI semantic: "is this fact predictable from the base?" |
-| No limits | — | No cap on document size or frequency |
-
-For every new material the AI agent:
-1. Reads the NLP meta + 2-3 most-related `knowledge/` pages
-2. Judges: **"Does this contain something the base does not yet know?"**
-3. Detects **contradictions** with existing knowledge
-4. Rates the **information value**: trivial restatement vs. genuine insight
-
-```yaml
-# In kb.config.yml — driven via mode_profiles:
-surprise:
-  # default profile:
-  engine: "python"             # python | ai
-  ai_trigger_min_words: 3000   # AI fallback only for large
-  ai_max_per_day: 2            # at most 2/day
-  # super profile:
-  # engine: "ai"               # AI for all
-  # ai_trigger_min_words: 0    # no size cap
-  # ai_max_per_day: null       # no frequency cap
-```
-
-### Outcome
-
-- **Surprise** → genuine new knowledge, add it
-- **Not a surprise** → propose updating `context_annotations` instead of creating a new page
-- **Contradicts** → add it AND create an entry in `knowledge/open-questions/`
+- **Nothing new** → update the existing page or add a `context_annotations` entry instead of creating a new page
+- **New** → add it
+- **Contradicts** existing knowledge → add it AND create an entry in `knowledge/open-questions/`
 
 ---
 
@@ -475,19 +452,21 @@ A quality filter protects the base from degradation:
 
 ## Query → Wiki Writeback
 
-Valuable AI answers are saved into `knowledge/` **immediately**, without waiting for meta-review.
+A valuable AI answer can become a `knowledge/` page without waiting for
+meta-review — **once the owner says yes** (or on `!save` / "save this").
+Offer it in one line ("Save this comparison as
+`knowledge/domain/rag-vs-wiki.md`?"); do not write on your own.
 
-### When to save
+### When to offer
 
 | Criterion | Example |
 |-----------|---------|
 | Synthesis from 3+ sources | Architecture comparison, approach overview |
 | Architectural decision with rationale | "Why Docker Swarm, not K8s" |
 | Comparative analysis | Trade-off table, pros/cons |
-| User explicitly said "save" | `!save` or "lock this into the base" |
-| Answer contradicts knowledge/ | → `knowledge/open-questions/` |
+| Answer contradicts knowledge/ | → offer an entry in `knowledge/open-questions/` |
 
-### When NOT to save
+### When NOT to offer
 
 - Trivial answers (one-liners)
 - Code without architectural rationale
@@ -503,6 +482,8 @@ session: "interactions/sessions/2026-05-07__highway-clicker__kb/"
 extracted_at: 2026-05-07
 confidence: medium
 verification_method: "ai-review"
+lifecycle: "evolving"
+importance: 6
 tags: [architecture, comparison]
 query: "Why is LLM Wiki better than RAG at our scale?"
 ---
@@ -524,8 +505,8 @@ query: "Why is LLM Wiki better than RAG at our scale?"
 
 1. Append to `log.md` (`query-writeback` operation)
 2. Add `[[wikilinks]]` to related `knowledge/` pages
-3. Update the routing table if the page does not fit existing routing pages
-4. On the next reindex — the page enters the Repomix index
+3. Routing is regenerated on reindex: `kb_route.py` rewrites `knowledge/routing/*.md` and the `AUTO-ROUTING` block of `routing-table.md` — never edit those by hand; edit `routing-table.md` outside that block only when the page needs a new topic line
+4. On the next reindex — the page enters its Repomix pack
 
 ---
 
@@ -535,20 +516,25 @@ The writer of a page must not be the only reviewer. `kb_reindex.py` writes
 `.repomix/audit/<pack>__request.md` (pack + checklist + report format) and
 `CROSS_PACK__request.md` (titles only).
 
-`!audit` → open a **new session** per request file. A finding without
-`file:line` and a quote is discarded. There is no `kb_audit.py`.
+`!audit` → one **new session** per request file. You cannot open one
+yourself: ask the owner to start a new chat (or a sub-agent with a clean
+context, if the tool has one) and give it the request file. A finding
+without `file:line` and a quote is discarded. There is no `kb_audit.py`.
 
 ## `!profile-review`
 
-`knowledge/profile/` uses `lifecycle: permanent`, so L1 stale lint skips it.
+`knowledge/profile/` is `permanent` by folder policy (`lifecycle.by_folder`
+→ `profile: permanent`, the default in `kb.config.yml`), so the stale check
+skips it.
 
 1. Read what you know about the author from `knowledge/profile/`. What is
    missing? Ask **three questions at a time**, important first. Update pages
    from the answers.
 2. Then: what may be outdated or incomplete? Same cadence.
 
-Stamp `profile_review.reviewed_at` in `kb.config.yml`. Lint warns after 30
-days if that field is set; missing field is not a warning.
+Stamp `profile_review.reviewed_at` in `kb.config.yml` (edit that one line;
+keep the comments). Lint warns after 30 days if that field is set; missing
+field is not a warning.
 
 ## `!quiz`
 
@@ -573,19 +559,20 @@ There is no `kb_quiz.py`.
 
 ## Exploration slot (`!reflect`)
 
-When `kb_reflect.py --json` (or `--generate`) returns `exploration` pairs,
-use **at most two** of them as reflection questions: "What connects
-[[A]] and [[B]] that the graph does not show?" Pairs are disconnected
-components (or nodes with no directed path) with tag/title overlap
-`< 0.8`. An empty list is valid — do not invent a link. New insights
-from a real connection go to `knowledge/insights/`.
+When `kb_reflect.py --json` returns `exploration` pairs, use **at most
+two** of them as reflection questions: "What connects [[A]] and [[B]] that
+the graph does not show?" Pairs are disconnected components (or nodes with
+no directed path) with tag/title overlap `< 0.8`. An empty list is valid —
+do not invent a link. New insights from a real connection go to
+`knowledge/insights/`.
 
 ---
 
 ## Logging
 
-All feedback-loop operations are recorded in `log.md` (see `10_LOG.md`):
+All feedback-loop operations are recorded in `log.md` (see `kb-docs/10_LOG.md`):
 - `session-capture` — when a session summary is written
 - `query-writeback` — when a valuable answer is saved
+- `meta-review` — when `!meta-review` finishes (sessions analyzed, insights written)
 - `quiz` — when `!quiz` writes `interactions/quiz/`
-- Meta-review results — when insights are created
+- `reflect` — written by `kb_reflect.py --record-result N`; `reflect-request` — written by `kb_reflect.py --generate` during consolidation

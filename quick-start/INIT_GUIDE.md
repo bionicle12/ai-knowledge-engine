@@ -11,10 +11,12 @@
 > under a token ceiling, plus a small **catalog**, plus a short routing table in
 > AGENTS.md. The agent loads the catalog and AT MOST ONE domain pack per task.
 >
-> **Reference templates** live next to this guide in `quick-start/templates/`:
-> the update script, git hooks, hook installer, pack manifest and pack config
-> examples, and the AGENTS.md section. Copy and adapt them — do not retype
-> them from scratch.
+> **Reference templates** live next to this guide in `quick-start/templates/`
+> of the AI Knowledge Engine checkout: the update script, git hooks, hook
+> installer, pack manifest and pack config examples, and the AGENTS.md
+> section. Copy them to the exact destinations in Phase 5 (never into the
+> project's own `templates/` folder — Twig, Blade, Django… use that name) and
+> adapt them; do not retype them from scratch.
 
 ---
 
@@ -28,8 +30,9 @@
 
 **Already-initialized project — routine rebuild (update):**
 
-> Run scripts/update-repomix-index.sh and report the pack status. If any pack
-> exceeds the ceiling, tell me — do not re-split anything without my approval.
+> Run scripts/update-repomix-index.sh and report .repomix/PACKS_STATUS.md. If
+> any pack is OVER or FAILED, or files are in no pack, tell me — do not
+> re-split anything without my approval.
 
 **Already-initialized project — old monolithic index, or packs went stale
 (reinit):**
@@ -110,8 +113,10 @@ find . -maxdepth 3 -type d ! -path '*/node_modules/*' ! -path '*/.git/*' ! -path
 # Git present?
 git rev-parse --is-inside-work-tree 2>/dev/null && echo "GIT: YES" || echo "GIT: NO"
 
-# Existing hooks / AGENTS.md
-ls .git/hooks/ .husky/ 2>/dev/null; test -f AGENTS.md && echo "AGENTS.md: EXISTS"
+# Existing hooks / hook manager / AGENTS.md
+ls "$(git rev-parse --git-path hooks)" .githooks/ .husky/ 2>/dev/null
+git config --get core.hooksPath && echo "HOOK MANAGER: core.hooksPath is set (see Phase 5)"
+test -f AGENTS.md && echo "AGENTS.md: EXISTS"
 ```
 
 ## Phase 1: install / locate repomix
@@ -120,8 +125,11 @@ ls .git/hooks/ .husky/ 2>/dev/null; test -f AGENTS.md && echo "AGENTS.md: EXISTS
 command -v repomix && repomix --version || npm install -g repomix
 ```
 
-No global install available → `npx --yes repomix` works everywhere node does.
-(The update script already falls back to npx automatically.)
+No global install available → `npx --yes repomix@1.14.0` works everywhere
+node does. The update script falls back to npx automatically and always runs
+the version pinned in the manifest's `repomix_version` (default `1.14.0` — the
+version the template ignore globs were verified on), never "latest".
+PACKS_STATUS.md names the repomix version of the last build.
 
 **Windows note:** everything in this guide runs in Git Bash (bundled with Git
 for Windows). Git executes `.sh` hooks through its own `sh.exe`, so hooks need
@@ -190,10 +198,11 @@ agent will get**, not by `src/` vs `tests/`:
    directory structure, no code bodies.
 
 **What to exclude from every pack:** vendor, node_modules, var, dist, build,
-lock files, binaries, `.git`, IDE dirs, `.repomix/` itself, secrets/pem,
-generated bundles, huge fixtures/xlsx/json dumps, **and `AGENTS.md` /
-`CLAUDE.md`** — they are already in the system prompt; indexing them doubles
-their cost.
+lock files, binaries, `.git`, IDE dirs, `.repomix/` itself, secrets (`.env`
+files, keys, certificates — the config templates end with these patterns in a
+form that works on repomix 1.14.0; keep them), generated bundles, huge
+fixtures/xlsx/json dumps, **and `AGENTS.md` / `CLAUDE.md`** — they are
+already in the system prompt; indexing them doubles their cost.
 
 Example split from a real Symfony backend (~258K monolith, 256K window) — a
 sample of the *method*, not a template:
@@ -224,16 +233,24 @@ repomix.config.json          # optional base config for bare `repomix` runs; if
 
 Per-pack configs (via `repomix -c`) are used instead of `--include` flags so
 CLI/config merge semantics can never surprise us. Each pack's `watch` array in
-the manifest lists its source roots — the update script uses them for
-skip-if-fresh checks.
+the manifest lists its source folders/files — real paths, never name prefixes
+(`docs/plan/08.`) or globs: the update script rebuilds a pack when a file under
+them is added, removed, renamed or edited, and reports a watch path that does
+not exist. The union of all watch paths is also what the coverage check
+(Phase 6) expects to find in exactly one pack; list files that no pack holds on
+purpose (fixtures, generated code) in the manifest's `coverage_ignore` (git
+pathspecs, `*` also matches `/`). Do not put token counts in the manifest.
 
 **Ignore-glob gotcha (verified on repomix 1.14.0).** When a config has an
-`include` list, ignore `customPatterns` of the form `**/*Name*` (bare `**/`
-prefix, no file extension) are **silently not applied** — the pack builds
-without error and comes out 2–4× fatter than measured. Patterns with an
-explicit root (`src/**/*Name*`) or a file extension (`**/*Name*.php`) DO
-work. Always write cross-domain ignores in a working form, e.g.
-`src/**/*Order*.php` + `tests/**/*Order*.php`, never `**/*Order*`.
+`include` list, ignore `customPatterns` of the form `**/*Name*` or `**/.env*`
+(bare `**/` prefix, no file extension) are **silently not applied** — the pack
+builds without error and comes out 2–4× fatter than measured (or with the
+`.env` files inside). Patterns with an explicit root (`src/**/*Name*`), a file
+extension (`**/*Name*.php`) or a doubled prefix (`**/**/*Name*`) DO work.
+Always write cross-domain ignores in a working form, e.g. `src/**/*Order*.php`
++ `tests/**/*Order*.php`, never `**/*Order*`. Other repomix versions may
+behave differently — which is why the npx fallback is pinned and the update
+script re-checks coverage on every run.
 
 **Cross-pack ownership.** Domains cut by name prefix overlap: one file can
 match two packs' includes (`InspectionProtocol` matches both `*Inspection*`
@@ -245,15 +262,19 @@ what you miss.
 
 ## Phase 5: infrastructure (scripts + hooks)
 
-Copy from `quick-start/templates/`:
+Copy each template to exactly this place in the **project root** (`<engine>` =
+the AI Knowledge Engine checkout this guide lives in). Never copy the
+`templates/` folder itself: many projects already have their own `templates/`
+(Twig, Blade, Django, Jinja) and the Repomix files do not belong there.
 
-```
-scripts/update-repomix-index.sh    # chmod +x
-scripts/update-repomix-index.bat   # Windows manual wrapper
-scripts/install-git-hooks.sh       # chmod +x
-scripts/install-git-hooks.bat
-.githooks/pre-push post-commit post-merge post-rewrite   # chmod +x
-```
+| From `<engine>/quick-start/templates/` | To `<project>/` |
+|----------------------------------------|-----------------|
+| `scripts/update-repomix-index.sh` (+ `.bat`) | `scripts/update-repomix-index.sh` (+ `.bat`) — `chmod +x` the `.sh` |
+| `scripts/install-git-hooks.sh` (+ `.bat`) | `scripts/install-git-hooks.sh` (+ `.bat`) — `chmod +x` the `.sh` |
+| `githooks/post-commit`, `post-merge`, `post-rewrite`, `post-checkout`, `pre-push` | `.githooks/<same name>` — `chmod +x` |
+| `repomix.packs.json.example` | `repomix.packs.json` (filled in, Phase 4) |
+| `configs/catalog.json.example`, `configs/domain-pack.json.example` | `.repomix/configs/<pack>.json` (one per pack, Phase 4) |
+| `AGENTS_SECTION.md` | merged into `AGENTS.md` (Phase 7) |
 
 Then:
 
@@ -262,30 +283,68 @@ mkdir -p .repomix
 ./scripts/install-git-hooks.sh
 ```
 
-`.gitignore` gets:
+The installer copies the hooks into the folder git really runs them from
+(`git rev-parse --git-path hooks`, so it also works from a linked worktree).
+An existing hook that differs is backed up next to it
+(`<hook>.bak-<timestamp>`) and the diff is printed. If `core.hooksPath` is
+set (husky, lefthook, …), git ignores `.git/hooks`: the installer copies
+nothing, exits 1 and prints the one-liners to add to the hook manager's hooks
+instead (`core.hooksPath=.githooks` is detected and works as is).
 
-```
-.repomix/*.xml
-.repomix/update.log
-.repomix/update.lock
-.repomix/PACKS_STATUS.md
+**Project-specific hook logic** (a CI gate in `pre-push`, a formatter in
+`post-commit`) goes into an executable `.githooks/<hook>.local`. Every
+template hook runs its `.local` first, with git's arguments and stdin; a
+failing `pre-push.local` blocks the push. The template hooks themselves stay
+identical to the templates, so a refresh never loses anything.
+
+`.gitignore` gets (build output stays local, the configs are versioned):
+
+```gitignore
+# Repomix index: build output stays local; configs are versioned
+.repomix/*
+!.repomix/configs/
 ```
 
-**Commit** `repomix.packs.json`, `.repomix/configs/`, `scripts/`, `.githooks/`.
-The XML packs themselves stay local — which is exactly why the rebuild
-machinery must be robust (PATH bootstrap, npx fallback, nohup, logging, always
-exit 0 — all already inside the template script; do not simplify it).
+This covers the packs, `PACKS_STATUS.md`, `coverage.txt`, the build state
+(`packs.state`), the log and its rotated copy, the lock and reinit backups
+(`.repomix/backup-*/`). The update script reports in PACKS_STATUS.md when
+`.gitignore` does not cover its files.
+
+`.gitattributes` gets (sh scripts and hooks break with CRLF on Windows
+checkouts, `.bat` labels with LF):
+
+```gitattributes
+scripts/update-repomix-index.sh text eol=lf
+scripts/install-git-hooks.sh text eol=lf
+scripts/update-repomix-index.bat text eol=crlf
+scripts/install-git-hooks.bat text eol=crlf
+.githooks/* text eol=lf
+```
+
+**Commit** `repomix.packs.json`, `.repomix/configs/`, `scripts/`, `.githooks/`,
+`.gitignore`, `.gitattributes`. The XML packs themselves stay local — which is
+exactly why the rebuild machinery must be robust (PATH bootstrap, pinned npx
+fallback, nohup, locking, logging, always exit 0 — all already inside the
+template script; do not simplify it).
 
 Why these hooks: `post-commit` alone is not enough — `git push` doesn't fire
-it, and merges/rebases change files without commits. `pre-push` runs
-synchronously (with stdin detached — git feeds refs there); the rest run in
-background via nohup so git stays fast.
+it, merges/rebases change files without commits, and switching branches
+changes files without any of them (`post-checkout`, branch checkouts only).
+`pre-push` runs synchronously (with stdin detached — git feeds refs there)
+but never waits for a build that is already running; the rest run in
+background via nohup so git stays fast. When hooks fire in a row (a rebase of
+5 commits, `commit --amend`), a run that finds a build in progress only
+queues a re-check that the running build performs when it finishes — usually
+two builds, never more than three passes per run; a re-check queued after the
+last pass waits for the next hook or manual run. `git reset --hard` and `git stash` fire no hook: the next hook or
+a manual run picks those changes up (freshness is decided by the file list and
+contents, so nothing is missed, only delayed).
 
 Document in README (one line): *"After clone run `./scripts/install-git-hooks.sh`
 to enable automatic AI-index rebuilds."*
 
 No git in the project → skip hooks; the update script alone is the manual
-`reindex` entry point.
+`reindex` entry point (without git it also cannot check coverage).
 
 ## Phase 6: first build + verification
 
@@ -294,23 +353,38 @@ No git in the project → skip hooks; the update script alone is the manual
 cat .repomix/PACKS_STATUS.md
 ```
 
-Verify: every pack under the ceiling; catalog in the 5–15K band (a
-`files: false` catalog may come in under 5K — that's fine, less routing tax);
-the script warns about any pack over the ceiling. Fix the split now, not later.
+Verify in PACKS_STATUS.md: no pack marked OVER or FAILED; catalog in the
+5–15K band (a `files: false` catalog may come in under 5K — that's fine, less
+routing tax); no "Problems" section. Fix the split now, not later.
 
-**Coverage check (mandatory).** Sizes alone don't prove the split is right —
-a silently-dropped ignore (see the glob gotcha in Phase 4) or a domain overlap
-leaves packs looking plausible while files are orphaned or double-indexed.
-Extract `<file path="…">` from every domain pack XML and compare the union
-against the Phase 2 census:
+**Coverage check (automatic, on every run).** Sizes alone don't prove the
+split is right — a silently-dropped ignore (see the glob gotcha in Phase 4) or
+a domain overlap leaves packs looking plausible while files are orphaned or
+double-indexed. The update script compares the text files under all watch
+paths (git-tracked or untracked-but-not-ignored; `AGENTS.md`, `CLAUDE.md`,
+`.repomix/` and the secret files the config templates exclude are left out)
+with the `<file path="…">` entries of every pack and
+reports in PACKS_STATUS.md:
 
-- **0 orphans** — every measured file lands in at least one pack;
-- **0 duplicates** — no file appears in two packs (resolve with cross-pack
-  ignores per the ownership priority chosen in Phase 3).
+- **files in no pack** (orphans) — add them to a pack, or to
+  `coverage_ignore` when leaving them out is intended;
+- **files in two or more packs** (duplicates) — resolve with cross-pack
+  ignores per the ownership priority chosen in Phase 3.
 
-It's a dozen lines of script. On a real reinit this check caught 5 duplicated
-files and a platform pack that had silently ballooned from 34K to 160K with
-zero build warnings.
+The check knows the exclusions above and `coverage_ignore`, not repomix's own
+default ignore list (lock files and the like) or a `.repomixignore`: files
+repomix skips by itself show up as "in no pack" — list them in
+`coverage_ignore`. Outside a git work tree the check cannot run;
+PACKS_STATUS.md then says "Coverage not checked" as a note, not a problem.
+
+The full lists are in `.repomix/coverage.txt`. The target is 0 and 0. On a
+real reinit this check caught 5 duplicated files and a platform pack that had
+silently ballooned from 34K to 160K with zero build warnings.
+
+The same run also greps every pack for secret-like strings (GitHub, AWS,
+Slack, Stripe, OpenAI-style keys, PEM private keys) and records what repomix's
+own secret check excluded — both appear under "Problems" (file paths only,
+never the values) and in `.repomix/update.log`.
 
 ## Phase 7: AGENTS.md
 
@@ -320,8 +394,11 @@ fill in the pack table. Hard rules:
 - **Never** write "read the full output.xml before large tasks" — that
   instruction is what blows up context windows.
 - Keep the section ~30–40 lines. Long architecture text goes to `docs/`.
-- Don't hardcode token numbers that will rot — the table points to
-  `.repomix/PACKS_STATUS.md` for fresh values.
+- **No token numbers** anywhere in AGENTS.md (the template table has no size
+  column): they rot — a pack listed as "~72K" grew to 217K unnoticed. Sizes,
+  OVER/FAILED flags and problems live only in `.repomix/PACKS_STATUS.md`.
+- Keep the rule "a pack marked OVER, FAILED or STALE in PACKS_STATUS.md is
+  never loaded whole".
 - Keep the "if you lose the thread mid-session" recovery rule from the
   template: it tells the agent to re-read the small routing table instead of
   re-reading packs when a long chat starts degrading.
@@ -329,14 +406,14 @@ fill in the pack table. Hard rules:
 ## Init checklist
 
 ```
-[ ] repomix available (global or npx)
+[ ] repomix available (global, or the pinned npx fallback)
 [ ] Token census done; domains cut; table approved by user
-[ ] repomix.packs.json + .repomix/configs/*.json written and committed
-[ ] scripts/ + .githooks/ copied, executable, committed; hooks installed
-[ ] .gitignore covers .repomix/ artifacts
-[ ] First build: all packs under ceiling, catalog 5–15K
-[ ] Coverage check: 0 orphans, 0 duplicates across domain packs
-[ ] AGENTS.md: pack table + loading rules (short!), no "read everything" advice
+[ ] repomix.packs.json (watch = real paths) + .repomix/configs/*.json written and committed
+[ ] scripts/ + .githooks/ copied to the Phase 5 destinations, executable, committed; hooks installed
+[ ] .gitignore and .gitattributes blocks from Phase 5 added
+[ ] First build: PACKS_STATUS.md shows no OVER/FAILED, catalog 5–15K
+[ ] PACKS_STATUS.md has no Problems: 0 files in no pack, 0 in two packs, no secrets
+[ ] AGENTS.md: pack table without token numbers + loading rules (short!), no "read everything" advice
 ```
 
 ---
@@ -346,32 +423,60 @@ fill in the pack table. Hard rules:
 Routine rebuild — this is what hooks run; agents/users can also run it manually:
 
 ```bash
-./scripts/update-repomix-index.sh            # skips fresh packs
+./scripts/update-repomix-index.sh            # rebuilds changed packs only
 ./scripts/update-repomix-index.sh --force    # rebuilds everything
+./scripts/update-repomix-index.sh --check    # builds nothing: refreshes PACKS_STATUS.md,
+                                             # exit 1 when it has warnings
 ```
 
 Behavior (already implemented in the template script — keep it intact):
 
-- Per-pack skip-if-fresh via the manifest's `watch` roots (mtime comparison);
-  manifest/config edits also trigger a rebuild.
-- Writes `.repomix/PACKS_STATUS.md` with fresh token estimates.
+- Per-pack freshness from the file list and index state under the manifest's
+  `watch` paths (git; a plain file listing without git) plus file mtimes, the
+  pack's manifest entry and its config: added, deleted, renamed and edited
+  files all trigger a rebuild. The first run after a script upgrade rebuilds
+  every pack once.
+- Writes `.repomix/PACKS_STATUS.md` on every run: per pack the token count
+  repomix reported, `ok`/`OVER` against the ceiling (for fresh packs too),
+  `fresh`/`rebuilt`/`STALE`/`FAILED` and the build time; a header with the
+  time, HEAD and repomix version; banner lines for OVER/FAILED/STALE packs; a
+  "Problems" section (coverage, watch paths that do not exist, secrets,
+  outdated `.gitignore`, a leftover monolithic `output.xml`).
+- A pack whose build fails keeps its row as `FAILED (old copy)` or
+  `FAILED (no output)` and is retried on the next run; the log records the
+  real exit code and the tail of repomix's output.
+- A pack whose config's `output.filePath` is not its manifest `output` is not
+  built: its row says `FAILED (config writes …)` and "Problems" names both
+  paths (repomix would write a file the manifest does not know).
+- Pack XMLs in `.repomix/` that no manifest pack produces any more (renamed or
+  dropped packs) are deleted (only files with the repomix header;
+  `output.xml` is only reported).
 - **Warns** when a pack exceeds the ceiling — the agent must then *offer* a
   re-split (reinit) to the user, never silently re-cut, and never silently
   let packs bloat.
 - Legacy mode: no manifest → plain monolith rebuild + a warning at >150K
   suggesting reinit.
-- Never blocks git (exit 0 everywhere), logs to `.repomix/update.log`.
+- One build at a time (`flock`, or a `mkdir` lock on macOS/Git Bash); hook
+  runs (`--background`, and `--no-wait` in pre-push) never wait for it — they
+  queue one re-check. A manual run waits up to 5 minutes. Never blocks git (exit 0
+  everywhere except `--check`), logs to `.repomix/update.log` (rotated to
+  `update.log.1` above 1 MB).
 
 Agent rules in update mode:
 
 1. Do not rewrite `repomix.packs.json` — the user may have hand-tuned it.
-2. A new top-level folder that matches no pack's globs → tell the user, propose
-   adding it to an existing pack or creating a new one.
-3. Ceiling warnings → propose reinit; apply only after approval.
+2. Read the "Problems" section of PACKS_STATUS.md: files in no pack → tell the
+   user, propose adding them to an existing pack or a new one (or to
+   `coverage_ignore`); a watch path that does not exist → propose the real
+   path; secret-like strings → propose the exclusion right away.
+3. OVER / ceiling warnings → propose reinit; apply only after approval.
 4. **AGENTS.md is merged, never replaced.** It is a live file the team and
    agents evolve between runs. If its Repomix section needs refreshing, read
-   the current file, edit ONLY what changed (pack table rows, stale numbers),
-   keep every local addition, and show the diff before writing.
+   the current file, edit ONLY what changed (pack table rows, removal of old
+   token numbers), keep every local addition, and show the diff before writing.
+5. Older setups (no `post-checkout` hook, the four-line `.repomix/…`
+   `.gitignore` list, token counts in AGENTS.md or the manifest) → propose the
+   reinit steps 5–6 below.
 
 ---
 
@@ -382,28 +487,39 @@ or the project wants to adopt this guide's fixes over an old-style setup
 ("подкинуть скрипт заново и переразвернуть").
 
 1. **Inventory the old setup:** existing `repomix.config.json`,
-   `.repomix/*.xml`, `repomix.packs.json`, hooks in `.git/hooks/` and
-   `.husky/`, the Repomix section in AGENTS.md. Old broken patterns to expect:
-   post-commit-only hook, silent `command -v repomix` no-op, backgrounding
-   without nohup, config in .gitignore, "read the full index" advice in
-   AGENTS.md.
+   `.repomix/*.xml`, `repomix.packs.json`, `.githooks/`, the installed hooks
+   (`git rev-parse --git-path hooks`, `core.hooksPath`, `.husky/`), the Repomix
+   section in AGENTS.md. Old broken patterns to expect: post-commit-only hook,
+   silent `command -v repomix` no-op, backgrounding without nohup, config in
+   .gitignore, "read the full index" advice and token numbers in AGENTS.md,
+   `watch` entries that are name prefixes.
 2. **Back up:** copy old configs + manifest to `.repomix/backup-<date>/`
-   (never delete user files).
+   (never delete user files; the Phase 5 `.gitignore` block keeps backups out
+   of git).
 3. **Re-measure** from scratch (Phase 2) and **re-cut** domains (Phase 3).
 4. **Show the diff**: old packs vs new packs (or "monolith → N packs"), with
    token numbers. If the user hand-edited an existing manifest, show their
    customizations explicitly before replacing anything. Wait for approval.
-5. Write configs (Phase 4), refresh scripts/hooks from the current templates
-   (Phase 5 — overwrite old copies of `update-repomix-index.sh`/hooks; the
-   installer backs up foreign hooks automatically), rebuild (Phase 6), update
-   the AGENTS.md section (Phase 7) — **delete** any old "DO read output.xml"
-   instruction and stale token numbers. **Merge AGENTS.md, never regenerate
-   it**: scripts and hooks are safe to overwrite from templates, but AGENTS.md
-   accumulates the project's own rules between runs — edit the Repomix section
-   in place, preserve everything else, show the diff before writing.
-6. Remove the obsolete monolith `output.xml` from disk if packs replace it
+5. **Refresh scripts and hooks, keeping local logic.** Before overwriting any
+   project copy of `scripts/update-repomix-index.sh`, `scripts/install-git-hooks.sh`
+   or `.githooks/*`, diff it against the new template
+   (`diff -u .githooks/pre-push <engine>/quick-start/templates/githooks/pre-push`).
+   Lines that come from no template (a CI gate, extra commands) are
+   project-specific: show them to the user and move hook logic into
+   `.githooks/<hook>.local` (executable) before copying the template over;
+   never drop them silently. Then run the installer — it backs up and diffs
+   any installed hook it replaces.
+6. Write configs (Phase 4), update `.gitignore`/`.gitattributes` (Phase 5),
+   rebuild (Phase 6), update the AGENTS.md section (Phase 7) — **delete** any
+   old "DO read output.xml" instruction and all token numbers. **Merge
+   AGENTS.md, never regenerate it**: it accumulates the project's own rules
+   between runs — edit the Repomix section in place, preserve everything else,
+   show the diff before writing.
+7. Remove the obsolete monolith `output.xml` from disk if packs replace it
    (after user approval), or leave it with a "do not read whole" note in
-   AGENTS.md if the user wants a CI artifact.
+   AGENTS.md if the user wants a CI artifact (PACKS_STATUS.md keeps
+   reporting it). Leftover pack XMLs of renamed packs are deleted by the
+   update script itself.
 
 ---
 

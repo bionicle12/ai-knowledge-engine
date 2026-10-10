@@ -19,8 +19,14 @@ Backends are tried in the order configured in ``kb.config.yml`` →
                           (not implemented — never selected as usable today)
 
 If no backend is available, :func:`transcribe` raises :class:`SttUnavailable`
-with an OS-specific install hint; the ingest pipeline catches it and routes the
-file to ``review/needs-ai-decision/`` with that hint inlined.
+with an OS-specific install hint. When the installed backends fail, the message
+names each backend's error and says whether a backend could not start (model
+download or load: a setup problem) or started and could not decode the file
+(the file is the likely cause). The ingest pipeline catches it and routes the
+file to ``review/needs-ai-decision/`` with that message inlined.
+
+A loaded Whisper model is kept for the rest of the process, so one ingest run
+over many files loads it once.
 
 Usage (standalone):
   python3 scripts/kb_stt.py path/to/audio.mp3
@@ -30,6 +36,7 @@ Usage (standalone):
 from __future__ import annotations
 
 import argparse
+import functools
 import importlib.util
 import sys
 from dataclasses import dataclass, field
@@ -53,7 +60,17 @@ DEFAULT_MODEL = "small"
 
 
 class SttUnavailable(RuntimeError):
-    """Raised when transcription cannot be performed (no usable backend)."""
+    """Raised when transcription cannot be performed (no usable backend, or
+    every usable backend failed on the file)."""
+
+
+class _StartFailed(Exception):
+    """A backend could not start (model download or load); the file itself
+    was not read."""
+
+    def __init__(self, error: Exception):
+        super().__init__(f"{type(error).__name__}: {error}")
+        self.error = error
 
 
 @dataclass
@@ -181,6 +198,31 @@ def render_markdown(
 # ---------------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=1)
+def _faster_whisper_model(model_size: str, device: str, compute_type: str):
+    from faster_whisper import WhisperModel  # type: ignore[import-untyped]
+
+    return WhisperModel(model_size, device=device, compute_type=compute_type)
+
+
+@functools.lru_cache(maxsize=1)
+def _openai_whisper_model(model_size: str):
+    import whisper  # type: ignore[import-untyped]
+
+    return whisper.load_model(model_size)
+
+
+def _load(loader, *args):
+    """Load a model; a failure other than a broken import means the backend
+    could not start (offline first download, disk, memory, runtime)."""
+    try:
+        return loader(*args)
+    except ImportError:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise _StartFailed(e) from e
+
+
 def _transcribe_faster_whisper(
     src: Path,
     *,
@@ -190,9 +232,7 @@ def _transcribe_faster_whisper(
     compute_type: str,
     timestamps: bool,
 ) -> TranscriptResult:
-    from faster_whisper import WhisperModel  # type: ignore[import-untyped]
-
-    model = WhisperModel(model_size, device=device, compute_type=compute_type)
+    model = _load(_faster_whisper_model, model_size, device, compute_type)
     segments_iter, info = model.transcribe(
         str(src),
         language=(language or None),
@@ -233,11 +273,9 @@ def _transcribe_openai_whisper(
     language: str | None,
     timestamps: bool,
 ) -> TranscriptResult:
-    import whisper  # type: ignore[import-untyped]
-
     if kbc.find_ffmpeg() is None:
         raise SttUnavailable(install_hint())
-    model = whisper.load_model(model_size)
+    model = _load(_openai_whisper_model, model_size)
     result = model.transcribe(str(src), language=(language or None))
     segments: list[dict] = []
     for seg in result.get("segments", []) or []:
@@ -273,6 +311,38 @@ def _transcribe_openai_whisper(
     )
 
 
+def _describe(error: Exception) -> str:
+    error = error.error if isinstance(error, _StartFailed) else error
+    return f"{type(error).__name__}: {error}"
+
+
+def _failed_message(src: Path, errors: list[tuple[str, Exception]]) -> str:
+    """Why transcription of ``src`` failed on every installed backend.
+
+    A backend that cannot be imported is a broken install (→ install hint);
+    one whose model could not load is a setup problem — the file was not read.
+    Only when a backend started and failed on the file is the file the likely
+    cause.
+    """
+    details = "; ".join(f"{name}: {_describe(e)}" for name, e in errors)
+    if all(isinstance(e, ImportError) for _, e in errors):
+        return f"no STT backend could be imported — {details}\n\n{install_hint()}"
+    if all(isinstance(e, (_StartFailed, ImportError)) for _, e in errors):
+        return (
+            f"no STT backend could start, so {src.name} was not read — {details}\n"
+            "This is a setup problem, not the file: the first run downloads the "
+            "Whisper model (network access to Hugging Face needed once; it is cached "
+            "afterwards), and loading it needs disk space and memory (a smaller "
+            "media.stt.model helps). Check with `python3 scripts/kb_doctor.py`."
+        )
+    return (
+        f"every installed STT backend failed on {src.name} — {details}\n"
+        "A backend started and could not decode this file, so the file is the likely "
+        "cause (damaged, or in a format the backend cannot decode). If other files "
+        "fail the same way, the backend is the problem: run `python3 scripts/kb_doctor.py`."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -290,7 +360,8 @@ def transcribe(
 ) -> TranscriptResult:
     """Transcribe an audio/video file using the first available backend.
 
-    Raises :class:`SttUnavailable` if no backend can be used.
+    Raises :class:`SttUnavailable` if no backend can be used or every usable
+    backend failed on the file.
     """
     src = Path(src)
     if not src.is_file():
@@ -310,7 +381,7 @@ def transcribe(
     if not usable:
         raise SttUnavailable(install_hint())
 
-    last_error: Exception | None = None
+    errors: list[tuple[str, Exception]] = []
     for backend in usable:
         try:
             if backend == "faster-whisper":
@@ -332,11 +403,8 @@ def transcribe(
         except SttUnavailable:
             raise
         except Exception as e:  # noqa: BLE001 — try the next backend
-            last_error = e
-            continue
-    raise SttUnavailable(
-        f"all backends failed ({', '.join(usable)}): {last_error}\n\n{install_hint()}"
-    )
+            errors.append((backend, e))
+    raise SttUnavailable(_failed_message(src, errors))
 
 
 def transcript_metadata(result: TranscriptResult) -> dict:

@@ -1,6 +1,7 @@
 """Tests for structural skill lint (spec §11.1, Phase 1 scope)."""
 from __future__ import annotations
 
+from ai_skills_fixer.filesystem import unsafe_symlinks
 from ai_skills_fixer.linting import lint_skill_dir
 
 
@@ -79,3 +80,66 @@ def test_existing_relative_link_and_http_links_are_fine(tmp_path):
 def test_long_body_is_warning(tmp_path):
     d = make_skill(tmp_path, folder="huge", body=("line of text\n" * 2000))
     assert "body-length" in checks(lint_skill_dir(d))
+
+
+def test_symlink_leaving_the_skill_is_error(tmp_path):
+    """B8: `reference.md -> ~/.ssh/id_test` must not audit as clean."""
+    d = make_skill(tmp_path)
+    secret = tmp_path / "id_test"
+    secret.write_text("PRIVATE KEY\n", encoding="utf-8")
+    (d / "reference.md").symlink_to(secret)
+    (d / "up.md").symlink_to("../id_test")
+    (d / "inside.md").symlink_to("SKILL.md")
+
+    findings = [f for f in lint_skill_dir(d) if f.check == "unsafe-symlink"]
+    assert {f.severity for f in findings} == {"error"}
+    messages = " ".join(f.message for f in findings)
+    assert "reference.md ->" in messages and "up.md -> ../id_test" in messages
+    assert "inside.md" not in messages
+
+
+def test_unsafe_symlink_is_reported_even_with_broken_frontmatter(tmp_path):
+    d = tmp_path / "broken"
+    d.mkdir()
+    (d / "SKILL.md").write_text("just text\n", encoding="utf-8")
+    (d / "key").symlink_to("/etc/hostname")
+    assert "unsafe-symlink" in checks(lint_skill_dir(d))
+
+
+def test_symlink_chain_escaping_only_after_a_link_is_error(tmp_path):
+    """B8 bypass: each link looks safe on its own (`x -> .`, `up1 -> x/..`),
+    but the OS resolves `reference.md` outside the skill."""
+    outside = tmp_path / "outside" / ".ssh"
+    outside.mkdir(parents=True)
+    (outside / "id_test").write_text("SECRETKEY\n", encoding="utf-8")
+    d = make_skill(tmp_path / "skills", folder="evil")
+    (d / "x").symlink_to(".")
+    (d / "up1").symlink_to("x/..")
+    (d / "up2").symlink_to("up1/..")
+    (d / "reference.md").symlink_to("up2/outside/.ssh/id_test")
+    assert (d / "reference.md").read_text() == "SECRETKEY\n"  # the OS agrees
+
+    unsafe = unsafe_symlinks(d)
+    assert "reference.md -> up2/outside/.ssh/id_test" in unsafe
+    assert "up1 -> x/.." in unsafe and "up2 -> up1/.." in unsafe
+    assert "x -> ." not in unsafe  # a link to the skill itself stays inside
+    assert "unsafe-symlink" in checks(lint_skill_dir(d))
+
+
+def test_links_resolving_inside_the_skill_stay_clean(tmp_path):
+    d = make_skill(tmp_path)
+    (d / "sub").mkdir()
+    (d / "sub" / "b.md").write_text("b\n", encoding="utf-8")
+    (d / "x").symlink_to(".")
+    (d / "via-self.md").symlink_to("x/sub/b.md")
+    (d / "sub" / "up.md").symlink_to("../SKILL.md")
+    (d / "dirlink").symlink_to("sub")
+    (d / "back.md").symlink_to("dirlink/../SKILL.md")
+    assert unsafe_symlinks(d) == []
+
+
+def test_symlink_loop_is_error(tmp_path):
+    d = make_skill(tmp_path)
+    (d / "a").symlink_to("b")
+    (d / "b").symlink_to("a")
+    assert unsafe_symlinks(d) == ["a -> b", "b -> a"]

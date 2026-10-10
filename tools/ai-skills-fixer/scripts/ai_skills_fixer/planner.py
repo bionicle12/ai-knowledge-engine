@@ -2,11 +2,19 @@
 
 Configuration errors raise ValidationError — a §19 safe-stop condition:
 an unknown state or target is never silently ignored.
+
+Plans only ever change direct children of a host's user skill root.
+Anything the planner cannot prove it may touch — a copy of unknown
+origin, a managed release edited in place, a source skill with symlinks
+leading outside it, a same-named skill nested in a user folder — becomes
+a ``review`` operation (never applied) with its reason in
+``notes.review_reasons``.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,12 +22,18 @@ from pathlib import Path
 import yaml
 
 from . import gitops
-from .filesystem import default_install_strategy
+from .filesystem import default_install_strategy, unsafe_symlinks
 from .discovery import discover_roots
 from .inventory import scan_installed_root
 from .provenance import content_hash
 from .releases import release_dir
-from .sources import CatalogError, load_registry, scan_source, source_checkout
+from .sources import (
+    CatalogError,
+    install_basename,
+    load_registry,
+    scan_source,
+    source_checkout,
+)
 
 VALID_STATES = {
     "enabled",
@@ -30,6 +44,7 @@ VALID_STATES = {
     "protected",
 }
 CANONICAL_TARGETS = ("claude", "codex", "cursor", "antigravity")
+PLAN_ID_RE = re.compile(r"^plan-[0-9a-f]{12}$")
 
 
 class ValidationError(Exception):
@@ -216,12 +231,75 @@ def _skill_suffix(skill_id: str) -> str:
     return skill_id.split(":", 1)[1] if ":" in skill_id else "skill"
 
 
+def _within(path: Path, base: Path) -> bool:
+    return Path(path).resolve().is_relative_to(Path(base).resolve())
+
+
 def _under_releases(store_root: Path, path: Path) -> bool:
-    try:
-        Path(path).relative_to(Path(store_root) / "releases")
-    except ValueError:
-        return False
-    return True
+    return _within(path, Path(store_root) / "releases")
+
+
+def _install_name(skill_id: str, entry) -> str:
+    """Folder name of a profile skill in a host root (see install_basename)."""
+    if entry is not None:
+        return install_basename(entry[0])
+    return Path(_skill_suffix(skill_id) if ":" in skill_id else skill_id).name
+
+
+def plan_id_for(plan: dict) -> str:
+    """Content-hash plan ID (spec §6.3).
+
+    ``plan_id`` and ``created_at`` are metadata outside the hash, so the
+    applier can recompute the ID of a saved plan and detect any edit made
+    after the user approved it.
+    """
+    content = {k: v for k, v in plan.items() if k not in ("plan_id", "created_at")}
+    canonical = json.dumps(
+        content, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    return "plan-" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+
+
+def _review_op(skill_id: str, host: str, source, dest: Path, inst) -> dict:
+    precondition = (
+        {"destination": "absent"} if inst is None
+        else {"destination": "exists", "content_hash": inst.content_hash}
+    )
+    return {
+        "skill_id": skill_id,
+        "host": host,
+        "type": "review",
+        "strategy": None,
+        "source": source,
+        "destination": str(dest),
+        "precondition": precondition,
+        "backup": None,
+        "validation": None,
+        "rollback": None,
+        "risk": "high",
+        "approval_required": True,
+    }
+
+
+def _quarantine_op(skill_id: str, host: str, inst) -> dict:
+    basename = Path(inst.path).name
+    return {
+        "skill_id": skill_id,
+        "host": host,
+        "type": "quarantine",
+        "strategy": None,
+        "source": None,
+        "destination": str(inst.path),
+        "precondition": {
+            "destination": "exists",
+            "content_hash": inst.content_hash,
+        },
+        "backup": f"move to state/backups/<apply-id>/{host}/{basename}",
+        "validation": "destination absent after quarantine",
+        "rollback": "restore quarantined copy from backup",
+        "risk": "medium",
+        "approval_required": True,
+    }
 
 
 def build_plan(
@@ -260,11 +338,18 @@ def build_plan(
 
     roots = discover_roots(home=home, project_dir=project_dir)
     user_roots = {r.host: r for r in roots if r.kind == "user"}
+    # Only direct children of a user root are reconcile-managed; skills
+    # nested inside a user folder are reported, never moved or replaced.
     installed: dict[tuple[str, str], object] = {}
+    nested: dict[tuple[str, str], object] = {}
     for root in roots:
         if root.exists and root.kind == "user":
             for skill in scan_installed_root(root):
-                installed[(root.host, Path(skill.directory).name)] = skill
+                key = (root.host, Path(skill.directory).name)
+                if "/" in skill.directory:
+                    nested.setdefault(key, skill)
+                else:
+                    installed[key] = skill
 
     agents = machine_cfg["agents"]
     overrides = machine_cfg["profile_overrides"]
@@ -274,7 +359,12 @@ def build_plan(
 
     operations: list[dict] = []
     occasional_fallbacks: dict[str, str] = {}
+    review_reasons: dict[str, str] = {}
     lock_skills: list[dict] = []
+
+    def review(skill_id, host, source, dest, inst, reason) -> None:
+        operations.append(_review_op(skill_id, host, source, dest, inst))
+        review_reasons[f"{skill_id} -> {host}"] = reason
 
     for pskill in sorted(profile, key=lambda s: s.skill_id):
         if pskill.skill_id in disabled_skills:
@@ -285,30 +375,38 @@ def build_plan(
         entry = catalog.get(pskill.skill_id)
 
         if pskill.state == "excluded":
-            basename = (
-                Path(entry[0].rel_path).name if entry else Path(_skill_suffix(pskill.skill_id)).name
+            basename = _install_name(pskill.skill_id, entry)
+            digest = content_hash(entry[0].repo_path) if entry else None
+            source_id = pskill.skill_id.split(":", 1)[0]
+            release_root = (
+                store_root / "releases" / source_id / _skill_suffix(pskill.skill_id)
             )
             for host in sorted(user_roots):
                 inst = installed.get((host, basename))
                 if inst is None:
+                    other = nested.get((host, basename))
+                    if other is not None and other.root_kind == "user":
+                        review(
+                            pskill.skill_id, host, None, other.path, other,
+                            f"excluded, but a same-named skill is nested at "
+                            f"{other.path}; reconcile only manages direct "
+                            f"children of {user_roots[host].path}",
+                        )
                     continue
-                operations.append({
-                    "skill_id": pskill.skill_id,
-                    "host": host,
-                    "type": "quarantine",
-                    "strategy": None,
-                    "source": None,
-                    "destination": str(inst.path),
-                    "precondition": {
-                        "destination": "exists",
-                        "content_hash": inst.content_hash,
-                    },
-                    "backup": f"move to state/backups/<apply-id>/{host}/{basename}",
-                    "validation": "destination absent after quarantine",
-                    "rollback": "restore quarantined copy from backup",
-                    "risk": "medium",
-                    "approval_required": True,
-                })
+                managed = (
+                    inst.entry_type in ("symlink", "junction")
+                    and _under_releases(store_root, inst.real_path)
+                    and _within(inst.real_path, release_root)
+                )
+                if managed or (digest is not None and inst.content_hash == digest):
+                    operations.append(_quarantine_op(pskill.skill_id, host, inst))
+                else:
+                    review(
+                        pskill.skill_id, host, None, inst.path, inst,
+                        "excluded, but the installed copy is not provably this "
+                        "source's skill (unknown origin or local edits); "
+                        "left in place",
+                    )
             continue
 
         if entry is None:
@@ -319,8 +417,9 @@ def build_plan(
         source_skill, spec, commit = entry
         digest = content_hash(source_skill.repo_path)
         suffix = _skill_suffix(pskill.skill_id)
-        basename = Path(source_skill.rel_path).name
+        basename = install_basename(source_skill)
         release_path = release_dir(store_root, spec.source_id, suffix, commit, digest)
+        unsafe = unsafe_symlinks(source_skill.repo_path)
 
         targets = sorted(
             set(pskill.targets) | set(additional_targets.get(pskill.skill_id, []))
@@ -332,7 +431,7 @@ def build_plan(
         lock_skills.append({
             "skill_id": pskill.skill_id,
             "source_id": spec.source_id,
-            "url": spec.url,
+            "url": gitops.redact_url(spec.url),
             "requested_ref": spec.ref,
             "resolved_commit": commit,
             "skill_path": source_skill.rel_path,
@@ -358,7 +457,21 @@ def build_plan(
                 continue
             dest = root.path / basename
             inst = installed.get((host, basename))
-            if inst is None:
+            is_link = inst is not None and inst.entry_type in ("symlink", "junction")
+            if unsafe:
+                review(
+                    pskill.skill_id, host, str(release_path), dest, inst,
+                    "source skill contains symlinks resolving outside it: "
+                    + ", ".join(unsafe),
+                )
+            elif inst is None and (host, basename) in nested:
+                other = nested[(host, basename)]
+                review(
+                    pskill.skill_id, host, str(release_path), dest, None,
+                    f"a same-named skill already exists nested at {other.path}; "
+                    "installing would give the host two skills with one name",
+                )
+            elif inst is None:
                 operations.append({
                     "skill_id": pskill.skill_id,
                     "host": host,
@@ -373,10 +486,14 @@ def build_plan(
                     "risk": "low",
                     "approval_required": True,
                 })
-            elif (
-                inst.entry_type in ("symlink", "junction")
-                and inst.real_path == release_path.resolve()
-            ):
+            elif is_link and inst.real_path == release_path.resolve():
+                if inst.content_hash != digest:
+                    review(
+                        pskill.skill_id, host, str(release_path), dest, inst,
+                        f"managed release {release_path} was modified in place; "
+                        "its content no longer matches its hash",
+                    )
+                    continue
                 operations.append({
                     "skill_id": pskill.skill_id,
                     "host": host,
@@ -394,9 +511,7 @@ def build_plan(
                     "risk": "none",
                     "approval_required": False,
                 })
-            elif inst.entry_type in ("symlink", "junction") and _under_releases(
-                store_root, inst.real_path
-            ):
+            elif is_link and _under_releases(store_root, inst.real_path):
                 operations.append({
                     "skill_id": pskill.skill_id,
                     "host": host,
@@ -433,44 +548,20 @@ def build_plan(
                     "approval_required": True,
                 })
             else:
-                operations.append({
-                    "skill_id": pskill.skill_id,
-                    "host": host,
-                    "type": "review",
-                    "strategy": None,
-                    "source": str(release_path),
-                    "destination": str(dest),
-                    "precondition": {
-                        "destination": "exists",
-                        "content_hash": inst.content_hash,
-                    },
-                    "backup": None,
-                    "validation": None,
-                    "rollback": None,
-                    "risk": "high",
-                    "approval_required": True,
-                })
+                review(
+                    pskill.skill_id, host, str(release_path), dest, inst,
+                    "installed copy differs from the source (local edits or "
+                    "another origin)",
+                )
 
     prune_skipped: dict[str, list[str]] = {}
     if prune:
         profiled_states: dict[str, str] = {}
         for pskill in profile:
-            entry = catalog.get(pskill.skill_id)
-            basename = (
-                Path(entry[0].rel_path).name if entry
-                else Path(_skill_suffix(pskill.skill_id)).name
-            )
+            basename = _install_name(pskill.skill_id, catalog.get(pskill.skill_id))
             profiled_states[basename] = pskill.state
 
-        kept: set[tuple[str, str]] = set()
-        for op in operations:
-            if op["type"] in ("install", "adopt", "noop", "update", "review"):
-                kept.add((op["host"], Path(op["destination"]).name))
-        already_quarantined = {
-            (op["host"], Path(op["destination"]).name)
-            for op in operations
-            if op["type"] == "quarantine"
-        }
+        planned = {(op["host"], Path(op["destination"]).name) for op in operations}
 
         hash_to_skill: dict[str, str] = {}
         for skill_id, (source_skill, _spec, _commit) in catalog.items():
@@ -479,7 +570,7 @@ def build_plan(
         for (host, basename), inst in sorted(installed.items()):
             if getattr(inst, "root_kind", "user") != "user":
                 continue
-            if (host, basename) in kept or (host, basename) in already_quarantined:
+            if (host, basename) in planned:
                 continue
             state = profiled_states.get(basename)
             if state in ("excluded", "undecided", "protected", "enabled"):
@@ -488,23 +579,7 @@ def build_plan(
             if matched is None:
                 prune_skipped.setdefault(host, []).append(basename)
                 continue
-            operations.append({
-                "skill_id": matched,
-                "host": host,
-                "type": "quarantine",
-                "strategy": None,
-                "source": None,
-                "destination": str(inst.path),
-                "precondition": {
-                    "destination": "exists",
-                    "content_hash": inst.content_hash,
-                },
-                "backup": f"move to state/backups/<apply-id>/{host}/{basename}",
-                "validation": "destination absent after quarantine",
-                "rollback": "restore quarantined copy from backup",
-                "risk": "medium",
-                "approval_required": True,
-            })
+            operations.append(_quarantine_op(matched, host, inst))
         for host in prune_skipped:
             prune_skipped[host] = sorted(prune_skipped[host])
 
@@ -525,18 +600,19 @@ def build_plan(
             ),
         },
         "sources": source_commits,
+        "user_roots": {
+            host: str(root.path) for host, root in sorted(user_roots.items())
+        },
         "operations": operations,
         "notes": {
             "occasional_fallbacks": occasional_fallbacks,
             "prune_skipped": prune_skipped,
+            "review_reasons": review_reasons,
         },
         "lock_proposal": {"schema_version": 1, "skills": lock_skills},
         "summary": {"operations_by_type": dict(sorted(op_counts.items()))},
     }
-    canonical = json.dumps(
-        content, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    plan_id = "plan-" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
+    plan_id = plan_id_for(content)
 
     plan = dict(content)
     plan["plan_id"] = plan_id

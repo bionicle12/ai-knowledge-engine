@@ -1,9 +1,17 @@
 #!/bin/sh
 # `git push` does not fire post-commit, so the index is refreshed here,
-# synchronously (skips instantly when already fresh).
+# synchronously (skips instantly when already fresh). --no-wait: when a
+# background build is still running, the push does not wait for it — that
+# build re-checks once it finishes.
+# Project-specific checks (e.g. a CI gate) belong in .githooks/pre-push.local
+# (executable): it gets git's arguments and the refs on stdin, a non-zero exit
+# blocks the push, and refreshing this file from the template never touches it.
+root=$(git rev-parse --show-toplevel) || exit 0
+if [ -x "$root/.githooks/pre-push.local" ]; then
+    "$root/.githooks/pre-push.local" "$@" || exit $?
+fi
+script="$root/scripts/update-repomix-index.sh"
 # The hook's stdin is the list of refs being pushed — it must NOT leak into
 # the update script, hence </dev/null.
-root=$(git rev-parse --show-toplevel)
-# Not exec: stdin has to be /dev/null for the script, not git's refs.
-"$root/scripts/update-repomix-index.sh" </dev/null
+[ -f "$script" ] && sh "$script" --no-wait </dev/null
 exit 0

@@ -5,7 +5,10 @@ Creates or refreshes:
   * ``knowledge/routing/<section>.md`` for each non-empty top-level section
   * an auto-managed routing block inside ``knowledge/routing-table.md``
 
-Manual content outside the managed root-table block is preserved.
+Manual content outside the managed root-table block is preserved. Pages are
+rewritten only when their content changes (dates and access counters stay
+put otherwise), so a reindex that changes nothing writes nothing — the
+watcher does not see its own writes as edits.
 """
 from __future__ import annotations
 
@@ -17,6 +20,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -24,6 +28,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import kb_common as kbc  # noqa: E402
 
+GENERATOR = "kb_route.py"
 AUTOGEN_BEGIN = "<!-- AUTO-ROUTING:BEGIN -->"
 AUTOGEN_END = "<!-- AUTO-ROUTING:END -->"
 SKIP_SECTIONS = {"routing", "_archive"}
@@ -72,12 +77,17 @@ def _knowledge_pages(root: Path) -> list[Path]:
             continue
         if rel.parts and rel.parts[0] in SKIP_SECTIONS:
             continue
+        if kbc.is_archived(rel.as_posix()):
+            continue
         pages.append(page)
     return pages
 
 
 def _page_title(page: Path) -> str:
-    _meta, body = kbc.read_frontmatter_file(page)
+    try:
+        _meta, body = kbc.read_frontmatter_file(page)
+    except OSError:
+        return _label(page.stem)
     for line in body.splitlines():
         stripped = line.strip()
         if stripped.startswith("#"):
@@ -112,8 +122,8 @@ def _group_pages(root: Path) -> dict[str, list[PageEntry]]:
 def _routing_meta(*, importance: int = 6) -> dict:
     today = _today()
     return {
-        "source": "system: kb_route.py",
-        "generated_by": "kb_route.py",
+        "source": f"system: {GENERATOR}",
+        "generated_by": GENERATOR,
         "extracted_at": today,
         "last_verified": today,
         "confidence": "high",
@@ -127,6 +137,37 @@ def _routing_meta(*, importance: int = 6) -> dict:
         "tags": ["routing", "navigation", "knowledge-base"],
         "supersedes": None,
     }
+
+
+# Keys kb_route decides on its section pages. Everything else — the dates,
+# access counters, keys an agent added — is kept from the existing page.
+OWNED_KEYS = (
+    "source",
+    "generated_by",
+    "confidence",
+    "verification_method",
+    "lifecycle",
+    "importance",
+    "valid_until",
+    "tags",
+    "supersedes",
+)
+
+
+def _write_section_page(page: Path, body: str) -> bool:
+    """Write a generated section page only when its content changed (D9)."""
+    fresh = _routing_meta()
+    if not page.exists():
+        return kbc.write_frontmatter_file(page, fresh, body)
+    meta, old_body = kbc.read_frontmatter_file(page)
+    if old_body.strip() == body.strip() and all(
+        meta.get(key) == fresh[key] for key in OWNED_KEYS
+    ):
+        return False
+    merged = dict(fresh)
+    merged.update((key, value) for key, value in meta.items() if key not in OWNED_KEYS)
+    merged["last_verified"] = fresh["last_verified"]
+    return kbc.write_frontmatter_file(page, merged, body, only_if_changed=True)
 
 
 def _render_section_page(section: str, entries: list[PageEntry]) -> str:
@@ -164,24 +205,39 @@ def _render_root_block(sections: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _upsert_root_table(root: Path, sections: list[str]) -> Path:
+def _upsert_root_table(root: Path, sections: list[str]) -> tuple[bool, str | None]:
+    """Refresh the managed block of routing-table.md.
+
+    Returns ``(written, warning)``. A page whose frontmatter does not parse is
+    left alone: rewriting it would stack a second frontmatter on top.
+    """
     root_table = root / "knowledge" / "routing-table.md"
+    block = _render_root_block(sections)
     if root_table.exists():
-        meta, body = kbc.read_frontmatter_file(root_table)
+        text, _encoding = kbc.read_text_auto(root_table)
+        error = kbc.frontmatter_error(text)
+        if error:
+            return False, (
+                f"{kbc.posix_relpath(root_table, root)} left unchanged: {error}; "
+                "fix its frontmatter and rerun kb_route.py"
+            )
+        meta, body = kbc.parse_frontmatter(text)
     else:
         meta = _routing_meta(importance=8)
         body = "# Routing Table\n"
 
-    block = _render_root_block(sections)
     if AUTOGEN_BEGIN in body and AUTOGEN_END in body:
         pattern = rf"{re.escape(AUTOGEN_BEGIN)}.*?{re.escape(AUTOGEN_END)}"
-        body = re.sub(pattern, block, body, flags=re.S)
+        new_body = re.sub(pattern, lambda _match: block, body, flags=re.S)
     else:
-        body = body.rstrip() + "\n\n" + block + "\n"
+        new_body = body.rstrip() + "\n\n" + block + "\n"
 
-    meta.setdefault("generated_by", "kb_route.py")
-    kbc.write_frontmatter_file(root_table, meta, body.rstrip() + "\n")
-    return root_table
+    if root_table.exists() and new_body.strip() == body.strip() and meta.get("generated_by"):
+        return False, None
+    meta.setdefault("generated_by", GENERATOR)
+    return kbc.write_frontmatter_file(
+        root_table, meta, new_body.rstrip() + "\n", only_if_changed=True
+    ), None
 
 
 def _cleanup_stale_pages(root: Path, active_sections: set[str]) -> list[Path]:
@@ -196,14 +252,14 @@ def _cleanup_stale_pages(root: Path, active_sections: set[str]) -> list[Path]:
             meta, _body = kbc.read_frontmatter_file(page)
         except Exception:  # noqa: BLE001
             continue
-        if meta.get("generated_by") != "kb_route.py":
+        if meta.get("generated_by") != GENERATOR:
             continue
         page.unlink()
         removed.append(page)
     return removed
 
 
-def generate_routes(root: Path) -> dict[str, list[str] | str]:
+def generate_routes(root: Path) -> dict[str, Any]:
     grouped = _group_pages(root)
     ordered_sections = [
         section for section in SECTION_ORDER if grouped.get(section)
@@ -215,24 +271,24 @@ def generate_routes(root: Path) -> dict[str, list[str] | str]:
     routing_dir = root / "knowledge" / "routing"
     routing_dir.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
+    unchanged: list[str] = []
     for section in ordered_sections:
         page = routing_dir / f"{section}.md"
-        kbc.write_frontmatter_file(
-            page,
-            _routing_meta(),
-            _render_section_page(section, grouped[section]),
-        )
-        written.append(kbc.posix_relpath(page, root))
+        changed = _write_section_page(page, _render_section_page(section, grouped[section]))
+        (written if changed else unchanged).append(kbc.posix_relpath(page, root))
 
     removed = [
         kbc.posix_relpath(page, root)
         for page in _cleanup_stale_pages(root, set(ordered_sections))
     ]
-    root_table = _upsert_root_table(root, ordered_sections)
+    root_written, warning = _upsert_root_table(root, ordered_sections)
     return {
-        "root_table": kbc.posix_relpath(root_table, root),
+        "root_table": "knowledge/routing-table.md",
+        "root_table_written": root_written,
         "written": written,
+        "unchanged": unchanged,
         "removed": removed,
+        "warnings": [warning] if warning else [],
     }
 
 
@@ -244,16 +300,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
-    root = args.root or kbc.find_kb_root()
+    root = (args.root or kbc.find_kb_root()).resolve()
+    if not kbc.kb_config_path(root).is_file():
+        kbc.print_err(
+            f"❌ [route] {root} is not a knowledge base (no kb.config.yml); "
+            "pass --root <base>"
+        )
+        return 2
     result = generate_routes(root)
+    for warning in result["warnings"]:
+        kbc.print_err(f"⚠️  [route] {warning}")
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        print(f"Updated {result['root_table']}")
+        state = "updated" if result["root_table_written"] else "unchanged"
+        print(f"{result['root_table']}: {state}")
         for page in result["written"]:
-            print(f"- {page}")
+            print(f"- updated {page}")
         for page in result["removed"]:
             print(f"- removed {page}")
+        if result["unchanged"]:
+            print(f"- {len(result['unchanged'])} routing page(s) unchanged")
     return 0
 
 

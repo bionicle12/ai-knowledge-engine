@@ -1,13 +1,15 @@
-"""Phase 1 CLI: read-only inventory with --json and the exit-code contract.
+"""CLI with --json output and the exit-code contract.
 
-Exit codes (spec §17): 0 success, 2 safe stop on a §19 condition,
-3 drift/precondition failure (unused in Phase 1), 1 any other error.
+Exit codes (spec §17): 0 success, 2 safe stop on a §19 condition (also a
+refused plan or a blocked rollback step), 3 drift/precondition failure,
+1 any other error (including a failed apply operation).
 """
 from __future__ import annotations
 
 import argparse
 import dataclasses
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -345,7 +347,7 @@ def _cmd_reconcile(args) -> int:
     store = resolve_store_root(args.store_root)
 
     if args.apply:
-        record = apply_plan(store, args.apply)
+        record = apply_plan(store, args.apply, home=args.home)
         lines = [f"applied plan {record['plan_id']} as {record['apply_id']}"]
         for result in record["operations"]:
             lines.append(
@@ -371,6 +373,8 @@ def _cmd_reconcile(args) -> int:
             f"  [{op['type']:<10}] {op['skill_id']} -> {op['host']} "
             f"(risk {op['risk']}) {op['destination']}"
         )
+    for key, reason in plan["notes"].get("review_reasons", {}).items():
+        lines.append(f"  review {key}: {reason}")
     for skill_id, note in plan["notes"]["occasional_fallbacks"].items():
         lines.append(f"  note: {skill_id}: {note}")
     for host, skipped in plan["notes"].get("prune_skipped", {}).items():
@@ -378,9 +382,10 @@ def _cmd_reconcile(args) -> int:
             f"  prune skipped on {host} (unknown/modified origin, untouched): "
             + ", ".join(skipped)
         )
+    home_opt = f" --home {shlex.quote(str(args.home))}" if args.home else ""
     lines.append(
         "dry run only; nothing was changed. Apply with: "
-        f"reconcile --apply {plan['plan_id']}"
+        f"reconcile --apply {plan['plan_id']}{home_opt}"
     )
     _emit(plan, args.json, lines)
     return 0
@@ -630,7 +635,9 @@ def main(argv: list[str] | None = None) -> int:
     ssub = source_p.add_subparsers(dest="source_command", required=True)
     add_p = ssub.add_parser("add", help="clone and register a source")
     add_p.add_argument("url")
-    add_p.add_argument("--id", default=None)
+    add_p.add_argument("--id", default=None,
+                       help="source id: lowercase letters, digits, '.', '_', '-' "
+                            "(default: derived from the URL)")
     add_p.add_argument("--ref", default=None)
     _add_store_opts(add_p)
     add_p.set_defaults(handler=_cmd_source_add)
