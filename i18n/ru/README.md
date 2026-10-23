@@ -410,7 +410,7 @@ Launcher автоматически находит исходный репози
 
 ## Ролевые шаблоны
 
-Full mode включает 16 стартовых конфигураций в [`knowledge-base/examples/`](../../knowledge-base/examples/):
+Full mode включает 17 стартовых конфигураций в [`knowledge-base/examples/`](../../knowledge-base/examples/):
 
 | Шаблон | Роль | Основные задачи |
 |---|---|---|
@@ -422,6 +422,7 @@ Full mode включает 16 стартовых конфигураций в [`k
 | [`fiction-writer.yml`](../../knowledge-base/examples/fiction-writer.yml) | Писатель | Теория писательского мастерства, голос, развитие сюжета, разбор черновиков |
 | [`founder.yml`](../../knowledge-base/examples/founder.yml) | Основатель стартапа | Продукт, инвесторы, найм, решения, развитие компании |
 | [`marketing-director.yml`](../../knowledge-base/examples/marketing-director.yml) | Директор по маркетингу | Стратегия, бренд, кампании, анализ аудитории |
+| [`mmo-game-developer.yml`](../../knowledge-base/examples/mmo-game-developer.yml) | Full-Stack MMO-разработчик и продюсер | Геймдизайн MMO, экономика, донат-монетизация, баланс, техстек/netcode, продвижение и LiveOps |
 | [`music-video-director.yml`](../../knowledge-base/examples/music-video-director.yml) | Режиссёр-сценарист музыкальных клипов | Тритменты, производство, планирование кадров, ритм монтажа |
 | [`product-manager.yml`](../../knowledge-base/examples/product-manager.yml) | Продакт-менеджер | Приоритизация, метрики, исследования, продуктовые требования |
 | [`programmer-senior.yml`](../../knowledge-base/examples/programmer-senior.yml) | Senior Software Engineer | Архитектура, отладка, знания о стеке, инженерные принципы |
@@ -510,7 +511,7 @@ ai-knowledge-engine/
 │   ├── scripts/                эталонный Python-конвейер и тесты
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              шаблоны конфигов, агента, структуры и зависимостей
-│   └── examples/               16 ролевых шаблонов
+│   └── examples/               17 ролевых шаблонов
 ├── scripts/                    обновления, проверка переводов, обслуживание репозитория
 ├── tools/ai-skills-fixer/      инвентаризация, аудит и синхронизация AI-скиллов между IDE
 ├── i18n/ru/                    русская документация и набор инструкций

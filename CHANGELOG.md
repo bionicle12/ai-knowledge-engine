@@ -85,6 +85,10 @@ loss, privacy leaks and non-converging upgrades found by the 2026-09-23 audit
 - Lite: a `post-checkout` hook, the `.githooks/<hook>.local` extension point,
   `update-repomix-index.sh --check`, a coverage report (`coverage_ignore`) and
   `quick-start/.gitattributes`.
+- Role template `knowledge-base/examples/mmo-game-developer.yml` for full-stack
+  MMO game development, game design, economy/monetization/balance modeling,
+  netcode/server architecture, LiveOps/UA, and feature triage across active
+  projects.
 
 ### Changed
 - **`kb.config.yml` is edited line by line everywhere** (`kb_common.config_set`,

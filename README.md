@@ -408,7 +408,7 @@ you can close. Full cycle and the five stages:
 
 ## Role blueprints
 
-Full mode includes 16 starting configurations in [`knowledge-base/examples/`](knowledge-base/examples/):
+Full mode includes 17 starting configurations in [`knowledge-base/examples/`](knowledge-base/examples/):
 
 | Template | Role | Focus |
 |---|---|---|
@@ -420,6 +420,7 @@ Full mode includes 16 starting configurations in [`knowledge-base/examples/`](kn
 | [`fiction-writer.yml`](knowledge-base/examples/fiction-writer.yml) | Fiction writer | Craft theory, voice studies, story development, draft critique |
 | [`founder.yml`](knowledge-base/examples/founder.yml) | Startup founder | Product, investors, hiring, decisions, company building |
 | [`marketing-director.yml`](knowledge-base/examples/marketing-director.yml) | Marketing Director | Strategy, brand, campaigns, audience analysis |
+| [`mmo-game-developer.yml`](knowledge-base/examples/mmo-game-developer.yml) | Full-Stack MMO Game Developer & Producer | MMO game design, economy, monetization, balance, netcode/tech stack, LiveOps & UA |
 | [`music-video-director.yml`](knowledge-base/examples/music-video-director.yml) | Music video writer-director | Treatments, production, shot planning, edit rhythm |
 | [`product-manager.yml`](knowledge-base/examples/product-manager.yml) | Product Manager | Prioritization, metrics, research, product requirements |
 | [`programmer-senior.yml`](knowledge-base/examples/programmer-senior.yml) | Senior Software Engineer | Architecture, debugging, stack knowledge, engineering principles |
@@ -504,7 +505,7 @@ ai-knowledge-engine/
 │   ├── scripts/                Python reference pipeline and tests
 │   ├── shell/                  macOS/Linux wrappers + Windows launchers
 │   ├── templates/              config, agent, structure, and dependency templates
-│   └── examples/               16 role blueprints
+│   └── examples/               17 role blueprints
 ├── scripts/                    upgrades, translation checks, repository maintenance
 ├── tools/ai-skills-fixer/      cross-IDE AI skill inventory, audit, and reconciliation
 ├── i18n/ru/                    Russian documentation and instruction set

@@ -21,6 +21,7 @@ REQUESTED_ROLE_TEMPLATES = {
     "viral-short-form-veo.yml": "Viral short-form video director (TikTok / Veo3)",
     "russian-software-engineering-student.yml": "Software engineering student in Russia",
     "startup-opportunity-explorer.yml": "Startup Opportunity Explorer",
+    "mmo-game-developer.yml": "Full-Stack MMO Game Developer & Producer",
 }
 
 
